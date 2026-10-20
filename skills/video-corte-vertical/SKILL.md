@@ -1,57 +1,58 @@
 ---
 name: video-corte-vertical
-description: Gera corte vertical 9:16 (1080x1920) de pregação para Reels/Shorts, com a janela acompanhando o pregador (detecção de rosto + suavização tipo operador de câmera) e legenda queimada. Também sugere, a partir da transcrição, os melhores trechos para corte (cristológicos, aplicação prática, frases marcantes; filtra triunfalismo, alegoria e teologia frágil). Use quando o usuário pedir corte vertical, Reels, Shorts, TikTok, "janela seguindo o pregador", "sugerir cortes" ou "melhores trechos" de um vídeo de culto.
+description: Gera cortes verticais 9:16 (1080x1920) de pregação para Reels/Shorts com edição dinâmica palavra a palavra — colagem de trechos de uma ideia, remoção de hesitações e pausas, janela acompanhando o pregador e legenda amarela sincronizada por palavra. Sugere as melhores ideias a partir da transcrição (cristológicas, aplicação prática, frases marcantes; filtra triunfalismo, alegoria e teologia frágil). Use quando o usuário pedir corte vertical, Reels, Shorts, TikTok, "sugerir cortes" ou "melhores trechos" de uma pregação.
 ---
 
-# Corte vertical que acompanha o pregador
+# Cortes verticais com edição dinâmica
 
-## Entradas
+Segunda etapa do fluxo. A primeira é `video-cortar-pregacao`, que gera a pasta da pregação:
 
-- **Fonte**: vídeo original do culto (não o corte horizontal da pregação).
-- **Trecho**: início e fim com milissegundos (`HH:MM:SS.mmm`).
-- **Legenda** (opcional): `.srt` com tempos relativos ao corte (começando em 00:00:00). Se o usuário der o `.srt`/`.txt` do culto inteiro, extraia os blocos do trecho, desloque para 00:00:00, descarte vazios, aplique as correções pedidas e **mostre o texto antes de queimar**.
-- **Pasta de saída**: se não informada, `~/Movies/Pregações` (avise).
-- **Nome**: o que o usuário pedir; se não pedir, gere sem perguntar `corte - <frase marcante do trecho>.mp4` (curta, com maiúscula inicial). Salve direto, sem confirmar. Se já existir, o script usa `-v2`, `-v3`… automaticamente (nunca sobrescreve); informe o nome final impresso em `pronto:`.
+```
+~/Videos/Pregações/AAAA-MM-DD - Título - Referência/
+  <pasta>.mp4      pregação horizontal
+  palavras.json    transcrição por palavra (tempos do .mp4)
+  roteiros/        um .json por corte
+  cortes/          resultado
+```
 
-Se faltar a fonte, pergunte. Se faltar o trecho, vá para a etapa 0.
-
-## 0. Sugerir cortes (quando o usuário não informar o trecho)
-
-Siga `sugerir-cortes.md` (critérios e processo) e calibre com `exemplos.md`. Apresente 3–5 opções com tempos, espere o usuário escolher e só então siga para o fluxo abaixo. Registre a decisão em `exemplos.md`.
+Roda no **leitao**, no repositório `~/cortes-pregacao` (`uv run cortes …`). Se a pasta não existir ou não tiver `palavras.json`, rode a primeira etapa antes.
 
 ## Fluxo
 
-1. Confirme a fonte com `ffprobe` (resolução, fps, duração). Se der `Operation not permitted` em `~/Downloads`, é TCC do macOS: o terminal precisa de Acesso Total ao Disco.
-2. Rode o script **em background** (detecção leva ~5 s de processamento por segundo de vídeo em 720p):
-   ```
-   python3 ~/.claude/skills/video-corte-vertical/vertical.py \
-     --fonte "<vídeo>" --ini 01:00:51.300 --fim 01:02:22.910 \
-     --srt "<legenda.srt>" --saida "<pasta>/<nome>.mp4" \
-     --trabalho "<scratchpad>/vertical"
-   ```
-   Use `--srt-offset -0.3` etc. se a legenda estiver deslocada em relação ao corte.
-   Se houver mais de uma pessoa em pé (testemunho, entrevista), olhe um quadro do original e passe `--alvo 0.7` (posição horizontal de quem fala, 0 = esquerda, 1 = direita); sem isso o script segue o maior rosto.
-3. Leia o resumo impresso: quadros com detecção, cortes de cena, distância máxima pregador-centro. Se a distância máxima chegar perto da meia janela, aumente `VMAX`/`GAIN` no topo do script e rode de novo (o cache `dets.json` no `--trabalho` evita refazer a detecção; o recorte é refeito).
-4. **Verificação visual obrigatória**: extraia 6 quadros espalhados (inclua momentos em que ele anda) e olhe:
-   ```
-   ffmpeg -i "<saída>" -vf "select='eq(n\,90)+eq(n\,600)+…',scale=270:480,tile=6x1" -frames:v 1 check.png
-   ```
-   Pregador enquadrado com rosto livre? Legenda legível e abaixo do rosto? Se não, ajuste e refaça.
-5. `ffprobe`: vídeo H.264 1080x1920, áudio AAC, duração. Opcional: loudness com `-af ebur128`.
-6. Relate: duração final, resolução de origem (e o fator de ampliação; 720p → 2,67×, fica mais suave), estatísticas do rastreamento, caminho do arquivo.
+1. **Sugerir ideias e montar roteiros** seguindo `sugerir-cortes.md` (critérios, salvaguardas da colagem e formato do roteiro), calibrado por `exemplos.md`. Cada ideia vira um roteiro em `roteiros/` e passa pelo `cortes preview` sem avisos.
 
-## O que o script faz
+2. **Aprovação obrigatória do roteiro em texto.** Mostre a saída do `preview` de cada ideia. O usuário pode aprovar várias de uma vez, pedir ajustes (tirar/incluir frase, trocar gancho) ou rejeitar. Ajuste o `.json`, rode `preview` de novo e mostre. Nada é renderizado sem aprovação.
 
-- Recorta o trecho reencodando (sem `-c copy`) e trabalha sobre ele.
-- Detecção por quadro: Haar (rosto frontal + perfil, OpenCV) com HOG (corpo) como reserva. Corte de cena por histograma HSV.
-- Mesma pessoa: inicia no maior rosto na parte de cima do quadro e segue por continuidade (ignora cabeças da plateia na parte inferior); sem detecção mantém a última posição.
-- Suavização: mediana → Savitzky-Golay (91 quadros) → zona morta ±45 px + velocidade/aceleração limitadas → Savitzky-Golay leve. Em corte de cena reposiciona de uma vez.
-- Janela 9:16 com altura total, presa aos limites do quadro, recorte subpixel (warpAffine Lanczos) escalado para 1080x1920. Sem fundo desfocado.
-- Legenda: Arial Bold 76 px, branca, contorno preto, até 2 linhas (quebra equilibrada), topo em y=1370 (terço inferior). Renderizada com Pillow e composta no quadro: o ffmpeg do Homebrew aqui não tem libass/drawtext.
-- Codificação: H.264 CRF 18 preset medium, AAC 192k, loudnorm -14 LUFS, `+faststart`. **Sem fades.**
+3. **Renderizar** cada roteiro aprovado, em background (≈ 2–4 min por corte):
+   ```
+   cortes short "<pasta>/roteiros/<slug>.json" --dir "<pasta>"
+   ```
+   Com mais de uma pessoa em pé (entrevista, testemunho), olhe um quadro e passe `--alvo 0.7` (posição horizontal de quem fala, 0 = esquerda).
+
+4. **Verificação visual obrigatória** de cada corte: 6 quadros espalhados, incluindo emendas entre trechos:
+   ```
+   ffmpeg -i "<corte>" -vf "select='eq(n\,90)+eq(n\,600)+…',scale=270:480,tile=6x1" -frames:v 1 check.png
+   ```
+   Pregador enquadrado com o rosto livre? Legenda legível, abaixo do rosto? Se não, ajuste e refaça.
+
+5. **Relatar**: duração, número de emendas, hesitações removidas, caminho, e o comando para trazer o arquivo:
+   ```
+   scp "leitao:Videos/Pregações/<pasta>/cortes/*.mp4" ~/Movies/Pregações/
+   ```
+   Lembre o usuário de assistir antes de publicar. Registre a decisão em `exemplos.md`.
+
+## O que a ferramenta faz
+
+- **Limpeza** (conservadora): remove "hã", "hum", "né", "é…"/"então…" arrastados e gaguejo de palavra curta ("o, o Senhor"). Repetição retórica ("santo, santo, santo") fica.
+- **Pausas**: depois de fim de frase ficam até 0,4 s (respiro antes da próxima ideia); demais pausas, 0,15 s.
+- **Emendas**: corte seco, no quadro mais silencioso perto da fronteira; fade-out/in de 15 ms no áudio contra estalos. Áudio e vídeo nunca dessincronizam.
+- **Enquadramento**: detecção de rosto (Haar) com corpo (HOG) como reserva; segue a mesma pessoa por continuidade, ignora cabeças da plateia; suavização tipo operador de câmera. Em troca de trecho do roteiro a janela reposiciona de uma vez.
+- **Legenda**: blocos de até 2 linhas, amarela (#FFE14D), 60 px, contorno preto e sombra, no terço inferior; cada bloco entra na primeira palavra e sai na próxima.
+- **Codificação**: H.264 CRF 18, AAC 192k, loudnorm −14 LUFS, `+faststart`. Nunca sobrescreve: usa `-v2`, `-v3`…
 
 ## Regras
 
-- Não apague nem altere o vídeo original.
-- Não instale pacotes sem perguntar (opencv, scipy, numpy e Pillow já estão no Python do pyenv).
-- Arquivos intermediários no scratchpad, nunca na pasta de saída.
+- Não apague nem altere a pregação, `palavras.json` ou roteiros aprovados sem perguntar.
+- Intermediários ficam em `<pasta>/trabalho/`.
+- Avaliação teológica é sugestão; publicar é decisão do usuário, após assistir.
+- Sem nomes de pessoas em `exemplos.md` (LGPD).

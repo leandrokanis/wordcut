@@ -13,15 +13,16 @@ JOIN_FADE_S = 0.015
 which would shorten each join and drift lips out of sync."""
 
 
-def assemble(source: Path, clips: Sequence[Clip], output: Path) -> Path:
-    subprocess.run(montage_command(source, clips, output), check=True)
+def assemble(source: Path, clips: Sequence[Clip], output: Path, fps: float) -> Path:
+    subprocess.run(montage_command(source, clips, output, fps), check=True)
     return output
 
 
-def montage_command(source: Path, clips: Sequence[Clip], output: Path) -> list[str]:
+def montage_command(source: Path, clips: Sequence[Clip], output: Path, fps: float) -> list[str]:
     """ffmpeg arguments; ``output`` is a near-lossless intermediate (``.mov``).
 
-    Each clip is its own seeked input, so ffmpeg decodes only what is used.
+    Each clip is its own seeked input, so ffmpeg decodes only what is used. The
+    frame rate is set explicitly: concat otherwise falls back to 25 fps.
     """
     if not clips:
         raise ValueError("timeline sem clipes")
@@ -40,7 +41,7 @@ def montage_command(source: Path, clips: Sequence[Clip], output: Path) -> list[s
     return [
         "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
         *inputs,
-        "-filter_complex", graph, "-map", "[v]", "-map", "[a]",
+        "-filter_complex", graph, "-map", "[v]", "-map", "[a]", "-r", f"{fps:g}",
         "-c:v", "libx264", "-crf", "12", "-preset", "fast", "-c:a", "pcm_s16le",
         str(output),
     ]  # fmt: skip

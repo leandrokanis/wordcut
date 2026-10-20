@@ -36,11 +36,15 @@ class EditList:
             raise ValueError("roteiro sem trechos")
 
     def reordered(self) -> list[int]:
-        """Indexes of segments that start before the previous one (out of order)."""
+        """Indexes of segments taken from further ahead in the sermon.
+
+        A segment is out of order when some later segment comes from earlier in
+        the sermon — typically a hook lifted from the conclusion. These are the
+        segments whose ``note`` must justify that the meaning is preserved.
+        """
+        starts = [segment.start for segment in self.segments]
         return [
-            i
-            for i in range(1, len(self.segments))
-            if self.segments[i].start < self.segments[i - 1].start
+            i for i, start in enumerate(starts) if any(later < start for later in starts[i + 1 :])
         ]
 
     def to_json(self) -> dict[str, Any]:

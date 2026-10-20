@@ -75,5 +75,15 @@ def test_segments_can_be_reordered_and_are_marked() -> None:
     timeline = plan_timeline(edit_list, words, FPS)
 
     assert [w.text for w in timeline.output_words()] == ["depois.", "antes."]
-    assert edit_list.reordered() == [1]
+    assert edit_list.reordered() == [0]
     assert timeline.segment_starts() == [pytest.approx(timeline.clips[0].duration)]
+
+
+def test_hook_from_conclusion_is_the_reordered_segment() -> None:
+    edit_list = edit((40.0, 44.0), (14.0, 39.0), (45.0, 90.0))
+
+    assert edit_list.reordered() == [0]
+
+
+def test_chronological_edit_list_has_no_reorder() -> None:
+    assert edit((1.0, 2.0), (5.0, 6.0)).reordered() == []

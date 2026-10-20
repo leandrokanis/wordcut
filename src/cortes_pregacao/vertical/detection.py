@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -12,6 +13,8 @@ import numpy as np
 from cv2.typing import MatLike
 
 SCENE_CUT_DISTANCE = 0.35  # Bhattacharyya distance between HSV histograms
+FACE_SEARCH_WIDTH = 960  # faces are searched on a downscaled frame; the preacher stays large
+DETECTION_STRIDE = 3  # detect people every 3rd frame; the camera smooths over ~3 s anyway
 HOG_WIDTH = 640
 MIN_FACE_PX = 20
 
@@ -44,8 +47,9 @@ class PeopleDetector:
         self._hog.setSVMDetector(people)
 
     def detect(self, frame: Frame) -> tuple[Detection, ...]:
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        faces = self._faces(gray)
+        scale = min(1.0, FACE_SEARCH_WIDTH / frame.shape[1])
+        gray = cv2.cvtColor(cv2.resize(frame, None, fx=scale, fy=scale), cv2.COLOR_BGR2GRAY)
+        faces = tuple(_rescale(face, scale) for face in self._faces(gray))
         return faces if faces else self._bodies(frame)
 
     def _faces(self, gray: Frame) -> tuple[Detection, ...]:
@@ -73,6 +77,12 @@ class PeopleDetector:
         )
 
 
+def _rescale(detection: Detection, scale: float) -> Detection:
+    return Detection(
+        detection.x / scale, round(detection.size / scale), detection.kind, detection.head_y / scale
+    )
+
+
 class SceneCutDetector:
     def __init__(self) -> None:
         self._previous: Frame | None = None
@@ -88,18 +98,38 @@ class SceneCutDetector:
         return bool(distance > SCENE_CUT_DISTANCE)
 
 
-def detect_frames(video: Path, cache: Path | None = None) -> list[FrameDetections]:
-    """Detections for every frame of ``video``; cached as JSON when ``cache`` is given."""
+Progress = Callable[[int, int], None]
+"""Called with (frames done, total frames)."""
+
+
+def detect_frames(
+    video: Path,
+    cache: Path | None = None,
+    stride: int = DETECTION_STRIDE,
+    progress: Progress | None = None,
+) -> list[FrameDetections]:
+    """Detections for every frame of ``video``; cached as JSON when ``cache`` is given.
+
+    People are detected every ``stride`` frames and on every scene cut; frames
+    in between reuse the last detection. Scene cuts are checked on every frame.
+    """
     if cache and cache.exists():
         return _load(cache)
     people, scenes = PeopleDetector(), SceneCutDetector()
     capture = cv2.VideoCapture(str(video))
+    total = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
     frames: list[FrameDetections] = []
+    last: tuple[Detection, ...] = ()
     while True:
         ok, frame = capture.read()
         if not ok:
             break
-        frames.append(FrameDetections(scenes.is_cut(frame), people.detect(frame)))
+        cut = scenes.is_cut(frame)
+        if cut or len(frames) % stride == 0:
+            last = people.detect(frame)
+        frames.append(FrameDetections(cut, last))
+        if progress:
+            progress(len(frames), total)
     capture.release()
     if cache:
         cache.write_text(json.dumps([asdict(f) for f in frames]), encoding="utf-8")

@@ -32,27 +32,40 @@ Bônus (somam, não bastam sozinhos):
 
 ## 3. Formato — funciona como corte?
 
-- **Duração** 30–90 s (ideal 45–75 s).
+- **Duração final** (depois da limpeza) 40–75 s, ideal 55–65 s. A limpeza tira ~15–20% do tempo bruto.
 - **Gancho**: os primeiros 3 s prendem — pergunta, afirmação forte, contraste. Nada de "como eu disse antes", "então", "e aí".
 - **Autônomo**: entendível sem o que veio antes.
+- **Colagem**: uma ideia que se desenvolve por vários minutos pode virar um corte juntando trechos dela. Corte sempre entre frases completas quando possível; dentro da frase, só para tirar uma oração intercalada sem mudar o sentido.
 - **Fechamento**: termina numa conclusão natural, não no meio do raciocínio.
 - **Limpo**: pouca leitura bíblica longa, sem avisos, sem música, sem interação com a plateia ("vira pro irmão do lado").
 
+## Colagem e reordenação — salvaguardas
+
+Reordenar é permitido (ex.: gancho tirado da conclusão), mas é onde mora o risco de distorção:
+
+- Todo trecho fora de ordem leva uma `note` justificando por que o sentido se mantém. O `preview` marca com `↑` e avisa se faltar.
+- Nunca emende de forma que mude uma afirmação: nada de juntar sujeito de uma frase com predicado de outra, nem de tirar "não", "mas", "se" ou uma condição.
+- Releia o **texto montado** (saída do `preview`) com os filtros da camada 1, especialmente "fora de contexto". O texto montado é o que o público vai ouvir.
+
 ## Processo
 
-1. Gere a transcrição com tempos: `python3 -I ~/.claude/skills/video-corte-vertical/transcricao.py "<legenda.vtt>" "<scratchpad>/transcricao.txt"`. Se só houver o vídeo do YouTube, baixe a legenda com `yt-dlp --skip-download --write-auto-subs --sub-langs "pt-orig,pt" --sub-format vtt` (se pedir verificação de bot, `--cookies-from-browser chrome`).
-2. Localize início e fim da pregação (ignore louvor, avisos, ofertório, Ceia conduzida por outra pessoa).
-3. Leia a pregação inteira antes de escolher — o contexto é o que pega o "fora de contexto".
-4. Consulte `exemplos.md` para calibrar com decisões anteriores.
-5. Selecione 3–5 candidatos. Tempos: início na primeira palavra do gancho menos ~0,3 s; fim na última palavra do fechamento mais ~0,5 s (tempos por palavra estão na transcrição).
-6. Apresente:
+1. Leia a pregação inteira: `cortes overview "<pasta>/palavras.json"`. O contexto é o que pega o "fora de contexto".
+2. Consulte `exemplos.md` para calibrar com decisões anteriores.
+3. Identifique 3–5 **ideias** fortes. Para cada uma, monte um roteiro (trechos que juntos contam a ideia em 55–65 s).
+4. Tempos dos trechos: `cortes overview … --words --start … --end …`. Cada trecho vai do **início** da primeira palavra ao **fim** da última (a ferramenta acrescenta as margens). Uma palavra só entra se estiver inteira dentro do trecho.
+5. Grave cada roteiro em `<pasta>/roteiros/<slug>.json`:
+   ```json
+   {"version": 1, "title": "Frase marcante curta",
+    "segments": [{"start": 2440.6, "end": 2444.5, "note": "gancho da conclusão; mesma tese"},
+                 {"start": 2414.05, "end": 2439.7, "note": ""}]}
+   ```
+6. Rode `cortes preview <roteiro> --dir <pasta>` para cada um e ajuste até não haver avisos.
+7. Apresente uma tabela e, para cada ideia, a saída do `preview` (trechos, cortes `[–hesitação–]`, texto montado):
 
-| # | Início–fim | Duração | Gancho (primeiras palavras) | Resumo | Valor | Alertas |
+| # | Ideia | Duração | Gancho | Valor | Trechos | Alertas |
 |---|---|---|---|---|---|---|
 
-   - **Valor**: qual critério da camada 2 atende.
-   - **Alertas**: algo limítrofe (ex.: aplicação boa logo depois de uma alegoria; transcrição automática duvidosa num trecho-chave).
-   - Depois da tabela, liste 1–2 **trechos descartados** que pareciam atraentes, com o motivo — mostra o critério em ação.
-7. Lembre: a avaliação é sugestão; a decisão teológica e a publicação são do usuário, após assistir ao trecho.
-8. Quando o usuário escolher/rejeitar, registre em `exemplos.md` (curto: tempo, gancho resumido, decisão, motivo). Não registre nomes de pessoas.
-9. Siga para o fluxo do corte vertical com o trecho escolhido.
+   - **Valor**: critério da camada 2. **Alertas**: algo limítrofe, transcrição duvidosa num trecho-chave, reordenação.
+   - Depois, 1–2 **trechos descartados** que pareciam atraentes, com o motivo.
+8. A avaliação é sugestão; a decisão teológica e a publicação são do usuário, após assistir.
+9. Registre escolhas/rejeições em `exemplos.md` (curto: tempo, gancho, decisão, motivo). Sem nomes de pessoas.

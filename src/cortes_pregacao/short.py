@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -81,19 +82,35 @@ def render_short(folder: SermonFolder, plan: ShortPlan, target: float | None = N
     folder.create()
     work = folder.work / _slug(plan.edit_list.title)
     work.mkdir(parents=True, exist_ok=True)
-    montage = assemble(folder.sermon_video, plan.timeline.clips, work / "montagem.mov")
 
+    _report(f"1/4 montando {len(plan.timeline.clips)} clipes ({plan.timeline.duration:.1f} s)")
+    montage = assemble(folder.sermon_video, plan.timeline.clips, work / "montagem.mov", plan.fps)
     width, height, fps = video_geometry(montage)
-    frames = detect_frames(montage)
+    if abs(fps - plan.fps) > 0.01:
+        raise RuntimeError(f"montagem saiu com {fps:g} fps; a pregação tem {plan.fps:g}")
+
+    _report("2/4 detectando o pregador")
+    frames = detect_frames(montage, progress=_progress_bar)
     forced_cuts = [round(t * fps) for t in plan.timeline.segment_starts()]
     camera = plan_camera(frames, width, height, target, forced_cuts)
 
+    _report("3/4 preparando legendas")
     renderer = CaptionRenderer(OUTPUT_WIDTH)
     captions = build_captions(plan.timeline.output_words(), renderer.measure)
     images = [renderer.render(caption) for caption in captions]
 
+    _report("4/4 renderizando 1080x1920")
     output = _unique(folder.path / "cortes" / f"corte - {_clean_title(plan.edit_list.title)}.mp4")
     return render_vertical(montage, camera, images, DEFAULT_STYLE.top, fps, output)
+
+
+def _report(message: str) -> None:
+    print(message, file=sys.stderr, flush=True)
+
+
+def _progress_bar(done: int, total: int) -> None:
+    if total and (done % 150 == 0 or done == total):
+        print(f"   {done}/{total} quadros", file=sys.stderr, flush=True)
 
 
 def _unique(path: Path) -> Path:
