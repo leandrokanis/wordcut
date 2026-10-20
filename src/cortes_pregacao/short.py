@@ -1,0 +1,112 @@
+"""A vertical short from a sermon folder and an approved edit list."""
+
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass
+from pathlib import Path
+
+from cortes_pregacao.edit.assemble import assemble
+from cortes_pregacao.edit.edit_list import EditList
+from cortes_pregacao.edit.energy import EnergyProfile
+from cortes_pregacao.edit.timeline import Timeline, plan_timeline
+from cortes_pregacao.media import video_geometry
+from cortes_pregacao.sermon_folder import SermonFolder
+from cortes_pregacao.timefmt import format_timestamp
+from cortes_pregacao.transcript import Transcript, Word
+from cortes_pregacao.vertical.camera import plan_camera
+from cortes_pregacao.vertical.captions import DEFAULT_STYLE, CaptionRenderer, build_captions
+from cortes_pregacao.vertical.detection import detect_frames
+from cortes_pregacao.vertical.render import OUTPUT_WIDTH, render_vertical
+
+IDEAL_DURATION_S = (55.0, 65.0)
+ALLOWED_DURATION_S = (40.0, 75.0)
+
+
+@dataclass(frozen=True)
+class ShortPlan:
+    edit_list: EditList
+    timeline: Timeline
+    fps: float
+
+    def warnings(self) -> list[str]:
+        problems: list[str] = []
+        low, high = ALLOWED_DURATION_S
+        if not low <= self.timeline.duration <= high:
+            problems.append(
+                f"duração {self.timeline.duration:.1f} s fora de {low:.0f}–{high:.0f} s"
+            )
+        for index in self.edit_list.reordered():
+            if not self.edit_list.segments[index].note.strip():
+                problems.append(f"trecho {index + 1} fora de ordem sem justificativa")
+        return problems
+
+
+def plan_short(folder: SermonFolder, edit_list: EditList, use_audio: bool = True) -> ShortPlan:
+    _, _, fps = video_geometry(folder.sermon_video)
+    words = Transcript.load(folder.words).words
+    energy = EnergyProfile.from_media(folder.sermon_video) if use_audio else None
+    return ShortPlan(edit_list, plan_timeline(edit_list, words, fps, energy), fps)
+
+
+def preview(plan: ShortPlan) -> str:
+    """The roteiro as the approver reads it: segments, cuts and the assembled text."""
+    lines = [f'Roteiro: "{plan.edit_list.title}"  ~{plan.timeline.duration:.0f} s', ""]
+    reordered = set(plan.edit_list.reordered())
+    removed = {(w.start, w.text) for w in plan.timeline.removed}
+    for index, segment in enumerate(plan.edit_list.segments):
+        arrow = "↑" if index in reordered else " "
+        span = f"{format_timestamp(segment.start)}–{format_timestamp(segment.end)}"
+        lines.append(f"{index + 1}. {span} {arrow}")
+        if segment.note:
+            lines.append(f"   └ {segment.note}")
+        texts = [
+            f"[–{w.text}–]" if (w.start, w.text) in removed else w.text
+            for w in _segment_words(plan, index)
+        ]
+        lines.append("   " + " ".join(texts))
+    lines += ["", "Texto montado:", " ".join(w.text for w in plan.timeline.output_words())]
+    lines += [f"\n⚠ {problem}" for problem in plan.warnings()]
+    return "\n".join(lines)
+
+
+def _segment_words(plan: ShortPlan, index: int) -> list[Word]:
+    kept = [w for clip in plan.timeline.clips if clip.segment == index for w in clip.words]
+    segment = plan.edit_list.segments[index]
+    dropped = [w for w in plan.timeline.removed if segment.start <= w.start <= segment.end]
+    return sorted([*kept, *dropped], key=lambda w: w.start)
+
+
+def render_short(folder: SermonFolder, plan: ShortPlan, target: float | None = None) -> Path:
+    work = folder.work / _slug(plan.edit_list.title)
+    work.mkdir(parents=True, exist_ok=True)
+    montage = assemble(folder.sermon_video, plan.timeline.clips, work / "montagem.mov")
+
+    width, height, fps = video_geometry(montage)
+    frames = detect_frames(montage)
+    forced_cuts = [round(t * fps) for t in plan.timeline.segment_starts()]
+    camera = plan_camera(frames, width, height, target, forced_cuts)
+
+    renderer = CaptionRenderer(OUTPUT_WIDTH)
+    captions = build_captions(plan.timeline.output_words(), renderer.measure)
+    images = [renderer.render(caption) for caption in captions]
+
+    output = _unique(folder.path / "cortes" / f"corte - {_clean_title(plan.edit_list.title)}.mp4")
+    return render_vertical(montage, camera, images, DEFAULT_STYLE.top, fps, output)
+
+
+def _unique(path: Path) -> Path:
+    """``name.mp4``, else ``name-v2.mp4``, ``name-v3.mp4``… — never overwrite."""
+    candidate, version = path, 2
+    while candidate.exists():
+        candidate = path.with_name(f"{path.stem}-v{version}{path.suffix}")
+        version += 1
+    return candidate
+
+
+def _clean_title(title: str) -> str:
+    return re.sub(r'[/\\:*?"<>|]', "", title).strip()
+
+
+def _slug(title: str) -> str:
+    return re.sub(r"[^\w]+", "-", title.lower()).strip("-") or "corte"

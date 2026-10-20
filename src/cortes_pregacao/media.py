@@ -40,6 +40,18 @@ def duration_seconds(media: Path) -> float:
     return float(_probe_format(media)["duration"])
 
 
+def video_geometry(media: Path) -> tuple[int, int, float]:
+    """Width, height and frame rate of the first video stream."""
+    result = subprocess.run(
+        ["ffprobe", "-v", "error", "-select_streams", "v:0",
+         "-show_entries", "stream=width,height,r_frame_rate", "-of", "json", str(media)],
+        check=True, capture_output=True, text=True,
+    )  # fmt: skip
+    stream = json.loads(result.stdout)["streams"][0]
+    numerator, denominator = stream["r_frame_rate"].split("/")
+    return int(stream["width"]), int(stream["height"]), float(numerator) / float(denominator)
+
+
 def start_time_seconds(media: Path) -> float:
     value = _probe_format(media).get("start_time")
     return float(value) if value not in (None, "N/A") else 0.0

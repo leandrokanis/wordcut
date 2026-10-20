@@ -11,6 +11,9 @@ license = "MIT"
 requires-python = ">=3.10"
 dependencies = [
     "numpy>=2.2.6",
+    "opencv-python-headless>=4.10,<5",
+    "pillow>=12.3.0",
+    "scipy>=1.15.3",
 ]
 
 [project.optional-dependencies]
@@ -20,7 +23,13 @@ asr = ["whisperx>=3.4"]
 cortes = "cortes_pregacao.cli:main"
 
 [dependency-groups]
-dev = ["pytest>=8", "ruff>=0.6", "mypy>=1.11"]
+dev = [
+    "pytest>=8",
+    "ruff>=0.6",
+    "mypy>=1.11",
+    "scipy-stubs>=1.15.3.0",
+    "types-pillow>=10.2.0.20240822",
+]
 
 [tool.ruff]
 line-length = 100
@@ -30,6 +39,8 @@ extend-exclude = ["skills/video-corte-vertical/*.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
+# en dash is intentional in Portuguese user-facing text
+allowed-confusables = ["–"]
 
 [tool.mypy]
 strict = true

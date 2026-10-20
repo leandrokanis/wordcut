@@ -10,10 +10,12 @@ from pathlib import Path
 from cortes_pregacao.asr import Transcriber
 from cortes_pregacao.asr.local import LocalTranscriber
 from cortes_pregacao.asr.remote import RemoteHost, RemoteTranscriber
+from cortes_pregacao.edit.edit_list import EditList
 from cortes_pregacao.media import extract_speech_audio
 from cortes_pregacao.overview import overview_lines, word_lines
 from cortes_pregacao.sermon import cut_sermon, transcribe_live
 from cortes_pregacao.sermon_folder import SermonFolder, default_root, folder_name
+from cortes_pregacao.short import plan_short, preview, render_short
 from cortes_pregacao.timefmt import format_timestamp, parse_timestamp
 from cortes_pregacao.transcript import Transcript
 from cortes_pregacao.youtube import YouTube
@@ -83,6 +85,18 @@ def _cut(args: argparse.Namespace) -> None:
     )
 
 
+def _preview(args: argparse.Namespace) -> None:
+    plan = plan_short(SermonFolder(args.dir), EditList.load(args.roteiro))
+    print(preview(plan))
+
+
+def _short(args: argparse.Namespace) -> None:
+    folder = SermonFolder(args.dir)
+    plan = plan_short(folder, EditList.load(args.roteiro))
+    output = render_short(folder, plan, args.alvo)
+    print(f"pronto: {output} ({plan.timeline.duration:.1f} s, {len(plan.timeline.clips)} clipes)")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="cortes", description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
@@ -123,6 +137,21 @@ def build_parser() -> argparse.ArgumentParser:
     cut.add_argument("--first-word", type=parse_timestamp, required=True, help="tempo na live")
     cut.add_argument("--last-word", type=parse_timestamp, required=True, help="fim, na live")
     cut.set_defaults(handler=_cut)
+
+    for name, handler, help_text in (
+        ("preview", _preview, "mostra o roteiro limpo e o texto montado, para aprovação"),
+        ("short", _short, "renderiza o corte vertical de um roteiro aprovado"),
+    ):
+        command = commands.add_parser(name, help=help_text)
+        command.add_argument("roteiro", type=Path, help="roteiro .json")
+        command.add_argument("--dir", type=Path, required=True, help="pasta da pregação")
+        if name == "short":
+            command.add_argument(
+                "--alvo",
+                type=float,
+                help="posição (0-1) de quem seguir se houver mais de uma pessoa",
+            )
+        command.set_defaults(handler=handler)
     return parser
 
 
