@@ -1,0 +1,55 @@
+# cortes-pregacao
+
+Ferramentas para transformar a transmissão de um culto em:
+
+1. **Pregação** — o trecho da pregação, recortado com precisão de quadro.
+2. **Cortes verticais** (Reels/Shorts) — colagens de 40–75 s editadas palavra a palavra:
+   sem hesitações nem pausas mortas, com a janela 9:16 acompanhando o pregador e legenda
+   sincronizada por palavra.
+
+> Estado: em desenvolvimento. Fase 1 (transcrição por palavra) implementada.
+
+## Arquitetura
+
+```
+Mac (orquestra, edita, renderiza)          host com GPU (ex.: "leitao")
+  extrai áudio 16 kHz mono  ── scp ──▶       WhisperX large-v3 + alinhamento wav2vec2 pt
+  palavras.json             ◀── scp ──       (venv em ~/.local/share/cortes-pregacao)
+```
+
+Só o áudio trafega, e só pela rede local.
+
+## Instalação
+
+Máquina principal:
+
+```sh
+uv sync
+```
+
+Host com GPU (CUDA), uma vez:
+
+```sh
+python3 -m venv ~/.local/share/cortes-pregacao/venv
+~/.local/share/cortes-pregacao/venv/bin/pip install whisperx
+```
+
+O código do pacote é sincronizado para o host automaticamente a cada execução.
+
+## Uso
+
+```sh
+uv run cortes transcribe pregacao.mp4 -o palavras.json --host leitao
+```
+
+## Desenvolvimento
+
+```sh
+uv run pytest
+uv run ruff check . && uv run ruff format --check .
+uv run mypy src
+```
+
+## Licença
+
+MIT
