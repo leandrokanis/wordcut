@@ -12,3 +12,5 @@ Formato: `- [vídeo, tempo] gancho resumido — APROVADO/REJEITADO: motivo`
 - [PICGAMA culto 2026-10-18, colagem 40:14–41:30 com gancho de 40:40] "Ele não arriscou sua vida, ele entregou sua vida" — APROVADO: cristológico (substituição), contraste Ester × Cristo; gancho reordenado aceito
 - [PICGAMA culto 2026-10-18, 37:31–38:09] "talvez você seja rainha para um momento como este… todas vocês" — DESCARTADO na sugestão: chamado único de Ester aplicado a todos, beira autoajuda
 - [PICGAMA culto 2026-10-18, 31:11] "Deus em silêncio tem cuidado de nós, para que nada nos aconteça" — DESCARTADO na sugestão: promessa sem cruz
+- [PICGAMA culto 2026-10-18, colagem 16:00–16:43 + 38:09–38:27] "Coragem não é ausência de medo" — APROVADO: aplicação prática; coragem ancorada em Deus, não em esforço próprio
+- [PICGAMA culto 2026-10-18, colagem 35:45–36:48 + 39:27–39:42, tese antecipada] "Violência não é cruz a carregar" — APROVADO: aplicação pastoral com modelo de Cristo; dados estatísticos deixados de fora
