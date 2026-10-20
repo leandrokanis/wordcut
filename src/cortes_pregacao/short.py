@@ -10,7 +10,7 @@ from pathlib import Path
 from cortes_pregacao.edit.assemble import assemble
 from cortes_pregacao.edit.edit_list import EditList
 from cortes_pregacao.edit.energy import EnergyProfile
-from cortes_pregacao.edit.text import apply_corrections, capitalize
+from cortes_pregacao.edit.text import apply_corrections, capitalize, tidy_joins
 from cortes_pregacao.edit.timeline import Timeline, plan_timeline
 from cortes_pregacao.media import video_geometry
 from cortes_pregacao.sermon_folder import SermonFolder
@@ -73,17 +73,18 @@ def preview(plan: ShortPlan) -> str:
 
 
 def caption_words(plan: ShortPlan) -> list[Word]:
-    """Output-timed words as shown on screen: corrected, each segment starting in capitals."""
+    """Output-timed words as shown on screen: corrected, tidied at joins, segments capitalized."""
     words: list[Word] = []
+    starts: list[bool] = []
     offset, previous_segment = 0.0, None
     for clip in plan.timeline.clips:
-        shifted = [word.shifted(offset - clip.start) for word in clip.words]
-        if shifted and clip.segment != previous_segment:
-            shifted[0] = capitalize(shifted[0])
-        words.extend(shifted)
+        for index, word in enumerate(clip.words):
+            words.append(word.shifted(offset - clip.start))
+            starts.append(index == 0 and clip.segment != previous_segment)
         offset += clip.duration
         previous_segment = clip.segment
-    return apply_corrections(words, plan.edit_list.corrections)
+    words = tidy_joins(apply_corrections(words, plan.edit_list.corrections), starts)
+    return [capitalize(w) if start else w for w, start in zip(words, starts, strict=True)]
 
 
 def _segment_words(plan: ShortPlan, index: int) -> list[Word]:
