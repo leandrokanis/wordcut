@@ -67,4 +67,5 @@ uv run mypy src
 
 ## Licença
 
-MIT
+MIT. A fonte Open Sans incluída em `src/cortes_pregacao/assets/fonts/` é distribuída sob a
+SIL Open Font License 1.1 (`OFL.txt`).

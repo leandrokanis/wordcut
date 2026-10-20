@@ -1,13 +1,13 @@
 """Film-style captions timed word by word.
 
-Blocks of up to two lines, yellow with a black outline, shown from their first
-word until the next block (or shortly after their last word when a pause
-follows). A block closes at a sentence end, at a pause, or when full.
+Blocks of up to two lines in Open Sans Bold, saturated yellow with a black
+outline, centred on the frame. Each block shows from its first word until the
+next block (or shortly after its last word when a pause follows) and closes at
+a sentence end, at a pause, or when full.
 """
 
 from __future__ import annotations
 
-import platform
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -18,11 +18,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 from cortes_pregacao.transcript import Word
 
-FONT_CANDIDATES = (
-    Path("/System/Library/Fonts/Supplemental/Arial Bold.ttf"),
-    Path("/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"),
-    Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
-)
+DEFAULT_FONT = Path(__file__).resolve().parents[1] / "assets/fonts/OpenSans-Bold.ttf"
 SENTENCE_END = (".", "?", "!")
 MIN_WORDS_BEFORE_SENTENCE_BREAK = 3
 PAUSE_BREAK_S = 0.6
@@ -32,12 +28,12 @@ LINGER_S = 0.4
 @dataclass(frozen=True)
 class CaptionStyle:
     size: int = 60
-    color: tuple[int, int, int] = (255, 225, 77)  # film-subtitle yellow
+    color: tuple[int, int, int] = (255, 214, 0)  # saturated subtitle yellow
     outline: int = 3
     shadow_offset: int = 3
     max_width: int = 960
     max_lines: int = 2
-    top: int = 1370  # lower third of 1920; clear of Reels' bottom UI
+    centre_y: int = 960  # vertical middle of the 1920 px frame
     line_spacing: float = 1.2
 
 
@@ -105,18 +101,12 @@ def _display(text: str) -> str:
     return text.replace("...", "…")
 
 
-def default_font() -> Path:
-    for candidate in FONT_CANDIDATES:
-        if candidate.exists():
-            return candidate
-    raise FileNotFoundError(f"nenhuma fonte encontrada para legendas ({platform.system()})")
-
-
 @dataclass(frozen=True)
 class CaptionImage:
-    """Pre-rendered caption: BGR colour and alpha (0-1), placed at ``top``."""
+    """Pre-rendered caption: BGR colour and alpha (0-1), placed at row ``top``."""
 
     caption: Caption
+    top: int
     bgr: npt.NDArray[np.float32]
     alpha: npt.NDArray[np.float32]
 
@@ -127,7 +117,7 @@ class CaptionRenderer:
     ) -> None:
         self.style = style
         self._width = frame_width
-        self._font = ImageFont.truetype(str(font or default_font()), style.size)
+        self._font = ImageFont.truetype(str(font or DEFAULT_FONT), style.size)
 
     def measure(self, text: str) -> float:
         return float(self._font.getlength(text))
@@ -147,4 +137,5 @@ class CaptionRenderer:
                 stroke_width=style.outline, stroke_fill=(0, 0, 0, 255),
             )  # fmt: skip
         rgba = np.asarray(image).astype(np.float32)
-        return CaptionImage(caption, rgba[..., 2::-1].copy(), rgba[..., 3:4] / 255.0)
+        top = style.centre_y - height // 2
+        return CaptionImage(caption, top, rgba[..., 2::-1].copy(), rgba[..., 3:4] / 255.0)

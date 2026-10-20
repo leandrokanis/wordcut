@@ -21,7 +21,6 @@ def render_vertical(
     montage: Path,
     camera: CameraPath,
     captions: Sequence[CaptionImage],
-    caption_top: int,
     fps: float,
     output: Path,
 ) -> Path:
@@ -39,7 +38,7 @@ def render_vertical(
             if not ok:
                 break
             image = _reframe(frame, float(camera.centres[index]))
-            _overlay(image, captions, index / fps, caption_top)
+            _overlay(image, captions, index / fps)
             encoder.stdin.write(image.tobytes())
     finally:
         capture.release()
@@ -63,10 +62,10 @@ def _reframe(frame: Frame, centre_x: float) -> Frame:
     )  # fmt: skip
 
 
-def _overlay(image: Frame, captions: Sequence[CaptionImage], t: float, top: int) -> None:
+def _overlay(image: Frame, captions: Sequence[CaptionImage], t: float) -> None:
     for caption in captions:
         if caption.caption.start <= t < caption.caption.end:
-            rows = slice(top, top + caption.bgr.shape[0])
+            rows = slice(caption.top, caption.top + caption.bgr.shape[0])
             base = image[rows].astype(np.float32)
             blended = caption.bgr * caption.alpha + base * (1 - caption.alpha)
             image[rows] = blended.astype(np.uint8)

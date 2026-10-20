@@ -6,7 +6,6 @@ from cortes_pregacao.vertical.captions import (
     CaptionRenderer,
     CaptionStyle,
     build_captions,
-    default_font,
 )
 
 STYLE = CaptionStyle(max_width=300)
@@ -55,14 +54,13 @@ def test_consecutive_blocks_hand_over_without_gap() -> None:
     assert first.end == second.start
 
 
-def test_renderer_produces_bgr_and_alpha() -> None:
-    try:
-        renderer = CaptionRenderer(1080, font=default_font())
-    except FileNotFoundError:
-        pytest.skip("sem fonte do sistema")
+def test_renderer_centres_caption_on_frame() -> None:
+    renderer = CaptionRenderer(1080)
     (caption,) = build_captions(spoken("Graça", "e", "paz."), renderer.measure)
 
     image = renderer.render(caption)
 
     assert image.bgr.shape[:2] == image.alpha.shape[:2]
     assert image.alpha.max() == 1.0
+    middle = image.top + image.bgr.shape[0] / 2
+    assert abs(middle - 960) <= 1

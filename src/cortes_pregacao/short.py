@@ -17,7 +17,7 @@ from cortes_pregacao.sermon_folder import SermonFolder
 from cortes_pregacao.timefmt import format_timestamp
 from cortes_pregacao.transcript import Transcript, Word
 from cortes_pregacao.vertical.camera import plan_camera
-from cortes_pregacao.vertical.captions import DEFAULT_STYLE, CaptionRenderer, build_captions
+from cortes_pregacao.vertical.captions import CaptionRenderer, build_captions
 from cortes_pregacao.vertical.detection import detect_frames
 from cortes_pregacao.vertical.render import OUTPUT_WIDTH, render_vertical
 
@@ -116,7 +116,7 @@ def render_short(folder: SermonFolder, plan: ShortPlan, target: float | None = N
 
     _report("4/4 renderizando 1080x1920")
     output = _unique(folder.path / "cortes" / f"corte - {_clean_title(plan.edit_list.title)}.mp4")
-    return render_vertical(montage, camera, images, DEFAULT_STYLE.top, fps, output)
+    return render_vertical(montage, camera, images, fps, output)
 
 
 def _report(message: str) -> None:

@@ -33,7 +33,7 @@ Roda no **leitao**, no repositório `~/cortes-pregacao` (`uv run cortes …`). S
    ```
    ffmpeg -i "<corte>" -vf "select='eq(n\,90)+eq(n\,600)+…',scale=270:480,tile=6x1" -frames:v 1 check.png
    ```
-   Pregador enquadrado com o rosto livre? Legenda legível, abaixo do rosto? Se não, ajuste e refaça.
+   Pregador enquadrado com o rosto livre? Legenda legível, sem cobrir o rosto? Se não, ajuste e refaça.
 
 5. **Relatar**: duração, número de emendas, hesitações removidas, caminho, e o comando para trazer o arquivo:
    ```
@@ -48,7 +48,7 @@ Roda no **leitao**, no repositório `~/cortes-pregacao` (`uv run cortes …`). S
 - **Pausas**: depois de fim de frase ficam até 0,4 s (respiro antes da próxima ideia); demais pausas, 0,15 s.
 - **Emendas**: corte seco, no quadro mais silencioso perto da fronteira; fade-out/in de 15 ms no áudio contra estalos. Áudio e vídeo nunca dessincronizam.
 - **Enquadramento**: detecção de rosto (Haar) com corpo (HOG) como reserva; segue a mesma pessoa por continuidade, ignora cabeças da plateia; suavização tipo operador de câmera. Em troca de trecho do roteiro a janela reposiciona de uma vez.
-- **Legenda**: blocos de até 2 linhas, amarela (#FFE14D), 60 px, contorno preto e sombra, no terço inferior; cada bloco entra na primeira palavra e sai na próxima.
+- **Legenda**: Open Sans Bold 60 px (fonte incluída no pacote), amarelo saturado (#FFD600), contorno preto e sombra, centralizada na metade do vídeo; blocos de até 2 linhas, cada um entra na primeira palavra e sai na próxima.
 - **Codificação**: H.264 CRF 18, AAC 192k, loudnorm −14 LUFS, `+faststart`. Nunca sobrescreve: usa `-v2`, `-v3`…
 
 ## Regras
