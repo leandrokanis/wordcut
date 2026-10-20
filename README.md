@@ -34,7 +34,14 @@ python3 -m venv ~/.local/share/cortes-pregacao/venv
 ~/.local/share/cortes-pregacao/venv/bin/pip install whisperx
 ```
 
-O código do pacote é sincronizado para o host automaticamente a cada execução.
+Para baixar do YouTube (na máquina que roda o pipeline):
+
+- `yt-dlp[default]` e [Deno](https://deno.land) (resolve o desafio JavaScript do YouTube);
+- no Linux, o [build estático de ffmpeg do yt-dlp](https://github.com/yt-dlp/FFmpeg-Builds)
+  extraído em `~/.local/share/cortes-pregacao/ffmpeg/` — o ffmpeg 6.1 do Ubuntu trava
+  ao baixar trechos;
+- cookies de uma sessão logada no YouTube em
+  `~/.config/cortes-pregacao/youtube-cookies.txt` (permissão `600`, nunca no repositório).
 
 ## Uso
 

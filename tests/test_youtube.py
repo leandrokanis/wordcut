@@ -46,3 +46,15 @@ def test_section_args_limit_resolution_and_use_seconds() -> None:
 def test_missing_cookies_file_is_explained(tmp_path: Path) -> None:
     with pytest.raises(FileNotFoundError, match="cookies"):
         YouTube(cookies=tmp_path / "none.txt").info("URL")
+
+
+def test_uses_bundled_ffmpeg_when_installed(tmp_path: Path) -> None:
+    command = YouTube(cookies=tmp_path / "c.txt", ffmpeg_dir=tmp_path).base_command()
+
+    assert command[command.index("--ffmpeg-location") + 1] == str(tmp_path)
+
+
+def test_falls_back_to_system_ffmpeg(tmp_path: Path) -> None:
+    command = YouTube(cookies=tmp_path / "c.txt", ffmpeg_dir=tmp_path / "missing").base_command()
+
+    assert "--ffmpeg-location" not in command

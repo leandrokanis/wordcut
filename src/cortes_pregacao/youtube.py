@@ -12,6 +12,8 @@ from zoneinfo import ZoneInfo
 
 CHURCH_TIMEZONE = ZoneInfo("America/Sao_Paulo")
 DEFAULT_COOKIES = Path.home() / ".config/cortes-pregacao/youtube-cookies.txt"
+# yt-dlp's static ffmpeg build; Ubuntu's ffmpeg 6.1 segfaults on section downloads.
+DEFAULT_FFMPEG_DIR = Path.home() / ".local/share/cortes-pregacao/ffmpeg/bin"
 MAX_HEIGHT = 1080
 
 
@@ -45,8 +47,11 @@ class LiveInfo:
 
 
 class YouTube:
-    def __init__(self, cookies: Path = DEFAULT_COOKIES) -> None:
+    def __init__(
+        self, cookies: Path = DEFAULT_COOKIES, ffmpeg_dir: Path | None = DEFAULT_FFMPEG_DIR
+    ) -> None:
         self._cookies = cookies
+        self._ffmpeg_dir = ffmpeg_dir if ffmpeg_dir and ffmpeg_dir.is_dir() else None
 
     def info(self, url: str) -> LiveInfo:
         output = self._run(["--dump-single-json", "--skip-download", url], capture=True)
@@ -76,11 +81,17 @@ class YouTube:
             url,
         ]  # fmt: skip
 
+    def base_command(self) -> list[str]:
+        command = ["yt-dlp", "--quiet", "--no-warnings", "--cookies", str(self._cookies)]
+        if self._ffmpeg_dir:
+            command += ["--ffmpeg-location", str(self._ffmpeg_dir)]
+        return command
+
     def _run(self, args: list[str], capture: bool = False) -> str:
         if not self._cookies.exists():
             raise FileNotFoundError(
                 f"arquivo de cookies não encontrado: {self._cookies} (veja o README)"
             )
-        command = ["yt-dlp", "--quiet", "--no-warnings", "--cookies", str(self._cookies), *args]
+        command = self.base_command() + args
         result = subprocess.run(command, check=True, capture_output=capture, text=True)
         return result.stdout if capture else ""

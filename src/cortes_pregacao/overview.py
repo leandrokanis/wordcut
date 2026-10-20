@@ -31,5 +31,14 @@ def overview_lines(
         yield _render(line)
 
 
+def word_lines(
+    transcript: Transcript, start: float = 0.0, end: float = float("inf")
+) -> Iterator[str]:
+    """``start  end  word`` per word, for picking exact cut points."""
+    for word in transcript.words:
+        if start <= word.start <= end:
+            yield f"{format_timestamp(word.start)}  {format_timestamp(word.end)}  {word.text}"
+
+
 def _render(words: list[Word]) -> str:
     return f"[{format_timestamp(words[0].start)}] " + " ".join(word.text for word in words)

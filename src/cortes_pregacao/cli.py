@@ -11,7 +11,7 @@ from cortes_pregacao.asr import Transcriber
 from cortes_pregacao.asr.local import LocalTranscriber
 from cortes_pregacao.asr.remote import RemoteHost, RemoteTranscriber
 from cortes_pregacao.media import extract_speech_audio
-from cortes_pregacao.overview import overview_lines
+from cortes_pregacao.overview import overview_lines, word_lines
 from cortes_pregacao.sermon import cut_sermon, transcribe_live
 from cortes_pregacao.sermon_folder import SermonFolder, default_root, folder_name
 from cortes_pregacao.timefmt import format_timestamp, parse_timestamp
@@ -67,7 +67,8 @@ def _transcribe_live(args: argparse.Namespace) -> None:
 
 def _overview(args: argparse.Namespace) -> None:
     transcript = Transcript.load(args.transcript)
-    for line in overview_lines(transcript, args.start or 0.0, args.end or float("inf")):
+    render = word_lines if args.words else overview_lines
+    for line in render(transcript, args.start or 0.0, args.end or float("inf")):
         print(line)
 
 
@@ -111,6 +112,9 @@ def build_parser() -> argparse.ArgumentParser:
     overview.add_argument("transcript", type=Path)
     overview.add_argument("--start", type=parse_timestamp)
     overview.add_argument("--end", type=parse_timestamp)
+    overview.add_argument(
+        "--words", action="store_true", help="uma palavra por linha (início, fim)"
+    )
     overview.set_defaults(handler=_overview)
 
     cut = commands.add_parser("cut", help="corta a pregação com fades e gera palavras.json")

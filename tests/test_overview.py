@@ -1,4 +1,4 @@
-from cortes_pregacao.overview import overview_lines
+from cortes_pregacao.overview import overview_lines, word_lines
 from cortes_pregacao.transcript import Transcript, Word
 
 
@@ -26,3 +26,9 @@ def test_restricts_to_range() -> None:
     t = transcript(("antes.", 0.0, 0.5), ("dentro.", 10.0, 10.5), ("depois.", 20.0, 20.5))
 
     assert list(overview_lines(t, start=5.0, end=15.0)) == ["[00:00:10.000] dentro."]
+
+
+def test_word_lines_show_start_and_end() -> None:
+    t = transcript(("este.", 5089.4, 5090.561), ("Amém.", 5090.581, 5090.881))
+
+    assert list(word_lines(t, start=5090.0)) == ["01:24:50.581  01:24:50.881  Amém."]
