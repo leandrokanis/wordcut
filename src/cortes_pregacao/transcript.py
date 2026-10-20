@@ -49,6 +49,9 @@ class Transcript:
     def text(self) -> str:
         return " ".join(word.text for word in self.words)
 
+    def shifted(self, delta: float) -> Transcript:
+        return replace(self, words=tuple(word.shifted(delta) for word in self.words))
+
     def between(self, start: float, end: float) -> Transcript:
         """Words fully inside ``[start, end]``, rebased so ``start`` becomes 0."""
         kept = tuple(

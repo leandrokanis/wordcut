@@ -6,6 +6,8 @@ the exact second, so times computed from the request can be off by seconds.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import numpy.typing as npt
 
@@ -29,7 +31,9 @@ def find_clip_start(
     return float(np.argmax(correlation)) / rate
 
 
-def locate_clip(recording_path: str, clip_path: str, expected_start: float, search: float) -> float:
+def locate_clip(
+    recording_path: Path | str, clip_path: Path | str, expected_start: float, search: float
+) -> float:
     """Start of ``clip_path`` within ``recording_path``, searched around ``expected_start``."""
     window_start = max(0.0, expected_start - search)
     recording = read_audio(

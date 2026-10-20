@@ -28,9 +28,9 @@ class TestTranscript:
 
         sliced = transcript.between(1.0, 2.0)
 
-        assert [(w.text, w.start, w.end) for w in sliced.words] == [
-            ("dentro", 0.0, pytest.approx(0.4))
-        ]
+        assert [w.text for w in sliced.words] == ["dentro"]
+        assert sliced.words[0].start == 0.0
+        assert sliced.words[0].end == pytest.approx(0.4)
 
     def test_json_round_trip(self, tmp_path: Path) -> None:
         transcript = make_transcript(Word("Cristo", 0.1, 0.6, score=0.9, estimated=True))
