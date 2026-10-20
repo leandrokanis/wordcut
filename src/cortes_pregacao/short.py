@@ -78,6 +78,7 @@ def _segment_words(plan: ShortPlan, index: int) -> list[Word]:
 
 
 def render_short(folder: SermonFolder, plan: ShortPlan, target: float | None = None) -> Path:
+    folder.create()
     work = folder.work / _slug(plan.edit_list.title)
     work.mkdir(parents=True, exist_ok=True)
     montage = assemble(folder.sermon_video, plan.timeline.clips, work / "montagem.mov")
