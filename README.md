@@ -38,6 +38,14 @@ O código do pacote é sincronizado para o host automaticamente a cada execuçã
 
 ## Uso
 
+Na própria máquina com GPU:
+
+```sh
+uv run cortes transcribe pregacao.mp4 -o palavras.json
+```
+
+De outra máquina, delegando a transcrição por SSH (só o áudio trafega):
+
 ```sh
 uv run cortes transcribe pregacao.mp4 -o palavras.json --host leitao
 ```

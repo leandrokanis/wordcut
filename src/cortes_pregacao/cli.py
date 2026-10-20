@@ -6,18 +6,25 @@ import argparse
 import tempfile
 from pathlib import Path
 
+from cortes_pregacao.asr.local import LocalTranscriber
 from cortes_pregacao.asr.remote import RemoteHost, RemoteTranscriber
 from cortes_pregacao.media import extract_speech_audio
 from cortes_pregacao.transcript import Transcript
 
-DEFAULT_HOST = "leitao"
-
 
 def _transcribe(args: argparse.Namespace) -> None:
-    transcriber = RemoteTranscriber(RemoteHost(args.host), model=args.model)
     if args.job:
-        transcriber.wait_and_fetch(args.job, args.output)
+        if not args.host:
+            raise SystemExit("--job exige --host")
+        RemoteTranscriber(RemoteHost(args.host), model=args.model).wait_and_fetch(
+            args.job, args.output
+        )
     else:
+        transcriber = (
+            RemoteTranscriber(RemoteHost(args.host), model=args.model)
+            if args.host
+            else LocalTranscriber(model=args.model)
+        )
         with tempfile.TemporaryDirectory() as tmp:
             audio = extract_speech_audio(args.video, Path(tmp) / "audio.wav")
             transcriber.transcribe(audio, args.output)
@@ -30,11 +37,13 @@ def build_parser() -> argparse.ArgumentParser:
     commands = parser.add_subparsers(dest="command", required=True)
 
     transcribe = commands.add_parser(
-        "transcribe", help="transcreve o vídeo com tempo por palavra (WhisperX no host remoto)"
+        "transcribe", help="transcreve o vídeo com tempo por palavra (WhisperX)"
     )
     transcribe.add_argument("video", type=Path)
     transcribe.add_argument("-o", "--output", type=Path, required=True)
-    transcribe.add_argument("--host", default=DEFAULT_HOST, help="host SSH com GPU")
+    transcribe.add_argument(
+        "--host", help="host SSH com GPU; sem ele, roda nesta máquina (ex.: no próprio leitao)"
+    )
     transcribe.add_argument("--model", default="large-v3")
     transcribe.add_argument("--job", help="retoma um job remoto já iniciado, pelo id")
     transcribe.set_defaults(handler=_transcribe)
