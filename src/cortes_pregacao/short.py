@@ -10,6 +10,7 @@ from pathlib import Path
 from cortes_pregacao.edit.assemble import assemble
 from cortes_pregacao.edit.edit_list import EditList
 from cortes_pregacao.edit.energy import EnergyProfile
+from cortes_pregacao.edit.text import apply_corrections, capitalize
 from cortes_pregacao.edit.timeline import Timeline, plan_timeline
 from cortes_pregacao.media import video_geometry
 from cortes_pregacao.sermon_folder import SermonFolder
@@ -66,9 +67,23 @@ def preview(plan: ShortPlan) -> str:
             for w in _segment_words(plan, index)
         ]
         lines.append("   " + " ".join(texts))
-    lines += ["", "Texto montado:", " ".join(w.text for w in plan.timeline.output_words())]
+    lines += ["", "Texto montado (como na legenda):", " ".join(w.text for w in caption_words(plan))]
     lines += [f"\n⚠ {problem}" for problem in plan.warnings()]
     return "\n".join(lines)
+
+
+def caption_words(plan: ShortPlan) -> list[Word]:
+    """Output-timed words as shown on screen: corrected, each segment starting in capitals."""
+    words: list[Word] = []
+    offset, previous_segment = 0.0, None
+    for clip in plan.timeline.clips:
+        shifted = [word.shifted(offset - clip.start) for word in clip.words]
+        if shifted and clip.segment != previous_segment:
+            shifted[0] = capitalize(shifted[0])
+        words.extend(shifted)
+        offset += clip.duration
+        previous_segment = clip.segment
+    return apply_corrections(words, plan.edit_list.corrections)
 
 
 def _segment_words(plan: ShortPlan, index: int) -> list[Word]:
@@ -96,7 +111,7 @@ def render_short(folder: SermonFolder, plan: ShortPlan, target: float | None = N
 
     _report("3/4 preparando legendas")
     renderer = CaptionRenderer(OUTPUT_WIDTH)
-    captions = build_captions(plan.timeline.output_words(), renderer.measure)
+    captions = build_captions(caption_words(plan), renderer.measure)
     images = [renderer.render(caption) for caption in captions]
 
     _report("4/4 renderizando 1080x1920")

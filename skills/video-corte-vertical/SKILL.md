@@ -43,7 +43,8 @@ Roda no **leitao**, no repositório `~/cortes-pregacao` (`uv run cortes …`). S
 
 ## O que a ferramenta faz
 
-- **Limpeza** (conservadora): remove "hã", "hum", "né", "é…"/"então…" arrastados e gaguejo de palavra curta ("o, o Senhor"). Repetição retórica ("santo, santo, santo") fica.
+- **Limpeza** (conservadora): remove "hã", "hum", "né", "é…"/"então…" arrastados, gaguejo de palavra curta ("o, o Senhor") e de expressão recomeçada ("não teve, não teve sonho"). Repetição retórica ("santo, santo, santo") fica. Se a hesitação removida tinha o ponto final, ele passa para a palavra anterior.
+- **Correções de grafia** da legenda vêm do campo `corrections` do roteiro; cada trecho começa com maiúscula.
 - **Pausas**: depois de fim de frase ficam até 0,4 s (respiro antes da próxima ideia); demais pausas, 0,15 s.
 - **Emendas**: corte seco, no quadro mais silencioso perto da fronteira; fade-out/in de 15 ms no áudio contra estalos. Áudio e vídeo nunca dessincronizam.
 - **Enquadramento**: detecção de rosto (Haar) com corpo (HOG) como reserva; segue a mesma pessoa por continuidade, ignora cabeças da plateia; suavização tipo operador de câmera. Em troca de trecho do roteiro a janela reposiciona de uma vez.

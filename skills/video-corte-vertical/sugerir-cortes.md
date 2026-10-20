@@ -57,9 +57,10 @@ Reordenar é permitido (ex.: gancho tirado da conclusão), mas é onde mora o ri
    ```json
    {"version": 1, "title": "Frase marcante curta",
     "segments": [{"start": 2440.6, "end": 2444.5, "note": "gancho da conclusão; mesma tese"},
-                 {"start": 2414.05, "end": 2439.7, "note": ""}]}
+                 {"start": 2414.05, "end": 2439.7, "note": ""}],
+    "corrections": {"Esther": "Ester", "Esté": "Ester", "a direita": "à direita"}}
    ```
-6. Rode `cortes preview <roteiro> --dir <pasta>` para cada um e ajuste até não haver avisos.
+6. Rode `cortes preview <roteiro> --dir <pasta>` para cada um e ajuste até não haver avisos. Confira nomes próprios no texto montado e corrija a grafia em `corrections` (nomes bíblicos pela NVI: Ester, Mardoqueu, Hamã…), mesmo número de palavras de cada lado.
 7. Apresente uma tabela e, para cada ideia, a saída do `preview` (trechos, cortes `[–hesitação–]`, texto montado):
 
 | # | Ideia | Duração | Gancho | Valor | Trechos | Alertas |

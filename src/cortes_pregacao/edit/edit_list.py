@@ -8,9 +8,11 @@ justifies why the meaning is preserved.
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
+
+from cortes_pregacao.edit.text import validate_corrections
 
 SCHEMA_VERSION = 1
 
@@ -30,10 +32,13 @@ class Segment:
 class EditList:
     title: str
     segments: tuple[Segment, ...]
+    corrections: dict[str, str] = field(default_factory=dict)
+    """Caption spelling fixes, e.g. ``{"Esther": "Ester", "a direita": "à direita"}``."""
 
     def __post_init__(self) -> None:
         if not self.segments:
             raise ValueError("roteiro sem trechos")
+        validate_corrections(self.corrections)
 
     def reordered(self) -> list[int]:
         """Indexes of segments taken from further ahead in the sermon.
@@ -52,6 +57,7 @@ class EditList:
             "version": SCHEMA_VERSION,
             "title": self.title,
             "segments": [asdict(segment) for segment in self.segments],
+            "corrections": self.corrections,
         }
 
     @classmethod
@@ -61,6 +67,7 @@ class EditList:
         return cls(
             title=data["title"],
             segments=tuple(Segment(**segment) for segment in data["segments"]),
+            corrections=data.get("corrections", {}),
         )
 
     def save(self, path: Path) -> None:
