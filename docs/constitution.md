@@ -16,8 +16,7 @@ Sync Impact Report
 - Pendência movida: TODO(AJUSTE_BORDAS) agora é questão aberta da feature 1.1.b.
 - Emendas anteriores (2026-10-25): 1.1.0 retirou os exemplos de calibração; 1.2.0 trocou as
   versões dos critérios por presets; 1.3.0 fixou os critérios no código.
-- Revisão das emendas 1.1.0 a 2.0.1: pendente. Uma emenda MUST ser revisada por outra pessoa
-  antes de valer (Governança).
+- Revisão das emendas 1.1.0 a 2.0.1: aprovadas pelo administrador do projeto em 2026-10-25.
 - Pendências:
   - TODO(DOMINIO): confirmar o domínio na Cloudflare para o Tunnel + Access.
   - TODO(TRAVAS): reavaliar uma trava só versus GPU/CPU separadas depois do uso real.
