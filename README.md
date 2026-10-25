@@ -7,17 +7,25 @@ Ferramentas para transformar a transmissão de um culto em:
    sem hesitações nem pausas mortas, com a janela 9:16 acompanhando o pregador e legenda
    sincronizada por palavra.
 
-> Estado: em desenvolvimento. Fase 1 (transcrição por palavra) implementada.
+> Estado: em uso. As duas etapas funcionam de ponta a ponta; a primeira pregação processada
+> foi a de 2026-10-18.
 
 ## Arquitetura
 
+O fluxo roda no host com GPU (ex.: "leitao"), conduzido por duas skills do Claude Code em
+`skills/`. O Mac só traz os vídeos prontos por `scp`.
+
 ```
-Mac (orquestra, edita, renderiza)          host com GPU (ex.: "leitao")
-  extrai áudio 16 kHz mono  ── scp ──▶       WhisperX large-v3 + alinhamento wav2vec2 pt
-  palavras.json             ◀── scp ──       (venv em ~/.local/share/cortes-pregacao)
+host com GPU ("leitao")
+  live do YouTube ─▶ info ─▶ transcribe-live ─▶ cut ─▶ pasta da pregação
+                                                        ├─ <pasta>.mp4
+                                                        ├─ palavras.json
+                                                        ├─ roteiros/*.json ─▶ preview ─▶ short
+                                                        └─ cortes/*.mp4
 ```
 
-Só o áudio trafega, e só pela rede local.
+A transcrição (WhisperX large-v3 + alinhamento wav2vec2 pt) também pode ser delegada por SSH
+a partir de outra máquina: só o áudio 16 kHz mono trafega, e só pela rede local.
 
 ## Instalação
 
@@ -43,18 +51,52 @@ Para baixar do YouTube (na máquina que roda o pipeline):
 - cookies de uma sessão logada no YouTube em
   `~/.config/cortes-pregacao/youtube-cookies.txt` (permissão `600`, nunca no repositório).
 
-## Uso
-
-Na própria máquina com GPU:
+Para usar as skills, ligue-as ao Claude Code:
 
 ```sh
-uv run cortes transcribe pregacao.mp4 -o palavras.json
+ln -s ~/cortes-pregacao/skills/video-cortar-pregacao ~/.claude/skills/
+ln -s ~/cortes-pregacao/skills/video-corte-vertical ~/.claude/skills/
 ```
 
-De outra máquina, delegando a transcrição por SSH (só o áudio trafega):
+## Uso
+
+O caminho normal é pelas skills: `video-cortar-pregacao` com o link da live e, depois,
+`video-corte-vertical` na pasta gerada. Elas chamam os comandos abaixo e pedem aprovação
+antes de cortar e de renderizar.
+
+### 1. Pregação
 
 ```sh
-uv run cortes transcribe pregacao.mp4 -o palavras.json --host leitao
+uv run cortes info <link>                    # título, data do culto, duração, se terminou
+uv run cortes transcribe-live <link> --dir "<pasta>" [--start HH:MM:SS --end HH:MM:SS]
+uv run cortes overview "<pasta>/trabalho/live-palavras.json" [--words --start … --end …]
+uv run cortes cut <link> --dir "<pasta>" --first-word <início> --last-word <fim>
+```
+
+A pasta segue o padrão `~/Videos/Pregações/AAAA-MM-DD - Título - Referência/`. O `cut` grava
+`<pasta>.mp4` e `palavras.json`, com tempos relativos ao vídeo; os intermediários ficam em
+`trabalho/`.
+
+### 2. Cortes verticais
+
+Cada corte é um roteiro em `<pasta>/roteiros/<slug>.json`: título, trechos (`start`/`end` em
+segundos do `.mp4`) e correções de grafia da legenda. Critérios e formato estão em
+`skills/video-corte-vertical/sugerir-cortes.md`.
+
+```sh
+uv run cortes overview "<pasta>/palavras.json"              # pregação, uma frase por linha
+uv run cortes preview "<pasta>/roteiros/<slug>.json" --dir "<pasta>"   # texto montado
+uv run cortes short "<pasta>/roteiros/<slug>.json" --dir "<pasta>" [--alvo 0.7]
+```
+
+O `short` grava `cortes/corte - <título>.mp4` em 1080x1920 e nunca sobrescreve (cria `-v2`,
+`-v3`…). Use `--alvo` quando houver mais de uma pessoa em quadro (0 = esquerda).
+
+### Transcrição avulsa
+
+```sh
+uv run cortes transcribe pregacao.mp4 -o palavras.json                # nesta máquina
+uv run cortes transcribe pregacao.mp4 -o palavras.json --host leitao  # por SSH
 ```
 
 ## Desenvolvimento
