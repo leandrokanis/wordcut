@@ -1,0 +1,1622 @@
+<title>Word Cuts</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Open+Sans:wght@700&family=Montserrat:wght@800&family=Poppins:wght@700&family=Roboto+Slab:wght@700&family=Bebas+Neue&family=Anton&display=swap">
+<style>
+/* Layout de editor: barra de ícones e painel à esquerda; prévia, transporte e timeline sempre visíveis. */
+:root {
+  color-scheme: dark;
+  --bg: #0d0e10;
+  --panel: #141619;
+  --raised: #1b1e22;
+  --hover: #23272c;
+  --line: #262a2f;
+  --line-2: #343940;
+  --fg: #e6e7e9;
+  --muted: #8b9198;
+  --faint: #5b6168;
+  --accent: #ffd600;
+  --on-accent: #141414;
+  --ok: #4cc38a;
+  --warn: #f0a43a;
+  --danger: #f2555a;
+  --font-ui: "Geist", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --font-cap: "Open Sans", "Helvetica Neue", Arial, sans-serif;
+  --r: 8px;
+  --tl-head: 132px;
+}
+html, body { height: 100%; margin: 0; }
+body { background: var(--bg); color: var(--fg); font: 14px/1.45 var(--font-ui); -webkit-font-smoothing: antialiased; overflow: hidden; }
+* { box-sizing: border-box; }
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.spacer { flex: 1; }
+
+.app { height: 100%; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
+.app.settings { grid-template-rows: minmax(0, 1fr) auto; }
+
+/* Barra de status no rodapé, sempre visível */
+.sbar { display: flex; align-items: center; gap: 10px; height: 30px; padding: 0 max(12px, env(safe-area-inset-right, 0px)) 0 max(6px, env(safe-area-inset-left, 0px)); border-top: 1px solid var(--line); background: var(--bg); font-size: 12px; color: var(--muted); min-width: 0; white-space: nowrap; }
+.sb-i { display: inline-flex; align-items: center; gap: 8px; background: none; border: 0; color: var(--fg); padding: 3px 6px; border-radius: 5px; cursor: pointer; overflow: hidden; text-overflow: ellipsis; min-width: 0; font-size: 12px; }
+.sb-i:hover { background: var(--raised); }
+.sb-prog { width: 90px; height: 4px; border-radius: 2px; background: var(--raised); overflow: hidden; flex: none; }
+.sb-prog i { display: block; height: 100%; background: var(--accent); }
+.segctl.sm { padding: 1px; }
+.segctl.sm button { padding: 1px 8px; font-size: 11.5px; }
+.dot.busy { background: var(--warn); animation: pulse 1.2s ease-in-out infinite; }
+
+/* Configurações: tela inteira com navegação lateral própria */
+.settings-screen { display: grid; grid-template-columns: 280px minmax(0, 1fr); min-height: 0; }
+.snav { border-right: 1px solid var(--line); background: var(--panel); display: grid; grid-template-rows: auto auto minmax(0, 1fr); min-height: 0; }
+.sn-back { display: flex; align-items: center; gap: 10px; padding: 16px 18px; border: 0; border-bottom: 1px solid var(--line); background: none; color: var(--fg); font-size: 14px; cursor: pointer; text-align: left; }
+.sn-back:hover { background: var(--raised); }
+.sn-back svg { width: 18px; height: 18px; }
+.sn-search { position: relative; padding: 12px; }
+.sn-search svg { position: absolute; left: 24px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--faint); }
+.sn-search .input { padding-left: 36px; }
+.sn-list { overflow: auto; padding: 0 10px 16px; display: grid; align-content: start; gap: 1px; }
+.sn-g { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); padding: 16px 10px 6px; }
+.sn-i { position: relative; display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 0; border-radius: 8px; background: none; color: var(--muted); cursor: pointer; text-align: left; font-size: 14px; }
+.sn-i:hover, .sn-i[aria-current="true"] { background: var(--raised); color: var(--fg); }
+.sn-i svg { width: 18px; height: 18px; flex: none; }
+.sn-i .rl { margin-left: auto; color: var(--faint); display: inline-flex; }
+.smain { overflow: auto; min-height: 0; }
+.s-top { position: sticky; top: 0; z-index: 3; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 32px; border-bottom: 1px solid var(--line); background: var(--bg); }
+.s-top .sl { font-weight: 500; }
+.s-wrap { max-width: 880px; margin: 0 auto; padding: 40px 32px 64px; }
+.s-head { display: flex; align-items: center; gap: 12px; }
+.s-head h1 { margin: 0; font-size: 26px; font-weight: 600; letter-spacing: -0.02em; }
+.s-head { padding-bottom: 20px; margin-bottom: 8px; border-bottom: 1px solid var(--line); }
+.ssec { padding-top: 32px; }
+.ssec > h2 { margin: 0 0 14px; font-size: 19px; font-weight: 600; letter-spacing: -0.01em; }
+.sgrp { position: relative; }
+.sgrp > .s-top { margin: 24px -32px 0; }
+.s-saved { position: fixed; top: 18px; right: 28px; z-index: 5; }
+.scard { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 20px 24px 10px; margin-bottom: 16px; }
+.scard > h3 { margin: 0 0 2px; font-size: 15px; font-weight: 600; }
+.scard > .note { margin-bottom: 6px; }
+.scard .note b { color: var(--fg); font-weight: 500; }
+
+/* Barra superior */
+.top { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 8px max(12px, env(safe-area-inset-right, 0px)) 8px max(12px, env(safe-area-inset-left, 0px)); border-bottom: 1px solid var(--line); }
+.brand { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 15px; letter-spacing: -0.01em; white-space: nowrap; }
+.brand b { width: 10px; height: 10px; border-radius: 2px; background: var(--accent); }
+.crumbs { display: flex; align-items: center; gap: 4px; min-width: 0; overflow: hidden; margin-left: 6px; padding-left: 12px; border-left: 1px solid var(--line); }
+.cr { background: none; border: 0; padding: 4px 6px; border-radius: 6px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 300px; font-size: 13.5px; }
+button.cr { cursor: pointer; }
+button.cr:hover { background: var(--raised); color: var(--fg); }
+.cr.cur { color: var(--fg); }
+.crsep { color: var(--faint); }
+.pill { display: inline-flex; align-items: center; gap: 8px; padding: 5px 10px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); color: var(--muted); font-size: 12.5px; white-space: nowrap; max-width: 280px; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); flex: none; }
+.pill.busy .dot { background: var(--warn); animation: pulse 1.2s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .35; } }
+.segctl { display: inline-flex; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 2px; flex: none; }
+.segctl button { border: 0; background: none; padding: 4px 10px; border-radius: 6px; color: var(--muted); cursor: pointer; font-size: 12.5px; white-space: nowrap; }
+.segctl button[aria-pressed="true"] { background: var(--hover); color: var(--fg); }
+.segctl.lg button { padding: 5px 10px; font-size: 13px; }
+.label-sm { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--faint); }
+.exp { position: relative; }
+.menu { position: absolute; right: 0; top: calc(100% + 6px); width: 310px; background: var(--raised); border: 1px solid var(--line-2); border-radius: 10px; padding: 6px; box-shadow: 0 14px 36px rgba(0,0,0,.55); z-index: 30; display: grid; gap: 2px; }
+.mi { display: grid; gap: 1px; text-align: left; padding: 8px 10px; border-radius: 7px; border: 0; background: none; cursor: pointer; }
+.mi:hover:not(:disabled) { background: var(--hover); }
+.mi b { font-weight: 500; font-size: 13.5px; }
+.mi small { color: var(--muted); font-size: 12px; }
+.mi:disabled { opacity: .45; cursor: not-allowed; }
+.msep { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--faint); padding: 10px 10px 2px; border-top: 1px solid var(--line); margin-top: 4px; }
+.mnote { margin: 2px 10px 4px; color: var(--warn); font-size: 12px; }
+
+/* Estrutura */
+.shell { display: grid; grid-template-columns: auto minmax(0, 1fr); min-height: 0; }
+.side { width: 340px; min-width: 0; border-right: 1px solid var(--line); background: var(--panel); display: grid; grid-template-rows: auto minmax(0, 1fr) auto; min-height: 0; container: side / inline-size; }
+.side.wide { width: min(540px, 44vw); }
+.side-h { display: flex; align-items: flex-start; gap: 8px; padding: 14px 10px 10px 16px; }
+.side-h h2 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: -0.005em; }
+.side-h .note { margin-top: 2px; }
+.side-b { overflow: auto; padding: 4px 16px 16px; display: grid; gap: 12px; align-content: start; min-height: 0; }
+.side-b > * { min-width: 0; }
+.work { display: grid; grid-template-rows: minmax(0, 1fr) auto auto; min-width: 0; min-height: 0; }
+
+/* Palco */
+.stage { position: relative; min-height: 0; display: grid; padding: 14px 20px; background: radial-gradient(ellipse at 50% 45%, #15171a 0%, #08090a 75%); }
+.vp { position: relative; min-height: 0; min-width: 0; container-type: size; display: grid; place-items: center; }
+.frame { position: relative; container-type: inline-size; border-radius: 4px; overflow: hidden; background: #000; box-shadow: 0 0 0 1px var(--line-2), 0 18px 40px rgba(0,0,0,.5); }
+.frame canvas { display: block; width: 100%; height: 100%; }
+.frame.h { width: min(100cqw, calc(100cqh * 16 / 9)); aspect-ratio: 16 / 9; }
+.frame.v { height: min(100cqh, calc(100cqw * 16 / 9)); aspect-ratio: 9 / 16; }
+.caption { position: absolute; left: 6%; right: 6%; top: 50%; transform: translateY(-50%); text-align: center; font: 700 6.4cqw/1.18 var(--font-cap); color: #ffd600;
+  -webkit-text-stroke: .5cqw #000; paint-order: stroke fill; text-shadow: 0 .6cqw 1.4cqw rgba(0,0,0,.75); text-wrap: balance; }
+.caption { pointer-events: none; }
+.caption .cw, .caption .cw-in { pointer-events: auto; }
+.caption .cw { cursor: text; border-radius: .25em; user-select: none; }
+.caption .cw:hover { background: rgba(255,214,0,.16); }
+.caption .cw-in { font: inherit; color: inherit; -webkit-text-stroke: inherit; paint-order: inherit; text-shadow: inherit; text-align: center; background: rgba(0,0,0,.55); border: 2px solid var(--accent); border-radius: .2em; padding: 0 .15em; outline: none; min-width: 2ch; }
+.caption[hidden] { display: none; }
+.sw { width: 22px; height: 22px; border-radius: 50%; background: var(--sw); border: 2px solid var(--line-2); cursor: pointer; padding: 0; flex: none; }
+.sw[aria-pressed="true"] { outline: 2px solid var(--fg); outline-offset: 2px; }
+input[type="color"].pick { width: 28px; height: 24px; padding: 0; border: 1px solid var(--line-2); border-radius: 6px; background: none; cursor: pointer; }
+input[type="range"].rng { width: 130px; accent-color: var(--accent); }
+.clip.cap.off { opacity: .3; }
+/* Formulário da legenda: rótulo à esquerda, controle à direita, em linhas compactas */
+.lform h3 { margin-bottom: 4px; }
+.lrow { display: grid; grid-template-columns: 84px minmax(0, 1fr); align-items: center; gap: 12px; min-height: 40px; padding: 4px 0; }
+.lrow .sl { font-size: 13px; font-weight: 500; color: var(--fg); }
+.lrow .ctl { display: flex; align-items: center; justify-content: flex-end; gap: 6px; min-width: 0; }
+.lrow .ctl select.input { width: 100%; max-width: 200px; }
+.lrow input[type="range"].rng { flex: 1; min-width: 0; max-width: 140px; }
+.lrow .lval { min-width: 44px; text-align: right; font-size: 12px; }
+.lrow .sw { width: 20px; height: 20px; }
+.croprect { position: absolute; top: 0; bottom: 0; border: 2px solid var(--accent); box-shadow: 0 0 0 9999px rgba(0,0,0,.5); border-radius: 2px; pointer-events: none; }
+.overlay { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,.55); }
+.ov-card { background: var(--raised); border: 1px solid var(--line-2); border-radius: 10px; padding: 14px 16px; display: grid; gap: 8px; width: min(320px, 84%); font-size: 13px; }
+.empty-stage { place-self: center; display: grid; justify-items: center; gap: 12px; text-align: center; color: var(--muted); border: 1.5px dashed var(--line-2); border-radius: 12px; padding: 32px 28px; max-width: 420px; }
+.empty-stage > svg { width: 28px; height: 28px; }
+.empty-stage p { margin: 0; }
+
+/* Transporte e ferramentas */
+.transport { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 10px; padding: 6px 12px; border-top: 1px solid var(--line); background: var(--bg); }
+.tools { display: flex; align-items: center; gap: 2px; min-width: 0; flex-wrap: wrap; }
+.tools.c { gap: 4px; flex-wrap: nowrap; }
+.tools.r { justify-content: flex-end; flex-wrap: nowrap; }
+.tsep { width: 1px; height: 20px; background: var(--line-2); margin: 0 6px; }
+.ibtn { width: 32px; height: 32px; display: inline-grid; place-items: center; border: 0; border-radius: 7px; background: none; color: var(--muted); cursor: pointer; flex: none; padding: 0; }
+.ibtn:hover:not(:disabled) { background: var(--raised); color: var(--fg); }
+.ibtn:disabled { opacity: .35; cursor: not-allowed; }
+.ibtn[aria-pressed="true"] { color: var(--accent); }
+.ibtn svg { width: 18px; height: 18px; }
+.ibtn.sm { width: 28px; height: 28px; }
+.ibtn.sm svg { width: 16px; height: 16px; }
+.play { width: 36px; height: 36px; border-radius: 50%; border: 0; background: var(--fg); color: var(--bg); cursor: pointer; display: grid; place-items: center; flex: none; margin: 0 2px; }
+.play:disabled { opacity: .35; cursor: not-allowed; }
+.play svg { width: 12px; height: 12px; }
+.tc { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 13px; color: var(--muted); white-space: nowrap; margin-left: 6px; }
+.tc b { color: var(--fg); font-weight: 500; }
+
+/* Timeline */
+.tl { position: relative; display: grid; grid-template-columns: var(--tl-head) minmax(0, 1fr); border-top: 1px solid var(--line); background: var(--panel); user-select: none; }
+.tl-heads { border-right: 1px solid var(--line); }
+.th { display: flex; align-items: center; gap: 7px; padding: 0 6px 0 10px; border-bottom: 1px solid var(--line); font-size: 12px; color: var(--muted); }
+.th > svg { width: 15px; height: 15px; flex: none; }
+.th .hl { color: var(--faint); display: inline-flex; }
+.tl-scroll { overflow-x: auto; overflow-y: hidden; min-width: 0; scrollbar-color: var(--line-2) transparent; }
+.tl-content { position: relative; min-width: 100%; }
+.lane { position: relative; border-bottom: 1px solid var(--line); cursor: pointer; }
+.lane.ruler { background: var(--bg); }
+.tick { position: absolute; bottom: 0; width: 1px; height: 5px; background: var(--line-2); }
+.tick.major { height: 9px; background: var(--faint); }
+.tick span { position: absolute; bottom: 10px; left: 4px; font: 10.5px var(--font-mono); color: var(--faint); white-space: nowrap; }
+.clip { position: absolute; top: 5px; bottom: 5px; min-width: 3px; border-radius: 6px; border: 1.5px solid transparent; overflow: hidden; display: flex; align-items: flex-end; font-size: 11px; }
+.clip .lbl { margin: 3px; padding: 1px 6px; border-radius: 4px; background: rgba(0,0,0,.66); color: #e8ebff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: calc(100% - 6px); }
+.clip.vid { background-color: #1d2440; background-size: 100% 100%; border-color: #4d60b0; }
+.clip.vid.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.clip[draggable="true"] { cursor: grab; }
+.clip.drop { outline: 2px dashed var(--accent); outline-offset: 1px; }
+.clip.aud { background-color: #18203a; background-size: 100% 100%; border-color: #34437d; }
+.clip.cap { background: color-mix(in srgb, var(--accent) 15%, var(--panel)); border-color: color-mix(in srgb, var(--accent) 50%, transparent); align-items: center; color: #ffe680; padding: 0 6px; }
+.clip.cap span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.clip.cap.sel { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 30%, var(--panel)); }
+.clip.rot { overflow: visible; background: color-mix(in srgb, var(--c) 32%, var(--panel)); border-color: var(--c); align-items: center; }
+.clip.rot .lbl { background: none; color: var(--fg); text-shadow: 0 1px 2px #000, 0 0 6px #000; margin-left: 8px; max-width: none; overflow: visible; }
+.clip.rot.off { opacity: .35; }
+.clip.ghost { opacity: .22; filter: grayscale(.6); border-color: transparent; pointer-events: none; }
+.clip.trimclip { overflow: visible; border-color: #4d60b0; }
+.clip.trimclip.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.clip.trimclip .lbl { margin-left: 14px; }
+.trim { position: absolute; top: -1.5px; bottom: -1.5px; width: 12px; background: var(--accent); cursor: ew-resize; z-index: 2; display: grid; place-items: center; touch-action: none; }
+.trim::after { content: ""; width: 2px; height: 40%; border-radius: 1px; background: #1a1a1a; }
+.trim.l { left: -1.5px; border-radius: 6px 0 0 6px; }
+.trim.r { right: -1.5px; border-radius: 0 6px 6px 0; }
+.trim:hover, .trimming .trim { filter: brightness(1.1); }
+.rnum { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 5px; background: var(--c); color: #111; font: 600 11px var(--font-mono); font-style: normal; flex: none; }
+.clip.rot .lbl { margin-left: 6px; padding: 0; text-shadow: none; }
+.clip.rot.sel { box-shadow: 0 0 0 2px var(--c); }
+.clip.rng { background: color-mix(in srgb, var(--accent) 18%, transparent); border-color: var(--accent); align-items: center; }
+.clip.rng .lbl { background: none; color: var(--accent); font-weight: 600; }
+.zone { position: absolute; top: 0; bottom: 0; pointer-events: none; background: repeating-linear-gradient(135deg, rgba(255,255,255,.08) 0 6px, transparent 6px 12px); }
+.zone span { position: absolute; top: 4px; left: 6px; font-size: 10.5px; color: #cfd3d8; background: rgba(0,0,0,.6); padding: 0 5px; border-radius: 3px; white-space: nowrap; }
+.hes { position: absolute; top: 3px; bottom: 3px; width: 2px; background: var(--danger); border-radius: 1px; }
+.playhead { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--fg); pointer-events: none; z-index: 5; }
+.playhead::before { content: ""; position: absolute; top: 0; left: -5px; width: 12px; height: 12px; background: var(--fg); clip-path: polygon(0 0, 100% 0, 50% 100%); }
+.lane-hint { position: absolute; inset: 0; display: flex; align-items: center; padding-left: 10px; color: var(--faint); font-size: 12px; pointer-events: none; }
+.tl-empty { position: absolute; inset: 26px 0 0; display: grid; place-items: center; color: var(--faint); font-size: 12.5px; pointer-events: none; }
+
+/* Componentes do painel */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 7px 12px; border-radius: 7px; border: 1px solid var(--line-2); background: var(--raised); cursor: pointer; white-space: nowrap; }
+.btn svg { width: 16px; height: 16px; }
+.btn:hover:not(:disabled) { background: var(--hover); }
+.btn.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); font-weight: 600; }
+.btn.primary:hover:not(:disabled) { filter: brightness(1.06); background: var(--accent); }
+.btn.ghost { background: none; border-color: transparent; color: var(--muted); }
+.btn.ghost:hover:not(:disabled) { color: var(--fg); background: var(--raised); }
+.btn.danger { color: var(--danger); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.sm { padding: 4px 9px; font-size: 12.5px; }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border-radius: 999px; font-size: 12px; background: var(--raised); color: var(--muted); border: 1px solid var(--line); white-space: nowrap; flex: none; }
+.chip.ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 35%, var(--line)); }
+.chip.warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 35%, var(--line)); }
+.chip.accent { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 35%, var(--line)); }
+.chip.off { color: var(--faint); }
+.field { display: grid; gap: 6px; }
+.field label { font-size: 12.5px; color: var(--muted); }
+.input { background: var(--bg); border: 1px solid var(--line-2); border-radius: 7px; padding: 7px 10px; width: 100%; min-width: 0; }
+textarea.input { resize: vertical; line-height: 1.5; }
+.note { color: var(--muted); font-size: 12.5px; margin: 0; }
+.banner { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 8px; border: 1px solid color-mix(in srgb, var(--warn) 40%, var(--line)); background: color-mix(in srgb, var(--warn) 8%, var(--panel)); font-size: 13px; }
+.banner.err { border-color: color-mix(in srgb, var(--danger) 45%, var(--line)); background: color-mix(in srgb, var(--danger) 8%, var(--panel)); }
+.banner strong { font-weight: 600; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 13px; margin: 0; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; }
+.kbd { font: 11px var(--font-mono); border: 1px solid var(--line-2); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; color: var(--muted); }
+.lock { display: inline-flex; gap: 6px; align-items: center; color: var(--faint); font-size: 12.5px; white-space: nowrap; }
+.progress { height: 6px; border-radius: 3px; background: var(--bg); overflow: hidden; }
+.progress i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .2s linear; }
+.steps { display: grid; gap: 14px; }
+.step { display: grid; grid-template-columns: 22px 1fr auto; gap: 10px; align-items: center; font-size: 13px; }
+.step .ic { width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid var(--line-2); display: grid; place-items: center; font-size: 11px; }
+.step.done .ic { background: var(--ok); border-color: var(--ok); color: var(--bg); }
+.step.run .ic { border-color: var(--accent); border-top-color: transparent; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.step .progress { grid-column: 2 / 4; }
+.emptyp { display: grid; justify-items: center; gap: 10px; text-align: center; color: var(--muted); padding: 28px 8px; }
+.emptyp > svg { width: 26px; height: 26px; }
+.emptyp p { margin: 0; font-size: 13px; }
+.plist { display: grid; gap: 6px; }
+.pitem { border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+.pitem.cur { border-color: var(--line-2); background: var(--raised); }
+.pmain { display: grid; gap: 1px; width: 100%; text-align: left; border: 0; background: none; padding: 9px 11px; border-radius: 7px; cursor: pointer; }
+.pmain:hover { background: var(--hover); }
+.pdate { font-size: 11.5px; color: var(--faint); }
+.pt { font-weight: 500; }
+.pref { color: var(--muted); font-size: 12.5px; }
+.pmeta { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; color: var(--muted); font-size: 12px; margin-top: 4px; }
+.pdel { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; padding: 0 8px 8px 11px; font-size: 12.5px; color: var(--muted); }
+.cuts { display: grid; gap: 4px; }
+.cuts div { display: flex; gap: 8px; align-items: center; font-size: 13px; }
+.cuts span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sent { display: grid; grid-template-columns: auto 40px 1fr; gap: 8px; align-items: baseline; padding: 6px 8px; border-radius: 6px; font-size: 13.5px; line-height: 1.5; }
+.sent.in { background: color-mix(in srgb, #7b93ff 12%, transparent); }
+.sent.out { color: var(--faint); }
+.sent .tm { font: 11px var(--font-mono); color: var(--faint); }
+.sent input { accent-color: #7b93ff; margin: 0; transform: translateY(2px); }
+.sent .nobox { width: 13px; }
+.w { cursor: pointer; border-radius: 3px; }
+.sent.in .w:hover, .words .w:hover { background: var(--hover); }
+.w.fix { color: var(--accent); }
+.w.now { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+.words { display: flex; flex-wrap: wrap; gap: 4px 6px; font-size: 14px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+.wedit { background: var(--raised); border: 1px solid var(--line-2); border-radius: 8px; padding: 12px; display: grid; gap: 8px; position: sticky; bottom: 0; }
+.versions { display: grid; gap: 6px; font-size: 12.5px; }
+.versions div { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); align-items: center; }
+.hist { display: grid; gap: 8px; }
+.hist > div { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; display: grid; gap: 4px; background: var(--bg); font-size: 13px; }
+.hist small { color: var(--muted); font-size: 12px; }
+.team { display: grid; gap: 6px; }
+.team > div { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: var(--bg); }
+.team .mono { flex: 1; min-width: 160px; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; }
+.team select.input { width: auto; }
+
+/* Configurações: uma opção por linha, rótulo à esquerda, controle à direita */
+.sgroup { display: grid; gap: 0; }
+.sgroup + .sgroup { border-top: 1px solid var(--line); padding-top: 14px; }
+.sgroup h3 { margin: 0; font-size: 14px; font-weight: 600; }
+.sgroup > .note { margin: 2px 0 4px; }
+.sgroup > .note b { color: var(--fg); font-weight: 500; }
+.srow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 20px; align-items: center; padding: 10px 0; }
+.srow.wide { grid-template-columns: minmax(0, 1fr); }
+.srow > div:first-child { min-width: 0; }
+.srow .sl { display: block; font-weight: 500; font-size: 13.5px; }
+.srow .sd { margin: 2px 0 0; color: var(--muted); font-size: 12.5px; }
+.srow .ctl { display: flex; align-items: center; gap: 6px; justify-self: end; min-width: 0; flex-wrap: wrap; }
+.srow.wide .ctl { justify-self: stretch; }
+.srow .ctl .input { width: auto; }
+.srow.wide .ctl .input { width: 100%; }
+.srow .ctl input.num { width: 58px; text-align: right; }
+.srow .unit { color: var(--muted); font-size: 13px; }
+.srow.wide textarea.input { field-sizing: content; min-height: 4.2em; max-height: 16em; }
+@container side (max-width: 470px) {
+  .srow { grid-template-columns: minmax(0, 1fr); }
+  .srow .ctl { justify-self: start; }
+}
+
+.saved { font-size: 12px; color: var(--ok); opacity: 0; transition: opacity .3s; white-space: nowrap; align-self: center; }
+.saved.on { opacity: 1; }
+.ferr { color: var(--danger); font-size: 12px; margin: 4px 0 0; }
+/* Nível 1: pregações */
+.l1 { overflow: auto; min-height: 0; }
+.l1-wrap { max-width: 1180px; margin: 0 auto; padding: 32px max(24px, env(safe-area-inset-right, 0px)) 48px max(24px, env(safe-area-inset-left, 0px)); }
+.l1-head { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+.l1-head h1 { margin: 0; font-size: 24px; font-weight: 600; letter-spacing: -0.02em; }
+.pgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+.pcard { position: relative; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); overflow: hidden; }
+.pcard:hover { border-color: var(--line-2); }
+.pc-main { display: grid; width: 100%; padding: 0; border: 0; background: none; text-align: left; cursor: pointer; }
+.pc-thumb { position: relative; display: block; aspect-ratio: 16 / 9; background: #000 center / cover; }
+.pc-prog { position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: rgba(0,0,0,.6); }
+.pc-prog i { display: block; height: 100%; background: var(--accent); }
+.pc-body { display: grid; gap: 2px; padding: 12px 14px 14px; }
+.pc-more { position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,.55); color: var(--fg); }
+.pc-more:hover:not(:disabled) { background: rgba(0,0,0,.8); }
+.pc-menu { top: 40px; right: 8px; }
+.pc-confirm { position: absolute; inset: auto 0 0 0; display: grid; gap: 8px; padding: 12px 14px; background: var(--raised); border-top: 1px solid var(--line-2); font-size: 13px; }
+.cmenu { position: absolute; z-index: 25; right: 0; top: calc(100% + 4px); min-width: 210px; background: var(--raised); border: 1px solid var(--line-2); border-radius: 10px; padding: 4px; box-shadow: 0 14px 36px rgba(0,0,0,.55); display: grid; gap: 2px; }
+.mi.danger b { color: var(--danger); }
+.modal-bg { position: fixed; inset: 0; z-index: 50; display: grid; place-items: start center; padding: 14vh 16px 16px; background: rgba(0,0,0,.6); }
+.modal { width: min(520px, 100%); display: grid; gap: 12px; padding: 18px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line-2); box-shadow: 0 24px 60px rgba(0,0,0,.6); }
+.modal h2 { margin: 0; font-size: 16px; font-weight: 600; }
+.xmodal { width: min(600px, 100%); max-height: calc(100vh - 12vh - 24px); grid-template-rows: auto minmax(0, 1fr) auto; padding: 18px 20px; }
+.modal-bg:has(.xmodal) { padding-top: 6vh; }
+.xbody { overflow: auto; min-height: 0; margin: 0 -20px; padding: 0 20px; }
+.xsec { padding: 6px 0 4px; border-top: 1px solid var(--line); }
+.xsec:first-child { border-top: 0; }
+.xsec h3 { margin: 10px 0 0; font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: .08em; color: var(--faint); }
+.xsec .srow { padding: 8px 0; }
+.xfoot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-top: 12px; border-top: 1px solid var(--line); }
+
+/* Painel lateral: abas do corte e cartões de corte */
+.ptabs { display: flex; gap: 2px; }
+.ptabs button { border: 0; background: none; padding: 4px 10px; border-radius: 6px; color: var(--muted); cursor: pointer; font-size: 14px; font-weight: 500; }
+.ptabs button[aria-selected="true"] { background: var(--raised); color: var(--fg); }
+.cclist { display: grid; gap: 6px; }
+.cc { position: relative; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); padding: 10px 8px 10px 12px; display: grid; gap: 4px; }
+.cc:hover { border-color: var(--line-2); }
+.cc.sel { border-color: var(--c); background: var(--raised); }
+.cc.off { opacity: .6; }
+.cc-top { position: relative; display: flex; align-items: center; gap: 6px; }
+.cc-main { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; padding: 0; border: 0; background: none; text-align: left; cursor: pointer; color: var(--fg); }
+.cc-title { font-weight: 500; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.cc.sel .cc-title { white-space: normal; }
+.cc-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding-left: 28px; font-size: 12.5px; color: var(--muted); }
+.cc-meta .warn { color: var(--warn); }
+.cc-st { color: var(--accent); }
+.cc-ex { display: inline-flex; align-items: center; gap: 4px; color: var(--ok); }
+.cc-ex svg { width: 13px; height: 13px; }
+.cc-more { display: grid; gap: 8px; padding: 6px 0 2px 28px; }
+.cc-quote { margin: 0; font-size: 13px; line-height: 1.55; color: var(--fg); display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.cc-why, .cc-risk { margin: 0; font-size: 12.5px; color: var(--muted); }
+.cc-risk { color: var(--warn); }
+.cc-more .btn { justify-self: start; }
+.ccgone summary { cursor: pointer; color: var(--muted); font-size: 12.5px; padding: 4px 2px; list-style-position: inside; }
+.ccgone[open] summary { margin-bottom: 6px; }
+.th[data-act] { cursor: pointer; }
+.th.on { color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.lane.on { background: color-mix(in srgb, var(--accent) 5%, transparent); }
+.th[data-act]:hover { color: var(--fg); background: var(--raised); }
+.th .thn { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.clip.ct { top: 4px; bottom: 4px; overflow: visible; background: color-mix(in srgb, var(--c) 28%, var(--panel)); border-color: var(--c); align-items: center; cursor: pointer; }
+.clip.ct .lbl { background: none; color: var(--fg); margin-left: 14px; font-family: var(--font-mono); }
+.clip.ct.sel { box-shadow: 0 0 0 2px var(--c); background: color-mix(in srgb, var(--c) 45%, var(--panel)); }
+.clip.ct.off { opacity: .35; }
+.clip.ct .trim { width: 8px; background: var(--c); }
+
+.toast { position: fixed; left: 50%; bottom: calc(44px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--fg); color: var(--bg); padding: 9px 14px; border-radius: 8px; font-size: 13px; z-index: 40; max-width: calc(100vw - 32px); box-shadow: 0 8px 24px rgba(0,0,0,.4); }
+.toast[hidden] { display: none; }
+
+@media (max-width: 860px) {
+  body { overflow: auto; }
+  .app.settings { grid-template-rows: minmax(0, 1fr) auto; }
+  .sbar { position: sticky; bottom: 0; z-index: 20; }
+  .settings-screen { grid-template-columns: minmax(0, 1fr); }
+  .snav { grid-template-rows: auto auto auto; border-right: 0; border-bottom: 1px solid var(--line); }
+  .settings-screen { grid-template-rows: auto minmax(0, 1fr); }
+  .sn-list { display: flex; overflow-x: auto; padding: 0 10px 10px; gap: 4px; }
+  .sn-g { display: none; }
+  .sn-i { white-space: nowrap; }
+  .smain { overflow: visible; }
+  .s-top { padding: 10px 16px; }
+  .s-wrap { padding: 24px 16px 48px; }
+  .scard { padding: 16px 16px 8px; }
+  .srow { grid-template-columns: minmax(0, 1fr); }
+  .srow .ctl { justify-self: start; }
+  :root { --tl-head: 92px; }
+  .app { height: auto; min-height: 100%; }
+  .top { flex-wrap: wrap; }
+  .crumbs { order: 9; flex-basis: 100%; margin: 0; padding: 0; border: 0; }
+  .vc { display: none; }
+  .shell { grid-template-columns: minmax(0, 1fr); }
+  .l1-wrap { padding: 20px 16px 40px; }
+  .work { order: 1; grid-template-rows: auto auto auto; }
+  .stage { height: 54vh; min-height: 320px; padding: 12px; }
+  .transport { grid-template-columns: minmax(0, 1fr); justify-items: center; }
+  .tools, .tools.r { justify-content: center; }
+        .side, .side.wide { order: 3; width: auto; border-right: 0; }
+  .side-b { overflow: visible; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pill.busy .dot, .step.run .ic { animation: none; }
+  .progress i { transition: none; }
+}
+</style>
+
+<div class="app" id="app"></div>
+
+<script>
+/* ---------- Dados de exemplo (pregação pública de 18/10/2026; textos da transcrição) ---------- */
+const SENT = [
+  [1, 960.26, 963.48, "Ela diz: se eu tiver que morrer, morrerei."],
+  [2, 963.49, 965.48, "Isso é coragem."],
+  [3, 965.49, 969.34, "E coragem não é a ausência de medo."],
+  [4, 969.34, 974.79, "Ela estava com medo, mas foi mesmo assim, porque ela confiava em Deus."],
+  [5, 974.79, 981.19, "Coragem é obedecer, mesmo com as pernas tremendo."],
+  [6, 981.19, 992.86, "Ela tinha tudo a perder: a coroa, o seu conforto, a sua vida."],
+  [7, 992.86, 1003.1, "Mas ela decidiu que lutar pelo seu povo valia mais do que a sua própria vida, e ela se arrisca."],
+  [8, 1046.7, 1054.14, "Quando viu a rainha Esther no palácio, ele a favoreceu, estendeu-lhe o cetro de ouro."],
+  [9, 1102.04, 1119.13, "Esther teve coragem de entrar, mas ele a favoreceu: ela não conquistou o cetro, ela recebeu."],
+  [10, 1119.13, 1124.73, "Foi Deus que abriu uma porta que ela jamais conseguiria sozinha abrir."],
+  [11, 2199.18, 2203.28, "Violência não é cruz a carregar."],
+  [12, 2203.28, 2205.82, "É pecado a ser enfrentado."],
+  [13, 2205.82, 2208.25, "É pecado a ser denunciado."],
+  [14, 2289.87, 2295.66, "Talvez Deus peça a coragem de Esther, a coragem de não se calar diante da injustiça."],
+  [15, 2295.66, 2299.14, "De dar um passo, mesmo diante do medo."],
+  [16, 2299.14, 2302.44, "Mas saiba, essa coragem, ela não nasce de nós."],
+  [17, 2302.44, 2307.49, "Ela nasce de saber que Deus está no controle de tudo."],
+  [18, 2367.5, 2369.82, "A gente tem que denunciar."],
+  [19, 2369.82, 2374.1, "A gente tem que acolher e orientar as vítimas."],
+  [20, 2374.1, 2382.22, "E mais do que isso, a gente tem que preparar as crianças a identificar e a não aceitar."],
+  [21, 2453.26, 2457.12, "Em Esté, o decreto de morte continuou de pé."],
+  [22, 2457.12, 2466.48, "Em Cristo, a dívida que havia contra nós foi paga, foi pregada naquela cruz do Calvário."],
+  [23, 2466.48, 2470.05, "Por isso, irmãos, não podemos viver como condenados."],
+  [24, 2470.05, 2475.89, "A dívida foi paga, a porta da graça foi aberta, entrem com confiança."],
+].map(([id, s, e, t]) => ({ id, s, e, t }));
+const SBY = Object.fromEntries(SENT.map(x => [x.id, x]));
+/* Intérprete de Libras entra no quadro nestes intervalos da pregação */
+const SECOND = [[974, 1004], [2366, 2383]];
+
+/* Sugestões de corte de exemplo (reaproveitadas quando uma pregação é processada no protótipo) */
+const TEMPLATE = [
+  { title: "Coragem não é ausência de medo", segs: [[2, 3, 4], [5, 6, 7], [14, 15, 16, 17]], why: "Aplicação prática: coragem como obediência; fecha em Deus no controle, não em força própria.", risk: "Nenhum.", hes: 4 },
+  { title: "Ela não conquistou o cetro", segs: [[8], [9, 10], [21, 22, 23, 24]], why: "Cristológico: graça recebida, não conquistada, ligada à dívida paga na cruz.", risk: "Material longo: o trecho final vem 22 min depois.", hes: 3 },
+  { title: "Violência não é cruz a carregar", segs: [[11, 12, 13], [18, 19, 20]], why: "Aplicação pastoral: denunciar e acolher, sem promessa fácil.", risk: "Abaixo da meta de duração; tema sensível.", hes: 1 },
+];
+/* Faixa do corte na pregação: do início da primeira frase ao fim da última */
+const rangeOf = segs => { const all = segs.flat().map(id => SBY[id]); return [Math.min(...all.map(x => x.s)), Math.max(...all.map(x => x.e))]; };
+
+const S = {
+  role: "assistente",
+  screen: "editor",
+  spage: "modelo",
+  sq: "",
+  level: 1,
+  tab: "texto",
+  panelOpen: true,
+  modal: false,
+  xdlg: false,
+  liveErr: false,
+  pmenu: null,
+  cutMenu: null,
+  selCut: null,
+  showGone: false,
+  styleSnap: false,
+  selBlock: null,
+  exportOpen: false,
+  zoom: 1,
+  scrollTo: null,
+  keep: null,
+  rate: 1,
+  undo: [],
+  redo: [],
+  centerPh: false,
+  sermonId: 43,
+  scriptId: 201,
+  view916: true,
+  selSeg: 0,
+  capEditing: false,
+  busy: null,
+  confirmDel: null,
+  render: null,
+  keyLast4: "3f9a",
+  model: "anthropic/claude-opus-5.5",
+  presets: [],
+  presetPadrao: 1,
+  presetSel: 1,
+  team: [
+    { email: "admin@exemplo.org", role: "Administrador" },
+    { email: "assistente1@exemplo.org", role: "Assistente" },
+    { email: "assistente2@exemplo.org", role: "Assistente" },
+  ],
+  history: [
+    { what: "Exportar “Coragem não é ausência de medo”", who: "assistente1@exemplo.org", when: "20/10 00:23", dur: "3 min", ok: true },
+    { what: "Processar pregação de 18/10", who: "admin@exemplo.org", when: "19/10 22:37", dur: "31 min", ok: true },
+    { what: "Exportar “Ele não arriscou sua vida…”", who: "admin@exemplo.org", when: "19/10 23:56", dur: "4 min", ok: false, err: "interrompido por reinício" },
+  ],
+  sermons: [
+    { id: 45, date: "25/10/2026", title: "Culto de domingo", ref: "", status: "faixa", live: "Culto de domingo · 25/10/2026", liveDur: 7574, range: null, scripts: [] },
+    { id: 43, date: "18/10/2026", title: "Para um momento como este", ref: "Ester 4.13-16", status: "pronta", live: "Culto de domingo · 18/10/2026", liveDur: 7471, range: [3492, 6072], done: [3492, 6072], base: 3492, dur: 2580,
+      sug: { model: "anthropic/claude-opus-5.5", preset: "Padrão", when: "19/10 23:09" },
+      scripts: TEMPLATE.map((t, i) => ({ ...JSON.parse(JSON.stringify(t)), id: 201 + i, state: i === 0 ? "escolhido" : "sugerido", corr: {}, exports: i === 0 ? [{ when: "20/10 00:23", dur: 57 }] : [], range: rangeOf(t.segs) })) },
+    { id: 41, date: "11/10/2026", title: "Eu sou a ressurreição e a vida", ref: "João 11.25", status: "pronta", live: "Culto de domingo · 11/10/2026", liveDur: 7302, range: [3105, 5598], done: [3105, 5598], base: 3105, dur: 2493,
+      sug: { model: "anthropic/claude-opus-5.5", preset: "Padrão", when: "12/10 09:40" }, scripts: [] },
+  ],
+};
+
+/* ---------- Critérios (conteúdo inicial: skills/video-corte-vertical/sugerir-cortes.md) ---------- */
+const CRIT0 = {
+  ideias: [3, 5],
+  filtros: [
+    { nome: "Triunfalismo", desc: "Vitória, prosperidade ou cura prometidas sem cruz.", nivel: "rigoroso" },
+    { nome: "Teologia frágil", desc: "Decretar sobre a própria vida, fé como força positiva.", nivel: "rigoroso" },
+    { nome: "Alegoria", desc: "Texto bíblico como metáfora livre, fora do contexto.", nivel: "moderado" },
+    { nome: "Moralismo sem graça", desc: "Esforço e cobrança sem Cristo como motivo.", nivel: "moderado" },
+    { nome: "Fora de contexto", desc: "Isolada, a frase muda ou inverte o argumento.", nivel: "rigoroso" },
+    { nome: "Sectarismo e polêmica", desc: "Ataque a outras igrejas ou cristãos.", nivel: "rigoroso" },
+    { nome: "Exposição de pessoas", desc: "Nome, saúde ou situação de terceiros (LGPD).", nivel: "rigoroso" },
+    { nome: "Erro factual", desc: "Citação bíblica ou dado histórico errado.", nivel: "moderado" },
+  ],
+  valores: [
+    { nome: "Cristológico", desc: "Cristo como centro: quem ele é, cruz, ressurreição, graça.", nivel: "rigoroso" },
+    { nome: "Aplicação prática", desc: "O que muda na vida concreta, motivado pelo evangelho.", nivel: "moderado" },
+    { nome: "Frase marcante", desc: "Síntese curta e memorável que se sustenta sozinha.", nivel: "moderado" },
+  ],
+  instrucoes: "Valorize também, sem que bastem sozinhos:\n- exposição fiel do texto bíblico;\n- chamado ao evangelho: fé, arrependimento, batismo;\n- Ceia, comunhão, unidade do corpo de Cristo;\n- consolo pastoral honesto;\n- ilustração que esclarece em vez de enfeitar.",
+  dur: [40, 75], ideal: [55, 65], gancho: 3,
+  autonomo: true, fechamento: true, limpo: true,
+  reordenar: true, protegidas: "não, mas, se",
+};
+const clone = o => JSON.parse(JSON.stringify(o));
+const rig = n => clone(CRIT0.filtros).map(f => ({ ...f, nivel: n }));
+S.presets = [
+  { id: 1, nome: "Padrão", ...clone(CRIT0) },
+  { id: 2, nome: "Culto de jovens", ...clone(CRIT0), ideal: [45, 55], gancho: 2 },
+  { id: 3, nome: "Estudo bíblico", ...clone(CRIT0), ideal: [60, 75], filtros: rig("rigoroso") },
+];
+const preset = id => S.presets.find(x => x.id === id);
+function setCrit(path, v) { const ks = path.split("."); let o = preset(S.presetSel); ks.slice(0, -1).forEach(k => { o = o[k]; }); o[ks[ks.length - 1]] = v; }
+/* Formulários salvam sozinhos; o cabeçalho do painel confirma com "Salvo" */
+let savedT;
+function saved() { const el = document.getElementById("saved"); if (!el) return; el.textContent = "Salvo"; el.classList.add("on"); clearTimeout(savedT); savedT = setTimeout(() => el.classList.remove("on"), 1500); }
+
+/* ---------- Utilidades ---------- */
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const pad = n => String(n).padStart(2, "0");
+function fmt(t) { t = Math.max(0, t); const h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), s = Math.floor(t % 60); return h ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`; }
+function fmtD(t) { return fmt(t) + "." + Math.floor((Math.max(0, t) % 1) * 10); }
+const isAdmin = () => S.role === "admin";
+const sermon = () => S.sermons.find(x => x.id === S.sermonId);
+const script = () => (sermon()?.scripts || []).find(x => x.id === S.scriptId);
+const ICON = {
+  play: '<svg viewBox="0 0 12 12"><path d="M2 1l9 5-9 5z" fill="currentColor"/></svg>',
+  pause: '<svg viewBox="0 0 12 12"><path d="M2 1h3v10H2zM7 1h3v10H7z" fill="currentColor"/></svg>',
+  lock: '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><rect x="2" y="5.5" width="8" height="5.5" rx="1.2" fill="currentColor"/><path d="M4 5.5V4a2 2 0 014 0v1.5" stroke="currentColor" stroke-width="1.3" fill="none"/></svg>',
+};
+function lev(a, b) {
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++)
+    d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  return d[a.length][b.length];
+}
+const core = w => w.toLowerCase().replace(/[^\p{L}\p{N}-]/gu, "");
+let toastTimer;
+function toast(msg) {
+  let el = document.querySelector(".toast");
+  if (!el) { el = document.createElement("div"); el.className = "toast"; el.setAttribute("role", "status"); document.body.appendChild(el); }
+  el.textContent = msg; el.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.hidden = true; }, 2800);
+}
+
+/* ---------- Montagem do roteiro: trechos, palavras e blocos de legenda ---------- */
+function build(sc) {
+  let out = 0; const segs = [], words = [];
+  sc.segs.forEach((ids, i) => {
+    const ss = ids.map(id => SBY[id]); const srcS = ss[0].s, srcE = ss[ss.length - 1].e, dur = srcE - srcS;
+    const second = SECOND.some(([a, b]) => srcS < b && srcE > a);
+    segs.push({ i, ids, srcS, srcE, dur, outS: out, second, text: ss.map(x => x.t).join(" ") });
+    ss.forEach(sn => {
+      const toks = sn.t.split(" "); const L = toks.reduce((a, w) => a + w.length + 1, 0); let c = sn.s;
+      toks.forEach((tok, k) => { const d = (sn.e - sn.s) * (tok.length + 1) / L; const key = sn.id + ":" + k;
+        words.push({ key, w: sc.corr[key] ?? tok, orig: tok, s: out + (c - srcS), e: out + (c - srcS) + d * .92, seg: i, end: /[.!?]$/.test(tok) }); c += d; });
+    });
+    out += dur;
+  });
+  const blocks = []; let cur = null;
+  words.forEach((w, i) => {
+    if (!cur || cur.words.length >= 6 || cur.chars + w.w.length > 34) { cur = { words: [], chars: 0, s: w.s }; blocks.push(cur); }
+    cur.words.push(w); cur.chars += w.w.length + 1;
+    if (w.end && i < words.length - 1) cur = null;
+  });
+  blocks.forEach((b, i) => { b.e = i < blocks.length - 1 ? blocks[i + 1].s : b.words[b.words.length - 1].e; b.text = b.words.map(w => w.w).join(" "); });
+  return { segs, words, blocks, total: out };
+}
+
+/* ---------- Cena do vídeo (simulada em canvas) ---------- */
+function person(ctx, x, H, scale, shirt) {
+  const r = H * .055 * scale, y = H * .36 + (1 - scale) * H * .08;
+  ctx.fillStyle = shirt; ctx.beginPath(); ctx.roundRect(x - H * .1 * scale, y + r * 1.15, H * .2 * scale, H * .5, H * .05 * scale); ctx.fill();
+  ctx.fillStyle = "#b98d6f"; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#2a1e17"; ctx.beginPath(); ctx.arc(x, y - r * .35, r * .95, Math.PI, 0); ctx.fill();
+}
+function preacherX(W, srcT) { return W * (.46 + .06 * Math.sin(srcT / 6.3) + .02 * Math.sin(srcT / 2.1)); }
+function drawScene(ctx, W, H, srcT, o = {}) {
+  const sermonOn = o.sermon !== false;
+  const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#1d1814"); g.addColorStop(1, "#0b0a09");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = "rgba(255,255,255,.04)"; ctx.lineWidth = 1;
+  for (let x = W * .08; x < W; x += W * .12) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H * .78); ctx.stroke(); }
+  ctx.strokeStyle = "rgba(255,226,180,.22)"; ctx.lineWidth = W * .006;
+  ctx.beginPath(); ctx.moveTo(W * .2, H * .12); ctx.lineTo(W * .2, H * .5); ctx.moveTo(W * .17, H * .2); ctx.lineTo(W * .23, H * .2); ctx.stroke();
+  if (!sermonOn) {
+    const hue = (srcT * 12) % 360;
+    [.25, .5, .75].forEach((p, k) => { const rg = ctx.createRadialGradient(W * p, 0, 0, W * p, 0, H * .9);
+      rg.addColorStop(0, `hsla(${(hue + k * 70) % 360},70%,55%,.28)`); rg.addColorStop(1, "transparent"); ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H); });
+    [.32, .5, .68].forEach((p, k) => person(ctx, W * p + Math.sin(srcT * 1.3 + k) * W * .006, H, .78, "#262b36"));
+    ctx.fillStyle = "rgba(255,255,255,.35)"; ctx.font = `500 ${H * .045}px Geist, system-ui, sans-serif`; ctx.fillText("louvor", W * .04, H * .93);
+  } else {
+    const px = preacherX(W, srcT);
+    const rg = ctx.createRadialGradient(px, H * .3, 0, px, H * .3, H * .75); rg.addColorStop(0, "rgba(255,214,150,.22)"); rg.addColorStop(1, "transparent");
+    ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H);
+    if (o.second) person(ctx, W * .82, H, .82, "#1f2a26");
+    person(ctx, px, H, 1, "#2c3440");
+    ctx.fillStyle = "#3a2c22"; ctx.fillRect(W * .55, H * .62, W * .12, H * .38);
+    ctx.fillStyle = "rgba(255,255,255,.05)"; ctx.fillRect(W * .55, H * .62, W * .12, H * .02);
+  }
+  ctx.fillStyle = "rgba(0,0,0,.35)"; ctx.fillRect(0, H * .9, W, H * .1);
+}
+const SRC = document.createElement("canvas"); SRC.width = 640; SRC.height = 360; const sctx = SRC.getContext("2d");
+
+/* ---------- Ícones ---------- */
+const ic = d => `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const I = {
+  menu: ic('<path d="M4 6h16M4 12h16M4 18h16"/>'),
+  film: ic('<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 5v14M17 5v14M3 9.5h4M3 14.5h4M17 9.5h4M17 14.5h4"/>'),
+  link: ic('<path d="M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.5-1.5"/>'),
+  spark: ic('<path d="M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7-4.7-1.8 4.7-1.8z"/><path d="M19 15l.7 1.8 1.8.7-1.8.7L19 20l-.7-1.8-1.8-.7 1.8-.7z"/>'),
+  text: ic('<path d="M5 7V5h14v2M12 5v14M9 19h6"/>'),
+  cc: ic('<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M10.5 10.2a2.2 2.2 0 1 0 0 3.6M17 10.2a2.2 2.2 0 1 0 0 3.6"/>'),
+  activity: ic('<path d="M3 12h4l3-8 4 16 3-8h4"/>'),
+  sliders: ic('<path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/>'),
+  users: ic('<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.3a6.5 6.5 0 0 1 3.5 5.7"/>'),
+  undo: ic('<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>'),
+  redo: ic('<path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/>'),
+  scissors: ic('<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4 8.1 15.9M14.5 14.5 20 20M8.1 8.1 12 12"/>'),
+  trash: ic('<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/>'),
+  zoomIn: ic('<circle cx="11" cy="11" r="7"/><path d="m20 20-4-4M8 11h6M11 8v6"/>'),
+  zoomOut: ic('<circle cx="11" cy="11" r="7"/><path d="m20 20-4-4M8 11h6"/>'),
+  fit: ic('<path d="M3 12h18M7 8l-4 4 4 4M17 8l4 4-4 4"/>'),
+  back: ic('<path d="M11 17l-5-5 5-5M18 17l-5-5 5-5"/>'),
+  fwd: ic('<path d="m13 17 5-5-5-5M6 17l5-5-5-5"/>'),
+  upload: ic('<path d="M12 15V3M7 8l5-5 5 5"/><path d="M5 15v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"/>'),
+  chev: ic('<path d="m6 9 6 6 6-6"/>'),
+  x: ic('<path d="M18 6 6 18M6 6l12 12"/>'),
+  plus: ic('<path d="M12 5v14M5 12h14"/>'),
+  crop: ic('<path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M18 22V8a2 2 0 0 0-2-2H2"/>'),
+  left: ic('<path d="m15 18-6-6 6-6"/>'),
+  right: ic('<path d="m9 18 6-6-6-6"/>'),
+  wave: ic('<path d="M3 12h1M7 8v8M11 5v14M15 9v6M19 7v10M22 12h-1"/>'),
+  range: ic('<path d="M5 4v16M19 4v16M5 12h14"/>'),
+  gear: ic('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>'),
+  search: ic('<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>'),
+  check: ic('<path d="M20 6 9 17l-5-5"/>'),
+  dots: ic('<circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/>'),
+  arrowLeft: ic('<path d="M19 12H5M12 19l-7-7 7-7"/>'),
+  filter: ic('<path d="M3 5h18l-7 8v6l-4 2v-8z"/>'),
+  star: ic('<path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3 6.4 20.2l1.1-6.2L3 9.6l6.2-.9z"/>'),
+  clock: ic('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'),
+  eye: ic('<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>'),
+  eyeOff: ic('<path d="M3 3l18 18M10.6 5.1A10 10 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4.2M6.6 6.6A17 17 0 0 0 2 12s3.5 7 10 7a9.7 9.7 0 0 0 5.4-1.6"/>'),
+};
+
+/* ---------- Miniaturas e formas de onda da timeline (desenhadas uma vez e guardadas) ---------- */
+const IMG = new Map();
+function makeImg(key, w, h, draw) {
+  if (IMG.has(key)) return IMG.get(key);
+  const c = document.createElement("canvas"); c.width = w; c.height = h; draw(c.getContext("2d"));
+  const u = c.toDataURL("image/jpeg", .72); IMG.set(key, u); return u;
+}
+function frames(key, n, t0, t1, opt) {
+  const fw = 64, fh = 36;
+  return makeImg(`f:${key}:${n}`, n * fw, fh, x => {
+    for (let i = 0; i < n; i++) {
+      const t = t0 + (i + .5) / n * (t1 - t0);
+      x.save(); x.translate(i * fw, 0); x.beginPath(); x.rect(0, 0, fw, fh); x.clip(); drawScene(x, fw, fh, t, opt(t)); x.restore();
+      x.fillStyle = "rgba(0,0,0,.55)"; x.fillRect(i * fw + fw - 1, 0, 1, fh);
+    }
+  });
+}
+const rnd = (i, s = 1) => { const v = Math.sin(i * 12.9898 + s * 78.233) * 43758.5453; return v - Math.floor(v); };
+function wave(key, n, amp) {
+  const h = 40;
+  return makeImg(`w:${key}:${n}`, n * 3, h, x => {
+    x.fillStyle = "#18203a"; x.fillRect(0, 0, n * 3, h); x.fillStyle = "#8094ff";
+    for (let i = 0; i < n; i++) { const bh = Math.max(.06, Math.min(1, amp(i / n, i))) * (h - 6); x.fillRect(i * 3, (h - bh) / 2, 2, bh); }
+  });
+}
+const speech = (i, s) => .18 + .62 * rnd(i, s) * (.45 + .55 * Math.abs(Math.sin(i * .17 + s)));
+/* Largura estimada da timeline em px, para escolher quantas miniaturas desenhar */
+function tlW() {
+  const side = S.panelOpen ? 340 : 0;
+  const w = innerWidth <= 860 ? innerWidth - 92 : innerWidth - side - 132;
+  return Math.max(200, w) * S.zoom;
+}
+const nFrames = px => Math.max(1, Math.min(240, Math.round(px / 82)));
+const MUSIC = [[0, 1500], [2160, 3420], [6120, 7574]];
+const liveOn = t => !MUSIC.some(([a, b]) => t >= a && t < b);
+const COLORS = ["#7b93ff", "#4cc38a", "#f0a43a", "#d77bff"];
+
+/* ---------- Estilo da legenda: um por corte, vale para todos os blocos ---------- */
+const CAP0 = { on: true, font: "Open Sans", size: 6.4, color: "#FFD600", pos: 50, stroke: 5, strokeColor: "#000000", shadow: "suave" };
+const FONTS = { "Open Sans": 700, "Montserrat": 800, "Poppins": 700, "Roboto Slab": 700, "Bebas Neue": 400, "Anton": 400 };
+const SHADOWS = { nenhuma: "none", suave: "0 .6cqw 1.4cqw rgba(0,0,0,.75)", forte: "0 .8cqw 0 rgba(0,0,0,.95), 0 0 2.4cqw rgba(0,0,0,.9)" };
+const TEXT_COLORS = [["#FFD600", "Amarelo"], ["#FFFFFF", "Branco"], ["#00E5FF", "Ciano"], ["#FF9F1C", "Laranja"], ["#FF5C8A", "Rosa"]];
+const capStyle = r => r.style || (r.style = clone(CAP0));
+const capCss = st => `font:${FONTS[st.font]} ${st.size}cqw/1.18 '${st.font}', var(--font-cap);color:${st.color};-webkit-text-stroke:${st.stroke / 10}cqw ${st.strokeColor};text-shadow:${SHADOWS[st.shadow]};top:${st.pos}%`;
+const px1080 = cqw => Math.round(cqw * 10.8);
+const capWords = (blk, r) => blk.words.map(w => `<span class="cw" data-k="${w.key}" data-w="${esc(w.orig)}" title="Clique duas vezes para corrigir">${esc(w.w)}</span>`).join(" ");
+/* Trava de grafia: o assistente só corrige para uma palavra parecida com a original */
+function checkWord(orig, val) {
+  if (val.split(/\s+/).length !== 1) return "Use uma palavra só.";
+  const d = lev(core(orig), core(val)), lim = Math.max(1, Math.floor(core(orig).length * .34));
+  if (!isAdmin() && d > lim) return `Bloqueado: “${val}” não é uma correção de grafia de “${orig}” e mudaria o que foi dito. Só o administrador altera o conteúdo.`;
+  return null;
+}
+function editCapWord(span) {
+  if (P) { P.playing = false; syncPlay(); }
+  const r = script(), key = span.dataset.k, orig = span.dataset.w, cur = r.corr[key] ?? orig;
+  const inp = document.createElement("input"); inp.className = "cw-in"; inp.value = cur; inp.size = Math.max(2, cur.length);
+  inp.setAttribute("aria-label", `Corrigir “${orig}”`); inp.spellcheck = false;
+  span.replaceWith(inp); S.capEditing = true; inp.focus(); inp.select();
+  let closed = false;
+  const close = commit => {
+    if (closed) return; const v = inp.value.trim();
+    if (commit && v && v !== cur) { const err = checkWord(orig, v); if (err) { toast(err); if (document.activeElement !== inp) { closed = true; S.capEditing = false; render(); } else inp.select(); return; }
+      snap(); if (v === orig) delete r.corr[key]; else r.corr[key] = v; }
+    closed = true; S.capEditing = false; render(); if (commit && v && v !== cur) saved();
+  };
+  inp.addEventListener("input", () => { inp.size = Math.max(2, inp.value.length); });
+  inp.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); close(true); } if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); close(false); } });
+  inp.addEventListener("blur", () => close(true));
+}
+function applyCap() { const c = document.getElementById("cap"); if (!c || S.level !== 3) return; const st = capStyle(script()); c.style.cssText = capCss(st); c.hidden = !st.on; }
+
+/* ---------- Player ---------- */
+let P = null, lastTs = 0;
+const viewKey = () => `${S.level}:${S.sermonId}:${S.level === 3 ? S.scriptId : ""}`;
+function setPlayer(cfg) { P = { t: 0, playing: false, rate: S.level === 2 && sermon().status !== "pronta" ? S.rate : 1, key: viewKey(), ...cfg }; P.frame(0); syncPlay(); }
+function syncPlay() { const b = document.getElementById("play"); if (b && P) { b.innerHTML = P.playing ? ICON.pause : ICON.play; b.setAttribute("aria-label", P.playing ? "Pausar" : "Reproduzir"); } }
+function seek(t) { if (!P) return; P.t = Math.min(Math.max(0, t), P.dur); P.frame(P.t); }
+function tick(ts) {
+  const dt = Math.min(.1, (ts - lastTs) / 1000); lastTs = ts;
+  try { if (P && P.playing) { P.t += dt * P.rate; if (P.t >= P.dur) { P.t = P.dur; P.playing = false; syncPlay(); } P.frame(P.t); } }
+  catch (err) { if (P) P.playing = false; }
+  requestAnimationFrame(tick);
+}
+requestAnimationFrame(t => { lastTs = t; requestAnimationFrame(tick); });
+/* Durante a reprodução, a timeline rola para manter o cursor à vista */
+function follow(frac) {
+  if (!P || !P.playing) return;
+  const sc = document.getElementById("tls"); if (!sc) return;
+  const x = frac * sc.scrollWidth;
+  if (x < sc.scrollLeft + 16 || x > sc.scrollLeft + sc.clientWidth - 40) sc.scrollLeft = x - sc.clientWidth * .2;
+}
+
+/* ---------- Componentes ---------- */
+const who = () => isAdmin() ? "admin@exemplo.org" : "assistente1@exemplo.org";
+const fileName = s => `${s.date.split("/").reverse().join("-")} - ${s.title}.mp4`;
+const MINLEN = 60;
+/* Bordas da pregação dentro da live. Sem marcação, o clipe é a live inteira. */
+function bounds(s = sermon()) { return { lo: s.range?.[0] ?? 0, hi: s.range?.[1] ?? s.liveDur, D: s.liveDur, trimmed: !!s.range }; }
+const rangeChanged = s => s.status === "pronta" && s.done && (s.range[0] !== s.done[0] || s.range[1] !== s.done[1]);
+const fmtS = t => (t < 0 ? "−" : "") + fmt(Math.abs(t));
+function busyBanner() {
+  if (!S.busy || S.render) return "";
+  const min = Math.max(1, Math.round((Date.now() - S.busy.since) / 60000));
+  return `<div class="banner" role="status"><span class="dot" style="background:var(--warn);margin-top:6px"></span><div><strong>Máquina ocupada:</strong> ${esc(S.busy.what)} · ${esc(S.busy.who)} · há ${min} min.</div></div>`;
+}
+const emptyP = (icon, msg, action = "") => `<div class="emptyp">${icon}<p>${msg}</p>${action}</div>`;
+function niceStep(x) { return [1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600].find(s => s >= x) || 3600; }
+/* Régua em tempo relativo a `zero` (início da pregação no nível 2; 0 nos demais) */
+function ruler(dur, zero = 0) {
+  const major = niceStep(dur / (8 * S.zoom)), minor = major / 5; let h = "";
+  for (let k = Math.ceil(-zero / minor); zero + k * minor <= dur + .001; k++) {
+    const t = zero + k * minor, rel = k * minor, m = Math.abs(rel / major - Math.round(rel / major)) < .001;
+    h += `<div class="tick${m ? " major" : ""}" style="left:${t / dur * 100}%">${m ? `<span>${fmtS(rel)}</span>` : ""}</div>`;
+  }
+  return h;
+}
+const cutIndex = (s, r) => s.scripts.indexOf(r);
+const cutColor = (s, r) => COLORS[cutIndex(s, r) % COLORS.length];
+const exported = r => r.exports && r.exports.length ? r.exports[0] : null;
+
+/* ---------- Barra superior ---------- */
+function topbar() {
+  const s = sermon();
+  let crumbs = `<button class="cr${S.level === 1 ? " cur" : ""}" data-act="level1">Pregações</button>`;
+  if (S.level >= 2) crumbs += `<span class="crsep">/</span>${S.level === 2 ? `<span class="cr cur">${esc(s.title)}</span>` : `<button class="cr" data-act="level2">${esc(s.title)}</button>`}`;
+  if (S.level === 2 && rangeChanged(s)) crumbs += `<span class="chip warn">bordas alteradas</span>`;
+  if (S.level === 3) crumbs += `<span class="crsep">/</span><span class="cr cur">${esc(script().title)}</span>`;
+  return `<header class="top">
+    ${S.level >= 2 ? `<button class="ibtn" data-act="togglepanel" aria-label="${S.panelOpen ? "Ocultar" : "Mostrar"} painel lateral" aria-expanded="${S.panelOpen}">${I.menu}</button>` : ""}
+    <div class="brand"><b></b>Word Cuts</div>
+    <nav class="crumbs" aria-label="Caminho">${crumbs}</nav>
+    <span class="spacer"></span>
+    <button class="ibtn" data-act="settings" title="Configurações" aria-label="Configurações">${I.gear}</button>
+    ${mainAction()}
+  </header>`;
+}
+function mainAction() {
+  if (S.level === 1) return "";
+  const s = sermon();
+  if (S.level === 2 && s.status === "faixa") { const { trimmed } = bounds(s);
+    return `<button class="btn primary" data-act="process" ${trimmed && !S.busy ? "" : "disabled"} title="${!trimmed ? "Ajuste as bordas do vídeo" : S.busy ? "Máquina ocupada" : "Processar a pregação"}">Processar</button>`; }
+  if (S.level === 2 && s.status === "processando") return `<button class="btn primary" disabled><span id="explbl">Processando ${procPct(s)}%</span></button>`;
+  return `<div class="exp"><button class="btn primary" data-act="exportmenu" aria-haspopup="menu" aria-expanded="${S.exportOpen}">${I.upload}<span id="explbl">${S.render && S.level === 3 && S.render.id === S.scriptId ? `Exportando ${Math.round(S.render.p * 100)}%` : "Exportar"}</span>${I.chev}</button>${S.exportOpen ? exportMenu() : ""}</div>`;
+}
+function exportMenu() {
+  const s = sermon();
+  const item = (act, title, sub, dis, extra = "") => `<button class="mi" role="menuitem" data-act="${act}" ${extra} ${dis ? "disabled" : ""}><b>${title}</b><small>${sub}</small></button>`;
+  const busy = S.busy ? `<p class="mnote">${S.render ? "Exportando…" : `Máquina ocupada: ${esc(S.busy.what)}`}</p>` : "";
+  if (S.level === 2) return `<div class="menu" role="menu">
+    ${item("dl", "Pregação 16:9", `1080p · ${fmt(s.dur)}`, false, `data-f="${esc(fileName(s))}"`)}
+    ${rangeChanged(s) ? item("process", "Reprocessar", "Refaz transcrição e sugestões; as edições dos cortes se perdem", !!S.busy) : ""}${busy}</div>`;
+  const r = script();
+  return `<div class="menu" role="menu">
+    ${item("xdlg", "Exportar 9:16…", "Escolher limpeza, edição, áudio e vídeo", !!S.busy)}${busy}
+    ${r.exports.length ? `<div class="msep">Exportações</div>${r.exports.map(x => item("dl", x.when, `9:16 · ${fmt(x.dur)}${x.sum ? " · " + esc(x.sum) : ""}`, false, `data-f="${esc(r.title)} - ${esc(x.when)}.mp4"`)).join("")}` : ""}
+  </div>`;
+}
+
+/* ---------- Nível 1: pregações ---------- */
+function thumb(s) {
+  return makeImg(`t:${s.id}:${s.status}`, 320, 180, x => s.status === "pronta"
+    ? drawScene(x, 320, 180, 965, {}) : drawScene(x, 320, 180, 3300, { sermon: liveOn(3300) }));
+}
+const procPct = s => s.prog ? Math.round(s.prog.reduce((a, x) => a + x, 0) / 4 * 100) : 0;
+function level1() {
+  return `<main class="l1"><div class="l1-wrap">
+    <div class="l1-head"><h1>Pregações</h1><span class="spacer"></span><button class="btn primary" data-act="nova">${I.plus}Nova pregação</button></div>
+    <div class="pgrid">${S.sermons.map(s => {
+      const n = s.scripts.filter(r => r.state !== "descartado").length, ex = s.scripts.filter(r => r.exports.length).length;
+      const st = s.status === "faixa" ? `<span class="chip warn">A delimitar</span>`
+        : s.status === "processando" ? `<span class="chip accent">Processando <span id="pcpct-${s.id}">${procPct(s)}</span>%</span>`
+        : `<span class="chip ok">Pronta</span><span class="mono">${fmt(s.dur)}</span>`;
+      return `<article class="pcard">
+        <button class="pc-main" data-act="open" data-id="${s.id}">
+          <span class="pc-thumb" style="background-image:url(${thumb(s)})">${s.status === "processando" ? `<span class="pc-prog"><i id="pcbar-${s.id}" style="width:${procPct(s)}%"></i></span>` : ""}</span>
+          <span class="pc-body"><span class="pdate mono">${s.date}</span><span class="pt">${esc(s.title)}</span>${s.ref ? `<span class="pref">${esc(s.ref)}</span>` : ""}
+            <span class="pmeta">${st}${s.status === "pronta" ? `<span>${n} corte${n === 1 ? "" : "s"} · ${ex} exportado${ex === 1 ? "" : "s"}</span>` : ""}</span></span>
+        </button>
+        ${isAdmin() ? `<button class="ibtn sm pc-more" data-act="pmenu" data-id="${s.id}" aria-label="Mais ações">${I.dots}</button>` : ""}
+        ${S.pmenu === s.id ? `<div class="cmenu pc-menu" role="menu"><button class="mi danger" data-act="delask" data-id="${s.id}"><b>Apagar</b></button></div>` : ""}
+        ${S.confirmDel === s.id ? `<div class="pc-confirm"><span>Apagar a pregação e ${s.scripts.length} corte${s.scripts.length === 1 ? "" : "s"}?</span><div class="row"><button class="btn sm danger" data-act="del" data-id="${s.id}">Apagar</button><button class="btn sm ghost" data-act="delno">Cancelar</button></div></div>` : ""}
+      </article>`; }).join("")}</div>
+  </div></main>`;
+}
+/* ---------- Caixa de exportação: opções do motor (limpeza, emendas, volume, legenda, codificação) ---------- */
+const XO0 = { hes: true, stammer: true, pauses: "naturais", joins: true, fades: true, loud: true, res: "1080", quality: "alta" };
+const xopts = r => r.xo || (r.xo = clone(XO0));
+function xEstimate(r) {
+  const b = build(r), x = xopts(r);
+  return b.total + (x.hes ? 0 : r.hes * .6) + (x.stammer ? 0 : .8) + ({ nenhum: b.total * .09, naturais: 0, curtas: -b.total * .06 }[x.pauses]);
+}
+const xSummary = (r, x = xopts(r)) => [x.res === "1080" ? "1080p" : "720p", capStyle(r).on ? "com legenda" : "sem legenda", x.hes ? null : "com hesitações", x.pauses === "nenhum" ? "pausas originais" : null].filter(Boolean).join(" · ");
+function exportDialog() {
+  if (!S.xdlg || S.level !== 3) return "";
+  const r = script(), x = xopts(r), est = xEstimate(r), ok = est >= 40 && est <= 75;
+  const seg = (k, opts) => `<div class="segctl" role="group">${opts.map(([v, n, tip]) => `<button type="button" data-act="xo" data-k="${k}" data-v="${v}" aria-pressed="${String(x[k]) === String(v)}"${tip ? ` title="${tip}"` : ""}>${n}</button>`).join("")}</div>`;
+  const yn = k => seg(k, [[false, "Não"], [true, "Sim"]]);
+  return `<div class="modal-bg"><div class="modal xmodal" role="dialog" aria-modal="true" aria-labelledby="xt">
+    <div class="row"><div style="flex:1;min-width:0"><h2 id="xt">Exportar 9:16</h2><p class="note" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.title)}</p></div><button class="ibtn sm" data-act="xclose" aria-label="Fechar">${I.x}</button></div>
+    <div class="xbody">
+      <section class="xsec"><h3>Limpeza</h3>
+        ${srow("Remover hesitações", `${r.hes} encontradas: “hã”, “né”, “ahn”…`, yn("hes"))}
+        ${srow("Remover gaguejos", "Palavras e frases repetidas ao recomeçar.", yn("stammer"))}
+        ${srow("Pausas", "", seg("pauses", [["nenhum", "Originais"], ["naturais", "Naturais", "Encurta as pausas, mas mantém 0,4 s nas pausas de ênfase"], ["curtas", "Curtas", "Encurta todas as pausas para 0,15 s"]]))}
+      </section>
+      <section class="xsec"><h3>Edição</h3>
+        ${srow("Suavizar emendas", "Fade curto no áudio entre trechos.", yn("joins"))}
+        ${srow("Fade no início e no fim", "", yn("fades"))}
+      </section>
+      <section class="xsec"><h3>Áudio</h3>
+        ${srow("Normalizar volume", "Nível de redes sociais (−14 LUFS).", yn("loud"))}
+      </section>
+      <section class="xsec"><h3>Vídeo</h3>
+        ${srow("Legenda", "O estilo fica na aba Legenda.", `<div class="segctl" role="group"><button type="button" data-act="cc" aria-pressed="${!capStyle(r).on}">Não</button><button type="button" data-act="cc" aria-pressed="${capStyle(r).on}">Sim</button></div>`)}
+        ${srow("Resolução", "", seg("res", [["1080", "1080×1920"], ["720", "720×1280"]]))}
+        ${srow("Qualidade", "", seg("quality", [["alta", "Alta"], ["leve", "Arquivo menor"]]))}
+      </section>
+    </div>
+    <div class="xfoot"><span class="note">Duração estimada <b class="mono" style="color:${ok ? "var(--ok)" : "var(--warn)"}">${fmt(est)}</b></span><span class="spacer"></span>
+      <button class="btn ghost" data-act="xclose">Cancelar</button><button class="btn primary" data-act="gerar" ${S.busy ? "disabled" : ""}>Exportar</button></div>
+  </div></div>`;
+}
+function modal() {
+  if (!S.modal) return "";
+  return `<div class="modal-bg"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="mt">
+    <div class="row"><h2 id="mt">Nova pregação</h2><span class="spacer"></span><button class="ibtn sm" data-act="closemodal" aria-label="Fechar">${I.x}</button></div>
+    <form data-form="link"><input class="input mono" id="url" name="url" placeholder="Link da live no YouTube" autocomplete="off" aria-label="Link da live no YouTube"></form>
+    ${S.liveErr ? `<div class="banner err"><div><strong>A live ainda não terminou.</strong> Tente de novo depois do fim da transmissão.</div></div>` : ""}
+    <div><button class="btn sm ghost" data-act="simlive">Simular live no ar</button></div>
+  </div></div>`;
+}
+
+/* ---------- Painel lateral ---------- */
+function side() {
+  if (!S.panelOpen) return "";
+  const head = S.level === 2 ? `<h2>Cortes</h2>`
+    : `<div class="ptabs" role="tablist">${[["texto", "Texto"], ["legenda", "Legenda"]].map(([k, n]) => `<button role="tab" data-act="tab" data-t="${k}" aria-selected="${S.tab === k}">${n}</button>`).join("")}</div>`;
+  const body = S.level === 2 ? cortesPanel() : S.tab === "texto" ? tabTexto(script()) : tabLegenda(script());
+  return `<aside class="side"><div class="side-h">${head}<span class="spacer"></span><span class="saved" id="saved" role="status" aria-live="polite"></span>${S.level === 3 && S.tab === "legenda" ? `<button class="ibtn sm" data-act="closeleg" aria-label="Fechar legenda">${I.x}</button>` : `<button class="ibtn sm" data-act="togglepanel" aria-label="Fechar painel">${I.x}</button>`}</div>
+    <div class="side-b" data-p="${S.level}-${S.tab}">${body}</div></aside>`;
+}
+const adminOnly = what => emptyP(ICON.lock, `${what}: só o administrador.`, `<button class="btn" data-act="role" data-r="admin">Ver como administrador</button>`);
+function stepsHtml(s) {
+  const names = ["Baixar a faixa em 1080p", "Transcrever palavra por palavra", "Cortar a pregação em 16:9", "Sugerir cortes (1 chamada ao LLM)"], p = s.prog;
+  return `<div class="steps" id="steps">${names.map((n, i) => `<div class="step ${p[i] >= 1 ? "done" : p[i] > 0 ? "run" : ""}"><span class="ic">${p[i] >= 1 ? "✓" : ""}</span><span>${n}</span><span class="tc">${Math.round(p[i] * 100)}%</span><div class="progress"><i style="width:${p[i] * 100}%"></i></div></div>`).join("")}</div>`;
+}
+function cortesPanel() {
+  const s = sermon();
+  if (s.status === "processando") return stepsHtml(s);
+  if (s.status === "faixa") { const { lo, hi, trimmed } = bounds(s);
+    return `<dl class="kv"><dt>Início</dt><dd class="mono" id="kvin">${fmt(lo)}</dd><dt>Fim</dt><dd class="mono" id="kvout">${fmt(hi)}</dd><dt>Duração</dt><dd class="mono" id="kvlen">${fmt(hi - lo)}</dd></dl>
+      ${trimmed ? "" : `<div class="banner"><div>Ajuste as bordas antes de processar.</div></div>`}${busyBanner()}
+      ${emptyP(I.spark, "Os cortes aparecem depois do processamento.")}`; }
+  const live = s.scripts.filter(r => r.state !== "descartado"), gone = s.scripts.filter(r => r.state === "descartado");
+  return `<div class="row"><span class="note" style="flex:1;min-width:140px">${s.sug ? `${esc(s.sug.model.split("/").pop())} · preset “${esc(s.sug.preset)}”` : ""}</span>
+      ${isAdmin() ? `<button class="btn sm" data-act="resug">Nova sugestão</button><button class="btn sm" data-act="newcut">${I.plus}Novo corte</button>` : ""}</div>
+    ${live.length ? `<div class="cclist">${live.map(cutCard).join("")}</div>` : emptyP(I.spark, "Nenhum corte nesta pregação.")}
+    ${gone.length ? `<details class="ccgone" ${S.showGone ? "open" : ""}><summary data-act="togglegone">Descartados (${gone.length})</summary><div class="cclist">${gone.map(cutCard).join("")}</div></details>` : ""}`;
+}
+function cutCard(r) {
+  const s = sermon(), b = build(r), k = cutIndex(s, r), ex = exported(r), sel = S.selCut === r.id, off = r.state === "descartado", ok = b.total >= 40 && b.total <= 75;
+  return `<article class="cc${sel ? " sel" : ""}${off ? " off" : ""}" style="--c:${cutColor(s, r)}" data-cutcard="${r.id}">
+    <div class="cc-top">
+      <button class="cc-main" data-act="selcut" data-id="${r.id}" data-toggle="1" aria-expanded="${sel}"><i class="rnum">${k + 1}</i><span class="cc-title">${esc(r.title)}</span></button>
+      <button class="ibtn sm" data-act="cutmenu" data-id="${r.id}" aria-label="Mais ações">${I.dots}</button>
+      ${S.cutMenu === r.id ? `<div class="cmenu" role="menu">
+        ${off ? `<button class="mi" data-act="restore" data-id="${r.id}"><b>Restaurar</b></button>` : `<button class="mi" data-act="discard" data-id="${r.id}"><b>Descartar</b></button>`}
+        ${r.exports.map(x => `<button class="mi" data-act="dl" data-f="${esc(r.title)} - ${esc(x.when)}.mp4"><b>Baixar exportação</b><small>${esc(x.when)} · ${fmt(x.dur)}</small></button>`).join("")}</div>` : ""}
+    </div>
+    <div class="cc-meta"><span class="mono${ok ? "" : " warn"}" title="${ok ? "Dentro da meta" : "Fora da meta"} de 40 a 75 s">${fmt(b.total)}</span><span>${r.segs.length} trecho${r.segs.length === 1 ? "" : "s"}</span>
+      ${r.state === "escolhido" ? `<span class="cc-st">Escolhido</span>` : ""}${ex ? `<span class="cc-ex" title="Última exportação: ${esc(ex.when)}">${I.check}Exportado</span>` : ""}</div>
+    ${sel && !off ? `<div class="cc-more">
+      <p class="cc-quote">${esc(b.segs.map(x => x.text).join(" "))}</p>
+      ${r.why ? `<p class="cc-why">${esc(r.why)}</p>` : ""}${r.risk && r.risk !== "Nenhum." ? `<p class="cc-risk">${esc(r.risk)}</p>` : ""}
+      <button class="btn primary" data-act="opencut" data-id="${r.id}">Abrir corte</button></div>` : ""}
+  </article>`;
+}
+function tabTexto(r) {
+  const inSet = new Set(r.segs.flat()), fixes = r.corr, [a, b] = r.range;
+  return `<div style="display:grid;gap:2px">${SENT.filter(sn => sn.s >= a - .01 && sn.e <= b + .01).map(sn => { const on = inSet.has(sn.id);
+      const words = sn.t.split(" ").map((w, k) => { const key = sn.id + ":" + k, shown = fixes[key] ?? w;
+        return on ? `<span class="w${fixes[key] ? " fix" : ""}" data-wk="${key}">${esc(shown)}</span>` : esc(shown); }).join(" ");
+      return `<div class="sent ${on ? "in" : "out"}">${isAdmin() ? `<input type="checkbox" id="s${sn.id}" data-act="sent" data-id="${sn.id}" ${on ? "checked" : ""} aria-label="Incluir frase ${sn.id}">` : `<span class="nobox"></span>`}<span class="tm">${fmt(sn.s)}</span><span>${words}</span></div>`; }).join("")}</div>
+`;
+}
+function tabLegenda(r) {
+  const fixes = Object.entries(r.corr), st = capStyle(r);
+  const seg = (k, opts) => `<div class="segctl" role="group">${opts.map(([v, n]) => `<button type="button" data-act="cstyle" data-k="${k}" data-v="${v}" aria-pressed="${String(st[k]) === String(v)}">${n}</button>`).join("")}</div>`;
+  const range = (k, min, max, step, label, shown) => `<input type="range" class="rng" data-cs="${k}" min="${min}" max="${max}" step="${step}" value="${st[k]}" aria-label="${label}"><span class="unit mono lval" id="v-${k}">${shown}</span>`;
+  const swatches = (k, list) => list.map(([c, n]) => `<button type="button" class="sw" style="--sw:${c}" data-act="cstyle" data-k="${k}" data-v="${c}" aria-pressed="${st[k].toUpperCase() === c}" aria-label="${n}" title="${n}"></button>`).join("") + `<input type="color" class="pick" data-cs="${k}" value="${st[k]}" aria-label="Outra cor" title="Outra cor">`;
+  const row = (label, ctl) => `<div class="lrow"><span class="sl">${label}</span><div class="ctl">${ctl}</div></div>`;
+  return `<section class="sgroup lform"><h3>Estilo</h3>
+      ${row("Legenda", seg("on", [[false, "Não"], [true, "Sim"]]))}
+      ${st.on ? `
+      ${row("Fonte", `<select class="input" data-cs="font" aria-label="Fonte">${Object.keys(FONTS).map(f => `<option ${f === st.font ? "selected" : ""} style="font-family:'${f}'">${f}</option>`).join("")}</select>`)}
+      ${row("Tamanho", range("size", 4, 10, .2, "Tamanho", `${px1080(st.size)} px`))}
+      ${row("Cor", swatches("color", TEXT_COLORS))}
+      ${row("Posição", seg("pos", [[20, "Topo"], [50, "Centro"], [78, "Base"]]))}
+      ${row("Altura", range("pos", 10, 90, 1, "Altura da legenda", `${st.pos}%`))}
+      ${row("Borda", range("stroke", 0, 12, 1, "Espessura da borda", `${px1080(st.stroke / 10)} px`))}
+      ${row("Cor da borda", swatches("strokeColor", [["#000000", "Preto"], ["#FFFFFF", "Branco"]]))}
+      ${row("Sombra", seg("shadow", [["nenhuma", "Não"], ["suave", "Suave"], ["forte", "Forte"]]))}
+      <div class="lrow"><span></span><div class="ctl"><button class="btn sm ghost" type="button" data-act="capreset">Restaurar padrão</button></div></div>` : ""}
+    </section>
+    <section class="sgroup"><h3>Correções de grafia</h3>
+      <div style="height:6px"></div>
+      ${fixes.length ? `<div class="versions">${fixes.map(([k, v]) => { const [sid, i] = k.split(":"); const o = SBY[sid].t.split(" ")[i];
+        return `<div><span>${esc(o)} → <b style="color:var(--fg)">${esc(v)}</b></span><button class="btn sm ghost" data-act="unfix" data-k="${k}">Desfazer</button></div>`; }).join("")}</div>` : `<p class="note">Nenhuma correção.</p>`}
+    </section>`;
+}
+
+/* ---------- Configurações ---------- */
+const srow = (label, desc, ctl, wide) => `<div class="srow${wide ? " wide" : ""}"><div><span class="sl">${label}</span><p class="sd">${desc}</p></div><div class="ctl">${ctl}</div></div>`;
+const onoff = (path, val, a = "Não", b = "Sim") => `<div class="segctl lg" role="group">${[[false, a], [true, b]].map(([v, n]) => `<button type="button" data-act="cset" data-c="${path}" data-v="${v}" aria-pressed="${val === v}">${n}</button>`).join("")}</div>`;
+const levels = (path, val, label, tips = {}) => `<div class="segctl lg" role="group" aria-label="Rigidez: ${esc(label)}">${[["brando", "Brando"], ["moderado", "Moderado"], ["rigoroso", "Rigoroso"]].map(([v, n]) => `<button type="button" data-act="cset" data-c="${path}" data-v="${v}" aria-pressed="${val === v}"${tips[v] ? ` title="${tips[v]}"` : ""}>${n}</button>`).join("")}</div>`;
+const num = (path, val, label, max = 600) => `<input class="input mono num" type="number" min="1" max="${max}" data-c="${path}" value="${val}" aria-label="${label}">`;
+const pair = (path, [a, b], label, unit) => `${num(path + ".0", a, label + ", mínimo")}<span class="unit">–</span>${num(path + ".1", b, label + ", máximo")}${unit ? `<span class="unit">${unit}</span>` : ""}`;
+const area = (path, val, label, rows = 3) => `<textarea class="input" rows="${rows}" data-c="${path}" aria-label="${label}">${esc(val)}</textarea>`;
+/* ---------- Configurações: tela inteira ---------- */
+const SPAGES = [
+  ["Sugestões", [
+    ["modelo", "Modelo", "spark", "modelo chave api openrouter llm"],
+    ["presets", "Presets", "sliders", "preset nome padrão duplicar apagar instruções adicionais ideias"],
+    ["filtros", "Filtros", "filter", "filtros rigidez triunfalismo teologia frágil alegoria moralismo contexto sectarismo polêmica exposição pessoas erro factual"],
+    ["valor", "Valor", "star", "valor rigidez cristológico aplicação prática frase marcante"],
+    ["formato", "Formato", "clock", "formato duração ideal gancho autônomo fechamento limpo edição reordenar palavras protegidas"],
+  ]],
+  ["Equipe", [["pessoas", "Pessoas", "users", "equipe pessoas e-mail email papel acesso liberar"]]],
+  ["Máquina", [["processamentos", "Processamentos", "activity", "status máquina processamentos histórico refazer ocupada"]]],
+];
+const SPAGE = Object.fromEntries(SPAGES.flatMap(([, items]) => items.map(x => [x[0], x])));
+const PRESET_PAGES = new Set(["presets", "filtros", "valor", "formato"]);
+const pageAllowed = id => isAdmin() || id === "processamentos";
+const scard = (title, sub, rows) => `<section class="scard">${title ? `<h3>${title}</h3>` : ""}${sub ? `<p class="note">${sub}</p>` : ""}${rows}</section>`;
+const LEVELS_V = { brando: "Basta tocar no tema", moderado: "O valor aparece com clareza", rigoroso: "O valor é o centro do corte, explicado e não só citado" };
+const LEVELS_F = { brando: "Exclui só quando é evidente", moderado: "Exclui quando é provável; o limítrofe vai com alerta", rigoroso: "Exclui na menor suspeita" };
+const SPG = {
+  modelo: () => ({ title: "Modelo", body: scard("", "",
+    srow("Modelo", "Usado na sugestão automática e nas novas sugestões. IDs de exemplo.",
+      `<select class="input mono" id="model" data-act="model" aria-label="Modelo">${["anthropic/claude-opus-5.5", "anthropic/claude-sonnet-5.5", "anthropic/claude-haiku-5.5"].map(m => `<option ${m === S.model ? "selected" : ""}>${m}</option>`).join("")}</select>`) +
+    srow("Chave da API", `Atual: <span class="mono">••••••••${S.keyLast4}</span>. Só pode ser trocada, nunca lida de volta. Cole e tecle Enter.`,
+      `<form data-form="key"><input class="input mono" id="newkey" name="key" type="password" autocomplete="off" placeholder="Cole a nova chave" aria-label="Nova chave" style="width:220px"></form>`)) }),
+  presets: () => { const c = preset(S.presetSel), padrao = S.presetSel === S.presetPadrao;
+    return { title: "Presets", body:
+      scard("Preset", "",
+        srow("Nome", "Como o preset aparece na lista e nas sugestões.", `<div><input class="input" data-c="nome" value="${esc(c.nome)}" aria-label="Nome do preset" maxlength="40" style="width:240px"><p class="ferr" id="nomeerr" hidden></p></div>`) +
+        srow("Padrão", "Usado na sugestão automática de cada pregação.", padrao ? `<span class="chip ok">Preset padrão</span>` : `<button class="btn" type="button" data-act="pdefault">Tornar padrão</button>`) +
+        srow("Cópia e remoção", "Duplicar cria um preset novo a partir deste.", `<button class="btn" type="button" data-act="pdup">Duplicar</button><button class="btn ghost danger" type="button" data-act="pdel" ${padrao ? 'disabled title="O preset padrão não pode ser apagado"' : ""}>Apagar</button>`)) +
+      scard("Sugestão", "",
+        srow("Instruções adicionais", "Texto livre acrescentado ao prompt, para orientar ou refinar as sugestões deste preset.", area("instrucoes", c.instrucoes, "Instruções adicionais", 6), true) +
+        srow("Ideias por pregação", "Quantos cortes o modelo sugere.", pair("ideias", c.ideias, "Ideias por pregação"))) }; },
+  filtros: () => { const c = preset(S.presetSel);
+    return { title: "Filtros",
+      body: scard("", "", c.filtros.map((f, i) => srow(esc(f.nome), esc(f.desc), levels(`filtros.${i}.nivel`, f.nivel, f.nome, LEVELS_F))).join("")) }; },
+  valor: () => { const c = preset(S.presetSel);
+    return { title: "Valor",
+      body: scard("", "", c.valores.map((f, i) => srow(esc(f.nome), esc(f.desc), levels(`valores.${i}.nivel`, f.nivel, f.nome, LEVELS_V))).join("")) }; },
+  formato: () => { const c = preset(S.presetSel);
+    return { title: "Formato", body:
+      scard("Duração", "", srow("Duração final", "Depois da limpeza das hesitações.", pair("dur", c.dur, "Duração final", "s")) +
+        srow("Duração ideal", "Faixa que o modelo procura atingir.", pair("ideal", c.ideal, "Duração ideal", "s")) +
+        srow("Gancho", "Tempo para prender a atenção no início.", `${num("gancho", c.gancho, "Gancho", 15)}<span class="unit">s</span>`)) +
+      scard("Estrutura", "", srow("Autônomo", "Entendível sem o que veio antes.", onoff("autonomo", c.autonomo)) +
+        srow("Fechamento", "Termina numa conclusão, não no meio do raciocínio.", onoff("fechamento", c.fechamento)) +
+        srow("Limpo", "Sem avisos, música, leitura longa ou interação com a plateia.", onoff("limpo", c.limpo))) +
+      scard("Edição", "", srow("Permitir reordenar", "Ex.: gancho tirado da conclusão.", onoff("reordenar", c.reordenar)) +
+        srow("Palavras protegidas", "Nunca removidas ao limpar hesitações ou escolher frases. Separadas por vírgula.", `<input class="input" data-c="protegidas" value="${esc(c.protegidas)}" aria-label="Palavras protegidas" style="width:200px">`)) }; },
+  pessoas: () => ({ title: "Pessoas", body:
+    scard("", "", `<div class="team" style="padding-bottom:10px">${S.team.map((m, i) => `<div><span class="mono">${esc(m.email)}</span><select class="input" id="role${i}" data-act="trole" data-i="${i}" aria-label="Papel de ${esc(m.email)}">${["Assistente", "Administrador"].map(o => `<option ${o === m.role ? "selected" : ""}>${o}</option>`).join("")}</select>
+      ${m.email.startsWith("admin@") ? "" : `<button class="btn sm ghost danger" data-act="trm" data-i="${i}">Remover</button>`}</div>`).join("")}</div>`) +
+    scard("Liberar acesso", "",
+      `<form data-form="team" style="padding:6px 0 14px"><div class="row" style="flex-wrap:nowrap"><input class="input mono" id="tnew" name="tnew" type="email" placeholder="email@exemplo.org" required style="flex:1"><select class="input" id="trnew" name="trnew" style="width:auto" aria-label="Papel"><option>Assistente</option><option>Administrador</option></select></div></form>`) }),
+  processamentos: () => ({ title: "Processamentos", body:
+    scard("Agora", "", `<div class="row" style="padding:8px 0 14px"><span class="pill ${S.busy ? "busy" : ""}" style="cursor:default"><span class="dot"></span>${S.busy ? `Ocupada: ${esc(S.busy.what)}` : "Livre"}</span>
+      ${S.busy ? `<span class="note">${esc(S.busy.who)} · desde ${new Date(S.busy.since).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span>` : ""}<span class="spacer"></span>
+      <button class="btn sm" data-act="simbusy">${S.busy && S.busy.external ? "Encerrar simulação" : "Simular processamento de outra pessoa"}</button></div>`) +
+    scard("Histórico", "", `<div class="hist" style="padding:8px 0 14px">${S.history.map((h, i) => `<div><div class="row"><span style="flex:1;min-width:0">${esc(h.what)}</span>${h.ok ? '<span class="chip ok">Concluída</span>' : `<span class="chip warn">Falhou</span>`}</div>
+      <small>${esc(h.who)} · <span class="mono">${h.when}</span> · ${h.dur}${h.ok ? "" : ` · ${esc(h.err)}`}</small>${h.ok ? "" : `<div><button class="btn sm" data-act="retry" data-i="${i}">Refazer</button></div>`}</div>`).join("")}</div>`) }),
+};
+function snavList() {
+  const q = S.sq.trim().toLowerCase();
+  const html = SPAGES.map(([g, items]) => { const its = items.filter(x => !q || `${x[1]} ${x[3]}`.toLowerCase().includes(q));
+    return its.length ? `<div class="sn-g">${g}</div>` + its.map(x => `<button class="sn-i" data-act="spage" data-p="${x[0]}" aria-current="${S.spage === x[0]}">${I[x[2]]}<span>${x[1]}</span>${pageAllowed(x[0]) ? "" : `<i class="rl">${ICON.lock}</i>`}</button>`).join("") : ""; }).join("");
+  return html || `<p class="note" style="padding:8px 10px">Nada encontrado.</p>`;
+}
+const secHtml = id => { const pg = SPG[id]();
+  return `<section class="ssec" id="sec-${id}" data-sec="${id}"><h2>${pg.title}</h2>${pageAllowed(id) ? pg.body : `<p class="lock">${ICON.lock} Só o administrador.</p>`}</section>`; };
+function settingsScreen() {
+  const ids = SPAGES.flatMap(([, items]) => items.map(x => x[0]));
+  const presetIds = ids.filter(id => PRESET_PAGES.has(id)), firstP = ids.indexOf(presetIds[0]), lastP = ids.indexOf(presetIds[presetIds.length - 1]);
+  const top = isAdmin() ? `<div class="s-top"><label class="sl" for="psel">Preset</label>
+    <select class="input" id="psel" style="width:auto;min-width:220px">${S.presets.map(x => `<option value="${x.id}" ${x.id === S.presetSel ? "selected" : ""}>${esc(x.nome)}${x.id === S.presetPadrao ? " · padrão" : ""}</option>`).join("")}</select></div>` : "";
+  /* as seções que dependem do preset ficam num grupo; a barra do preset fica presa no topo só enquanto se rola por ele */
+  const body = ids.slice(0, firstP).map(secHtml).join("") + `<div class="sgrp">${top}${presetIds.map(secHtml).join("")}</div>` + ids.slice(lastP + 1).map(secHtml).join("");
+  return `<div class="settings-screen">
+    <nav class="snav" aria-label="Seções das configurações">
+      <button class="sn-back" data-act="closesettings">${I.arrowLeft}Voltar</button>
+      <div class="sn-search">${I.search}<input class="input" id="sq" type="search" placeholder="Buscar configurações" value="${esc(S.sq)}" autocomplete="off" aria-label="Buscar configurações"></div>
+      <div class="sn-list" id="snlist">${snavList()}</div>
+    </nav>
+    <main class="smain" id="smain"><span class="saved s-saved" id="saved" role="status" aria-live="polite"></span>
+      <div class="s-wrap"><div class="s-head"><h1>Configurações</h1></div>
+      ${isAdmin() ? "" : `<div style="margin-bottom:16px">${adminOnly("A maior parte das configurações")}</div>`}${body}</div></main>
+  </div>`;
+}
+/* Ao rolar, o menu destaca a seção visível */
+function spyScroll() {
+  const sm = document.getElementById("smain"); if (!sm) return;
+  const top = Math.max(0, sm.getBoundingClientRect().top) + 90, ownScroll = sm.scrollHeight > sm.clientHeight + 2;
+  let cur = null; sm.querySelectorAll(".ssec").forEach(sec => { if (sec.getBoundingClientRect().top <= top) cur = sec.dataset.sec; });
+  if (!cur) cur = sm.querySelector(".ssec")?.dataset.sec;
+  const atEnd = ownScroll ? sm.scrollTop + sm.clientHeight >= sm.scrollHeight - 4 : innerHeight + scrollY >= document.documentElement.scrollHeight - 4;
+  if (atEnd) cur = [...sm.querySelectorAll(".ssec")].pop()?.dataset.sec ?? cur;
+  if (cur && cur !== S.spage) { S.spage = cur; document.querySelectorAll(".sn-i").forEach(b => b.setAttribute("aria-current", b.dataset.p === cur));
+    try { history.replaceState(null, "", `#configuracoes/${cur}`); } catch (e) {} }
+}
+function jumpTo(id, smooth) {
+  const sm = document.getElementById("smain"), sec = document.getElementById(`sec-${id}`); if (!sm || !sec) return;
+  S.spage = id; document.querySelectorAll(".sn-i").forEach(b => b.setAttribute("aria-current", b.dataset.p === id));
+  const offset = PRESET_PAGES.has(id) && isAdmin() ? 64 : 16;
+  const behavior = smooth ? "smooth" : "auto";
+  if (sm.scrollHeight > sm.clientHeight + 2) sm.scrollTo({ top: sec.getBoundingClientRect().top - sm.getBoundingClientRect().top + sm.scrollTop - offset, behavior });
+  else window.scrollTo({ top: sec.getBoundingClientRect().top + scrollY - offset - document.querySelector(".snav").offsetHeight * 0, behavior });
+}
+
+/* ---------- Barra de status ---------- */
+function busyPct() {
+  if (S.render) return Math.round(S.render.p * 100);
+  if (S.busy && S.busy.sid) { const s = S.sermons.find(x => x.id === S.busy.sid); return s ? procPct(s) : null; }
+  return null;
+}
+function statusbar() {
+  const b = S.busy, min = b ? Math.max(1, Math.round((Date.now() - b.since) / 60000)) : 0, pct = busyPct();
+  return `<footer class="sbar">
+    <button class="sb-i" data-act="spage" data-p="processamentos" title="Ver processamentos"><span class="dot${b ? " busy" : ""}"></span>${b ? `Ocupada: ${esc(b.what)} · ${esc(b.who)} · há ${min} min` : "Máquina livre"}</button>
+    ${pct != null ? `<span class="sb-prog" aria-hidden="true"><i id="sbbar" style="width:${pct}%"></i></span><span class="mono" id="sbpct">${pct}%</span>` : ""}
+    <span class="spacer"></span>
+    <div class="segctl sm" role="group" aria-label="Ver como"><button data-act="role" data-r="assistente" aria-pressed="${!isAdmin()}">Assistente</button><button data-act="role" data-r="admin" aria-pressed="${isAdmin()}">Admin</button></div>
+  </footer>`;
+}
+function syncProgress() {
+  const p = busyPct(); if (p == null) return;
+  const set = (id, f) => { const el = document.getElementById(id); if (el) f(el); };
+  set("sbbar", el => { el.style.width = p + "%"; }); set("sbpct", el => { el.textContent = p + "%"; });
+  set("ovbar", el => { el.style.width = p + "%"; }); set("ovpct", el => { el.textContent = p + "%"; });
+  if (S.busy && S.busy.sid) { set(`pcbar-${S.busy.sid}`, el => { el.style.width = p + "%"; }); set(`pcpct-${S.busy.sid}`, el => { el.textContent = p; }); }
+  set("explbl", el => { el.textContent = S.render ? `Exportando ${p}%` : `Processando ${p}%`; });
+}
+
+/* ---------- Área de trabalho: prévia, transporte e timeline ---------- */
+function work() { return `<div class="work">${stage()}${transport()}${timeline()}</div>`; }
+function stage() {
+  let frame;
+  if (S.level === 2) frame = `<div class="frame h"><canvas id="cv" width="640" height="360"></canvas>${sermon().status === "processando" ? `<div class="overlay"><div class="ov-card"><div class="row"><b style="font-weight:600">Processando</b><span class="spacer"></span><span class="tc" id="ovpct">${procPct(sermon())}%</span></div><div class="progress"><i id="ovbar" style="width:${procPct(sermon())}%"></i></div></div></div>` : ""}</div>`;
+  else frame = S.view916
+    ? `<div class="frame v"><canvas id="cv" width="405" height="720"></canvas><div class="caption" id="cap" style="${capCss(capStyle(script()))}" ${capStyle(script()).on ? "" : "hidden"}></div></div>`
+    : `<div class="frame h"><canvas id="cv" width="640" height="360"></canvas><div class="croprect" id="crop"></div></div>`;
+  return `<div class="stage"><div class="vp">${frame}</div></div>`;
+}
+function transport() {
+  const s = sermon(), l2 = S.level === 2, step = l2 && s.status !== "pronta" ? 60 : 5;
+  const zoom = `<button class="ibtn" data-act="zoom" data-z="-1" title="Diminuir zoom (−)" aria-label="Diminuir zoom" ${S.zoom <= 1 ? "disabled" : ""}>${I.zoomOut}</button><button class="ibtn" data-act="zoom" data-z="1" title="Aumentar zoom (+)" aria-label="Aumentar zoom">${I.zoomIn}</button><button class="ibtn" data-act="zoom" data-z="0" title="${l2 && s.status === "pronta" ? "Enquadrar a pregação" : "Ajustar à largura"}" aria-label="Ajustar zoom">${I.fit}</button>`;
+  let left = "", right = zoom;
+  if (l2) {
+    const proc = s.status === "processando";
+    left = `<button class="btn sm" data-act="markin" ${proc ? "disabled" : ""} title="Puxa a borda inicial até o cursor">Início aqui <span class="kbd">I</span></button><button class="btn sm" data-act="markout" ${proc ? "disabled" : ""} title="Puxa a borda final até o cursor">Fim aqui <span class="kbd">O</span></button>`;
+    if (s.status !== "pronta") right = `<div class="segctl" role="group" aria-label="Velocidade">${[1, 8, 32].map(v => `<button data-act="rate" data-r="${v}" aria-pressed="${S.rate === v}">${v}×</button>`).join("")}</div><span class="tsep"></span>${zoom}`;
+  } else {
+    const a = isAdmin(), t = tip => a ? `title="${tip}" aria-label="${tip}"` : `disabled title="Só o administrador muda o conteúdo" aria-label="${tip} (só o administrador)"`;
+    const b = build(script()), ok = b.total >= 40 && b.total <= 75;
+    left = `<button class="ibtn" data-act="undo" title="Desfazer (Ctrl+Z)" aria-label="Desfazer" ${S.undo.length ? "" : "disabled"}>${I.undo}</button><button class="ibtn" data-act="redo" title="Refazer (Ctrl+Shift+Z)" aria-label="Refazer" ${S.redo.length ? "" : "disabled"}>${I.redo}</button><span class="tsep"></span>
+      <button class="ibtn" data-act="split" ${t("Dividir o trecho no cursor, entre frases")}>${I.scissors}</button>
+      <button class="ibtn" data-act="mvseg" data-d="-1" ${t("Mover o trecho para a esquerda")}>${I.left}</button>
+      <button class="ibtn" data-act="mvseg" data-d="1" ${t("Mover o trecho para a direita")}>${I.right}</button>
+      <button class="ibtn" data-act="delseg" ${t("Remover o trecho")}>${I.trash}</button>`;
+    right = `<span class="chip ${ok ? "ok" : "warn"} mono" title="${ok ? "Dentro da meta" : b.total < 40 ? "Abaixo da meta" : "Acima da meta"} de 40 a 75 s">${fmt(b.total)}</span><span class="tsep"></span>
+      <div class="segctl" role="group" aria-label="Formato da prévia"><button data-act="vmode" data-m="v" aria-pressed="${S.view916}">9:16</button><button data-act="vmode" data-m="h" aria-pressed="${!S.view916}" title="Quadro original com o recorte 9:16">16:9</button></div><span class="tsep"></span>${zoom}`;
+  }
+  return `<div class="transport"><div class="tools">${left}</div>
+    <div class="tools c"><button class="ibtn" data-act="jump" data-d="-${step}" title="Voltar" aria-label="Voltar">${I.back}</button><button class="play" id="play" data-act="toggle" aria-label="Reproduzir">${ICON.play}</button><button class="ibtn" data-act="jump" data-d="${step}" title="Avançar" aria-label="Avançar">${I.fwd}</button><span class="tc" id="tc"><b>0:00</b> / 0:00</span></div>
+    <div class="tools r">${right}</div></div>`;
+}
+const trk = (name, icon, h, html, side = "", attrs = "", lane = "") => ({ name, icon, h, html, side, attrs, lane });
+function tlFrame(dur, tracks, zero = 0) {
+  const heads = `<div class="th" style="height:26px"></div>` + tracks.map(t => `<div class="th${/class="on"/.test(t.attrs) ? " on" : ""}" style="height:${t.h}px" ${t.attrs.replace(/ ?class="[^"]*"/, "")}>${t.icon}<span class="thn">${t.name}</span><span class="spacer"></span>${t.side}</div>`).join("");
+  const lanes = `<div class="lane ruler" style="height:26px" data-seek>${ruler(dur, zero)}</div>` + tracks.map(t => `<div class="lane${/ on"/.test(t.lane) ? " on" : ""}" style="height:${t.h}px" data-seek ${t.lane.replace(/ ?class="[^"]*"/, "")}>${t.html}</div>`).join("");
+  return `<section class="tl" aria-label="Timeline"><div class="tl-heads">${heads}</div><div class="tl-scroll" id="tls"><div class="tl-content" id="tlc" style="width:${S.zoom * 100}%">${lanes}<div class="playhead" id="ph"></div></div></div></section>`;
+}
+/* O clipe mostra só o trecho entre as bordas; o resto fica esmaecido atrás, como mídia cortada */
+const innerBg = (img, lo, hi, D) => `background-image:url(${img});background-size:${D / (hi - lo) * 100}% 100%;background-position:${hi - lo >= D ? 0 : lo / (D - (hi - lo)) * 100}% 0`;
+function timeline() {
+  const W = tlW(), s = sermon();
+  if (S.level === 2) {
+    const { lo, hi, D, trimmed } = bounds(s), pc = x => x / D * 100, proc = s.status === "processando", ready = s.status === "pronta";
+    const zones = MUSIC.map(([a, b]) => `<div class="zone" style="left:${pc(a)}%;width:${pc(b - a)}%"><span>louvor</span></div>`).join("");
+    const strip = frames(`live${s.id}`, nFrames(W), 0, D, t => ({ sermon: liveOn(t) }));
+    const wv = wave(`live${s.id}`, Math.min(4000, Math.round(W / 3)), (fr, i) => liveOn(fr * D) ? speech(i, 3) : .5 + .45 * rnd(i, 7));
+    const handles = proc ? "" : `<span class="trim l" data-trim="in" role="slider" aria-label="Início da pregação" aria-valuetext="${fmt(lo)}" title="Arraste para o início da pregação"></span><span class="trim r" data-trim="out" role="slider" aria-label="Fim da pregação" aria-valuetext="${fmt(hi)}" title="Arraste para o fim da pregação"></span>`;
+    const vid = `<div class="clip vid ghost" style="left:0;width:100%;background-image:url(${strip})"></div>${zones}
+      <div class="clip vid trimclip${trimmed ? " on" : ""}" id="trimv" style="left:${pc(lo)}%;width:${pc(hi - lo)}%;${innerBg(strip, lo, hi, D)}">${handles}<span class="lbl" id="trimlbl">${trimmed ? `Pregação · ${fmt(hi - lo)}` : `Live inteira · ${fmt(D)}`}</span></div>`;
+    const aud = `<div class="clip aud ghost" style="left:0;width:100%;background-image:url(${wv})"></div><div class="clip aud" id="trima" style="left:${pc(lo)}%;width:${pc(hi - lo)}%;${innerBg(wv, lo, hi, D)}"></div>`;
+    const tracks = [];
+    if (ready) {
+      const order = [...s.scripts.filter(r => r.state !== "descartado"), ...s.scripts.filter(r => r.state === "descartado")];
+      order.forEach(r => { const c = cutColor(s, r), k = cutIndex(s, r), [a, b] = r.range;
+        const block = `<div class="clip ct${S.selCut === r.id ? " sel" : ""}${r.state === "descartado" ? " off" : ""}" data-cut="${r.id}" style="left:${pc(s.base + a)}%;width:${pc(b - a)}%;--c:${c}" title="${esc(r.title)} · ${fmt(a)}–${fmt(b)}">
+          ${isAdmin() && r.state !== "descartado" ? `<span class="trim l" data-cutedge="l" aria-hidden="true"></span><span class="trim r" data-cutedge="r" aria-hidden="true"></span>` : ""}<span class="lbl">${fmt(build(r).total)}</span></div>`;
+        tracks.push(trk(esc(r.title), `<i class="rnum" style="--c:${c}">${k + 1}</i>`, 30, block, "", `data-act="selcut" data-id="${r.id}" title="${esc(r.title)}"`)); });
+    }
+    tracks.push(trk("Vídeo", I.film, 58, vid), trk("Áudio", I.wave, 40, aud));
+    return tlFrame(D, tracks, ready ? lo : 0);
+  }
+  const r = script(), b = build(r), D = b.total, pc = x => x / D * 100, lockH = isAdmin() ? "" : `<span class="hl" title="Conteúdo travado: só o administrador">${ICON.lock}</span>`;
+  const st = capStyle(r), caps = (st.on ? "" : `<span class="lane-hint" style="z-index:2;inset:7px auto 7px 8px;padding:0 8px;border-radius:4px;background:var(--raised);color:var(--muted)">Legenda desativada</span>`) + b.blocks.map((k, i) => `<div class="clip cap${S.selBlock === i ? " sel" : ""}${st.on ? "" : " off"}" data-block="${i}" style="left:${pc(k.s)}%;width:calc(${pc(k.e - k.s)}% - 2px)" title="${esc(k.text)}"><span>${esc(k.text)}</span></div>`).join("");
+  const vids = b.segs.map(g => `<div class="clip vid${g.i === S.selSeg ? " sel" : ""}" data-seg="${g.i}" ${isAdmin() ? 'draggable="true"' : ""} style="left:${pc(g.outS)}%;width:calc(${pc(g.dur)}% - 2px);background-image:url(${frames(`s${g.srcS}-${g.srcE}`, nFrames(W * g.dur / D), g.srcS, g.srcE, () => ({ second: g.second }))})"><span class="lbl"><b>T${g.i + 1}</b> · ${fmt(g.dur)}</span></div>`).join("");
+  const auds = b.segs.map(g => { const marks = Array.from({ length: r.hes }, (_, m) => m).filter(m => m % b.segs.length === g.i).map(m => `<i class="hes" style="left:${20 + (m * 37) % 60}%" title="Hesitação removida"></i>`).join("");
+    return `<div class="clip aud" style="left:${pc(g.outS)}%;width:calc(${pc(g.dur)}% - 2px);background-image:url(${wave(`s${g.srcS}`, Math.max(8, Math.round(W * g.dur / D / 3)), (fr, i) => speech(i, g.srcS % 17))})">${marks}</div>`; }).join("");
+  return tlFrame(D, [
+    trk("Legenda", I.cc, 34, caps, `<button class="ibtn sm" data-act="cc" aria-pressed="${st.on}" title="${st.on ? "Desativar" : "Ativar"} a legenda do corte" aria-label="Legenda do corte">${st.on ? I.eye : I.eyeOff}</button>`, `data-legend class="${S.tab === "legenda" && S.panelOpen ? "on" : ""}"`, `data-legend class="lane${S.tab === "legenda" && S.panelOpen ? " on" : ""}"`),
+    trk("Vídeo", I.film, 58, vids, lockH),
+    trk("Áudio", I.wave, 40, auds, lockH),
+  ]);
+}
+
+/* ---------- Render ---------- */
+function hashFor() {
+  if (S.screen === "settings") return `configuracoes/${S.spage}`;
+  return S.level === 1 ? "pregacoes" : S.level === 2 ? `pregacao/${S.sermonId}` : `corte/${S.sermonId}/${S.scriptId}`;
+}
+function render() {
+  const app = document.getElementById("app");
+  if (P) { if (P.key === viewKey()) S.keep = { k: P.key, t: P.t }; P.playing = false; }
+  try { const h = hashFor(); if (location.hash.slice(1) !== h) history.replaceState(null, "", "#" + h); } catch (e) {}
+  if (S.screen === "settings") {
+    P = null;
+    const sm = document.getElementById("smain"), y = sm ? sm.scrollTop : null;
+    app.className = "app settings"; app.innerHTML = settingsScreen() + statusbar();
+    const sm2 = document.getElementById("smain");
+    if (sm2) { sm2.addEventListener("scroll", spyScroll, { passive: true });
+      if (S.jump) { jumpTo(S.jump, false); S.jump = null; } else if (y != null) sm2.scrollTop = y; }
+    return;
+  }
+  if (S.level === 1) { P = null; app.className = "app"; app.innerHTML = topbar() + level1() + statusbar() + modal(); if (S.modal) setTimeout(() => document.getElementById("url")?.focus(), 0); return; }
+  const keep = P && P.key === viewKey() ? P.t : S.keep && S.keep.k === viewKey() ? S.keep.t : null; S.keep = null;
+  const tls = document.getElementById("tls"), sb = document.querySelector(".side-b");
+  const tlx = tls ? tls.scrollLeft / Math.max(1, tls.scrollWidth) : 0;
+  const sideKey = `${S.level}-${S.tab}`, sideY = sb && sb.dataset.p === sideKey ? sb.scrollTop : 0;
+  app.className = "app"; app.innerHTML = topbar() + `<div class="shell">${side()}${work()}</div>` + statusbar() + exportDialog();
+  const tls2 = document.getElementById("tls"), sb2 = document.querySelector(".side-b");
+  if (tls2) tls2.scrollLeft = S.scrollTo != null ? S.scrollTo * tls2.scrollWidth : tlx * tls2.scrollWidth;
+  S.scrollTo = null;
+  if (sb2) sb2.scrollTop = sideY;
+  P = null; setupView(keep);
+  if (S.centerPh && P && tls2) tls2.scrollLeft = P.t / P.dur * tls2.scrollWidth - tls2.clientWidth / 2;
+  S.centerPh = false;
+}
+function setupView(keep) {
+  const cv = document.getElementById("cv"); if (!cv) return;
+  const ctx = cv.getContext("2d"), tc = document.getElementById("tc"), ph = document.getElementById("ph");
+  const placePh = frac => { if (ph) ph.style.left = `${frac * 100}%`; follow(frac); };
+  if (S.level === 2) {
+    const s = sermon(), D = s.liveDur;
+    setPlayer({ dur: D, frame: t => {
+      const { lo, hi } = bounds(s), ready = s.status === "pronta", st = t - (s.base ?? 0);
+      if (ready && st >= 0 && st <= s.dur) drawScene(ctx, 640, 360, st, { second: SECOND.some(([a, b]) => st > a && st < b) });
+      else drawScene(ctx, 640, 360, t, { sermon: liveOn(t) });
+      tc.innerHTML = ready ? `<b>${fmtS(t - lo)}</b> / ${fmt(hi - lo)}` : `<b>${fmt(t)}</b> / ${fmt(D)}`;
+      placePh(t / D);
+    } });
+    seek(keep ?? (s.status === "pronta" ? s.base + 965 : bounds(s).lo || 3300));
+  } else {
+    const r = script(), b = build(r), cap = document.getElementById("cap"), crop = document.getElementById("crop");
+    setPlayer({ dur: b.total, frame: t => {
+      const g = b.segs.find(x => t >= x.outS && t < x.outS + x.dur) || b.segs[b.segs.length - 1];
+      const src = g.srcS + (t - g.outS);
+      drawScene(sctx, 640, 360, src, { second: g.second });
+      const cx = preacherX(640, src), cw = 360 * 9 / 16, x0 = Math.min(Math.max(0, cx - cw / 2), 640 - cw);
+      if (S.view916) { ctx.drawImage(SRC, x0, 0, cw, 360, 0, 0, cv.width, cv.height); const bi = b.blocks.findIndex(k => t >= k.s && t < k.e); if (cap && !S.capEditing && cap.dataset.bi !== String(bi)) { cap.dataset.bi = bi; cap.innerHTML = bi < 0 ? "" : capWords(b.blocks[bi], r); } }
+      else { ctx.drawImage(SRC, 0, 0); if (crop) { crop.style.left = `${x0 / 640 * 100}%`; crop.style.width = `${cw / 640 * 100}%`; } }
+      tc.innerHTML = `<b>${fmtD(t)}</b> / ${fmtD(b.total)}`;
+      placePh(t / b.total);
+      if (P && P.playing && g.i !== S.selSeg) selectSeg(g.i);
+      const cw2 = b.words.find(w => t >= w.s && t < w.e);
+      document.querySelectorAll(".w.now").forEach(el => el.classList.remove("now"));
+      if (cw2 && P && P.playing) document.querySelector(`.w[data-wk="${cw2.key}"]`)?.classList.add("now");
+    } });
+    seek(keep ?? 0);
+  }
+}
+function selectSeg(i) { S.selSeg = i; document.querySelectorAll(".clip.vid[data-seg]").forEach(el => el.classList.toggle("sel", +el.dataset.seg === i)); }
+/* Enquadra um intervalo da live na timeline do nível 2 */
+function fitTo(a, b) {
+  const D = sermon().liveDur, len = Math.max(10, b - a), m = len * .06;
+  S.zoom = Math.max(1, Math.min(400, D / (len + 2 * m))); S.scrollTo = Math.max(0, (a - m) / D);
+}
+function fitSermon() { const { lo, hi, D } = bounds(); if (sermon().status === "pronta") fitTo(lo, hi); else { S.zoom = 1; S.scrollTo = 0; } }
+
+/* ---------- Edição: desfazer, trechos e faixa do corte ---------- */
+const snapOf = r => JSON.stringify({ segs: r.segs, corr: r.corr, style: capStyle(r) });
+function snap() { S.undo.push(snapOf(script())); if (S.undo.length > 60) S.undo.shift(); S.redo = []; }
+const inRange = (sn, [a, b]) => sn.s >= a - .01 && sn.e <= b + .01;
+/* Ao redimensionar a faixa, saem as frases que ficaram de fora; ao mover, cada frase vai para a mais próxima na nova posição */
+function refit(r, newRange, delta) {
+  const pool = SENT.filter(sn => inRange(sn, newRange)); if (!pool.length) return false;
+  let ids;
+  if (delta == null) ids = r.segs.flat().filter(id => inRange(SBY[id], newRange));
+  else { const used = new Set();
+    ids = r.segs.flat().map(id => { const target = SBY[id].s + delta;
+      const pick = pool.filter(sn => !used.has(sn.id)).sort((x, y) => Math.abs(x.s - target) - Math.abs(y.s - target))[0];
+      if (pick) used.add(pick.id); return pick?.id; }).filter(Boolean).sort((a, b) => a - b); }
+  if (!ids.length) ids = pool.map(sn => sn.id);
+  /* trechos = sequências de frases vizinhas, sem pausa longa entre elas */
+  const segs = [];
+  ids.forEach(id => { const last = segs[segs.length - 1], prev = last && last[last.length - 1];
+    if (last && id === prev + 1 && SBY[id].s - SBY[prev].e < 2) last.push(id); else segs.push([id]); });
+  r.segs = segs; r.range = newRange; return true;
+}
+function freshCuts() {
+  return TEMPLATE.map((t, i) => ({ ...clone(t), id: Date.now() % 100000 * 10 + i, state: "sugerido", corr: {}, exports: [], range: rangeOf(t.segs) }));
+}
+
+/* ---------- Ações ---------- */
+const go2 = id => { S.sermonId = id; S.level = 2; S.selCut = null; S.cutMenu = null; S.exportOpen = false; S.panelOpen = true; fitSermon(); render(); };
+const A = {
+  level1: () => { S.level = 1; S.exportOpen = false; S.pmenu = null; render(); },
+  level2: () => go2(S.sermonId),
+  open: d => { S.pmenu = null; S.confirmDel = null; go2(+d.id); },
+  togglepanel: () => { S.panelOpen = !S.panelOpen; render(); },
+  role: d => { S.role = d.r; S.pmenu = null; render(); },
+  settings: () => { S.screen = "settings"; S.exportOpen = false; S.jump = S.spage; render(); },
+  spage: d => { S.exportOpen = false; if (S.screen === "settings" && document.getElementById("smain")) { jumpTo(d.p, true); return; } S.screen = "settings"; S.jump = d.p; render(); },
+  closesettings: () => { S.screen = "editor"; S.sq = ""; render(); },
+  exportmenu: () => { S.exportOpen = !S.exportOpen; render(); },
+  nova: () => { S.modal = true; S.liveErr = false; render(); },
+  closemodal: () => { S.modal = false; render(); },
+  simlive: () => { S.liveErr = true; render(); },
+  pmenu: d => { S.pmenu = S.pmenu === +d.id ? null : +d.id; S.confirmDel = null; render(); },
+  delask: d => { S.pmenu = null; S.confirmDel = +d.id; render(); },
+  delno: () => { S.confirmDel = null; render(); },
+  del: d => { S.sermons = S.sermons.filter(x => x.id !== +d.id); S.confirmDel = null; toast("Pregação e cortes apagados."); render(); },
+  tab: d => { S.tab = d.t; render(); },
+  closeleg: () => setLegendTab(false),
+  toggle: () => { if (!P) return; if (P.t >= P.dur) P.t = 0; P.playing = !P.playing; syncPlay(); },
+  rate: (d, el) => { S.rate = +d.r; if (P) P.rate = S.rate; el.parentElement.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", b === el)); },
+  jump: d => { if (P) seek(P.t + +d.d); },
+  zoom: d => {
+    if (+d.z === 0) { if (S.level === 2) fitSermon(); else { S.zoom = 1; S.scrollTo = 0; } }
+    else { S.zoom = Math.max(1, Math.min(400, S.zoom * (+d.z > 0 ? 1.6 : 1 / 1.6))); S.centerPh = true; }
+    render();
+  },
+  markin: () => { if (!P) return; const s = sermon(), { hi } = bounds(s); if (P.t > hi - MINLEN) { toast("O início precisa ficar antes do fim."); return; } s.range = [Math.round(P.t), hi]; render(); },
+  markout: () => { if (!P) return; const s = sermon(), { lo } = bounds(s); if (P.t < lo + MINLEN) { toast("O fim precisa ficar depois do início."); return; } s.range = [lo, Math.round(P.t)]; render(); },
+  process: () => {
+    S.exportOpen = false;
+    if (S.busy) { toast("Máquina ocupada. Tente quando terminar."); render(); return; }
+    const s = sermon(), { lo, hi, trimmed } = bounds(s); if (!trimmed) return;
+    s.range = [lo, hi]; s.status = "processando"; s.prog = [0, 0, 0, 0];
+    S.busy = { what: `Processar pregação de ${s.date.slice(0, 5)}`, who: who(), since: Date.now(), sid: s.id };
+    render();
+    let i = 0; const iv = setInterval(() => {
+      s.prog[i] = Math.min(1, s.prog[i] + .08); if (s.prog[i] >= 1) i++;
+      if (i >= 4) { clearInterval(iv); finishProcess(s); return; }
+      const st = document.getElementById("steps"); if (st && S.level === 2 && S.sermonId === s.id) st.outerHTML = stepsHtml(s);
+      syncProgress();
+    }, 110);
+  },
+  selcut: d => { if (d.toggle && S.selCut === +d.id) { S.selCut = null; render(); return; } const s = sermon(), r = s.scripts.find(x => x.id === +d.id); S.selCut = r.id; S.cutMenu = null; fitTo(s.base + r.range[0], s.base + r.range[1]); S.keep = { k: viewKey(), t: s.base + r.range[0] }; if (P) P.key = ""; render(); },
+  opencut: d => { const r = sermon().scripts.find(x => x.id === +d.id); if (r.state === "sugerido") r.state = "escolhido";
+    S.scriptId = r.id; S.level = 3; S.selSeg = 0; S.selBlock = null; S.undo = []; S.redo = []; S.tab = "texto"; S.zoom = 1; S.scrollTo = 0; S.exportOpen = false; S.panelOpen = true; render(); },
+  togglegone: () => { S.showGone = !S.showGone; render(); },
+  cutmenu: d => { S.cutMenu = S.cutMenu === +d.id ? null : +d.id; render(); },
+  discard: d => { sermon().scripts.find(x => x.id === +d.id).state = "descartado"; S.cutMenu = null; render(); },
+  restore: d => { sermon().scripts.find(x => x.id === +d.id).state = "sugerido"; S.cutMenu = null; render(); },
+  resug: () => { if (S.busy) { toast("Máquina ocupada. Tente quando terminar."); return; } const s = sermon(), n = preset(S.presetPadrao).nome; s.sug = { ...s.sug, preset: n, when: "agora" }; toast(`Nova sugestão pedida (1 chamada · preset “${n}”)`); render(); },
+  newcut: () => {
+    const s = sermon(), t = (P ? P.t : s.base) - s.base;
+    const startI = SENT.reduce((best, sn, i) => Math.abs(sn.s - t) < Math.abs(SENT[best].s - t) ? i : best, 0), ids = [];
+    for (let i = startI; i < SENT.length && (!ids.length || (SENT[i].e - SBY[ids[0]].s < 50 && SENT[i].s - SBY[ids[ids.length - 1]].e < 20)); i++) ids.push(SENT[i].id);
+    const r = { id: Date.now() % 100000, title: "Novo corte", segs: [ids], state: "escolhido", why: "", risk: "", hes: 0, corr: {}, exports: [], range: rangeOf([ids]) };
+    s.scripts.push(r); S.selCut = r.id; fitTo(s.base + r.range[0], s.base + r.range[1]); toast("Corte criado. Ajuste a faixa na timeline."); render();
+  },
+  dl: d => { S.exportOpen = false; S.cutMenu = null; render(); toast(`Download iniciado: ${d.f} (protótipo)`); },
+  vmode: d => { S.view916 = d.m === "v"; render(); },
+  cc: () => { const st = capStyle(script()); snap(); st.on = !st.on; render(); },
+  cstyle: d => { const st = capStyle(script()); snap(); st[d.k] = d.k === "on" ? d.v === "true" : d.k === "pos" ? +d.v : d.v; render(); saved(); },
+  capreset: () => { snap(); script().style = clone(CAP0); render(); saved(); },
+  unfix: d => { snap(); delete script().corr[d.k]; render(); },
+  sent: (d, el) => {
+    const r = script(), id = +d.id;
+    if (r.segs.flat().includes(id)) {
+      if (r.segs.flat().length === 1) { el.checked = true; toast("O corte precisa de pelo menos uma frase."); return; }
+      snap(); for (let i = r.segs.length - 1; i >= 0; i--) { const k = r.segs[i].indexOf(id); if (k < 0) continue;
+        r.segs.splice(i, 1, ...[r.segs[i].slice(0, k), r.segs[i].slice(k + 1)].filter(x => x.length)); }
+    } else {
+      snap(); const i = r.segs.findIndex(g => g[g.length - 1] === id - 1), j = r.segs.findIndex(g => g[0] === id + 1);
+      if (i >= 0) r.segs[i].push(id); else if (j >= 0) r.segs[j].unshift(id); else r.segs.push([id]);
+    }
+    render();
+  },
+  split: () => {
+    if (!isAdmin() || !P) return;
+    const r = script(), b = build(r), t = P.t, g = b.segs.find(x => t >= x.outS && t < x.outS + x.dur) || b.segs[b.segs.length - 1], ids = r.segs[g.i];
+    if (ids.length < 2) { toast("Este trecho tem uma frase só. A divisão é sempre entre frases."); return; }
+    const src = g.srcS + (t - g.outS); let k = 1, best = Infinity;
+    for (let j = 1; j < ids.length; j++) { const d = Math.abs(SBY[ids[j]].s - src); if (d < best) { best = d; k = j; } }
+    snap(); r.segs.splice(g.i, 1, ids.slice(0, k), ids.slice(k)); S.selSeg = g.i + 1; toast(`T${g.i + 1} dividido entre frases.`); render();
+  },
+  mvseg: d => { if (!isAdmin()) return; const r = script(), i = S.selSeg, j = i + +d.d; if (j < 0 || j >= r.segs.length) return;
+    snap(); [r.segs[i], r.segs[j]] = [r.segs[j], r.segs[i]]; S.selSeg = j; render(); },
+  delseg: () => { if (!isAdmin()) return; const r = script(); if (r.segs.length < 2) { toast("O corte precisa de pelo menos um trecho."); return; }
+    snap(); const i = S.selSeg; r.segs.splice(i, 1); S.selSeg = Math.max(0, i - 1); toast(`T${i + 1} removido. Ctrl+Z desfaz.`); render(); },
+  undo: () => { const r = script(); if (!S.undo.length) return; S.redo.push(snapOf(r)); Object.assign(r, JSON.parse(S.undo.pop())); S.selSeg = Math.min(S.selSeg, r.segs.length - 1); render(); },
+  redo: () => { const r = script(); if (!S.redo.length) return; S.undo.push(snapOf(r)); Object.assign(r, JSON.parse(S.redo.pop())); S.selSeg = Math.min(S.selSeg, r.segs.length - 1); render(); },
+  xdlg: () => { S.exportOpen = false; S.xdlg = true; render(); },
+  xclose: () => { S.xdlg = false; render(); },
+  xo: d => { xopts(script())[d.k] = d.v === "true" ? true : d.v === "false" ? false : d.v; render(); },
+  gerar: () => {
+    S.exportOpen = false; S.xdlg = false;
+    if (S.busy) { toast("Máquina ocupada. Tente quando terminar."); render(); return; }
+    const r = script(), est = xEstimate(r), sum = xSummary(r);
+    S.busy = { what: `Exportar “${r.title}”`, who: who(), since: Date.now() };
+    S.render = { id: r.id, p: 0 }; render();
+    const iv = setInterval(() => {
+      S.render.p = Math.min(1, S.render.p + .04); syncProgress();
+      if (S.render.p >= 1) { clearInterval(iv); S.busy = null; S.render = null;
+        r.exports.unshift({ when: "agora", dur: Math.round(est), sum });
+        S.history.unshift({ what: `Exportar “${r.title}”`, who: who(), when: "agora", dur: "3 min", ok: true });
+        toast(`Exportação pronta: ${r.title}.`); render(); }
+    }, 90);
+  },
+  simbusy: () => { S.busy = S.busy && S.busy.external ? null : { what: "Exportar “Ela não conquistou o cetro”", who: "assistente2@exemplo.org", since: Date.now() - 120000, external: true }; render(); },
+  retry: d => { const h = S.history[+d.i]; if (S.busy) { toast("Máquina ocupada."); return; } h.ok = true; h.when = "agora"; toast("Refeito: " + h.what); render(); },
+  cset: (d, el) => { setCrit(d.c, d.v === "true" ? true : d.v === "false" ? false : d.v); el.parentElement.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", b === el)); saved(); },
+  pdup: () => { const src = preset(S.presetSel), id = Math.max(...S.presets.map(x => x.id)) + 1;
+    S.presets.push({ ...clone(src), id, nome: `Cópia de ${src.nome}` }); S.presetSel = id; render(); toast("Preset duplicado. Renomeie e ajuste."); },
+  pdel: () => { if (S.presetSel === S.presetPadrao) return; const nome = preset(S.presetSel).nome;
+    S.presets = S.presets.filter(x => x.id !== S.presetSel); S.presetSel = S.presetPadrao; toast(`Preset “${nome}” apagado.`); render(); },
+  pdefault: () => { S.presetPadrao = S.presetSel; toast(`“${preset(S.presetSel).nome}” agora é o padrão.`); render(); },
+  trm: d => { S.team.splice(+d.i, 1); render(); },
+};
+function finishProcess(s) {
+  S.busy = null;
+  s.status = "pronta"; s.base = s.base ?? s.range[0]; s.dur = s.range[1] - s.range[0]; s.done = [...s.range]; s.prog = null;
+  s.sug = { model: S.model, preset: preset(S.presetPadrao).nome, when: "agora" };
+  s.scripts = freshCuts();
+  S.history.unshift({ what: `Processar pregação de ${s.date.slice(0, 5)}`, who: who(), when: "agora", dur: "31 min", ok: true });
+  if (S.level === 2 && S.sermonId === s.id) { S.selCut = null; S.keep = null; fitSermon(); if (P) P.key = ""; }
+  toast(`Pregação de ${s.date.slice(0, 5)} pronta: ${s.scripts.length} cortes sugeridos.`); render();
+}
+
+/* ---------- Formulários que salvam sozinhos ---------- */
+function saveKey(el) { const v = el.value.trim(); if (!v) return; if (v.length < 8) { toast("Cole a chave completa."); return; } S.keyLast4 = v.slice(-4); el.value = ""; render(); saved(); }
+let urlT;
+function loadLive(url) {
+  if (!/^https?:\/\/(www\.)?(youtube\.com|youtu\.be)\/\S+/.test(url.trim())) return;
+  let s = S.sermons.find(x => x.status === "faixa");
+  if (!s) { s = { id: Math.max(...S.sermons.map(x => x.id)) + 1, date: "25/10/2026", title: "Culto de domingo", ref: "", status: "faixa", live: "Culto de domingo · 25/10/2026", liveDur: 7574, range: null, scripts: [] }; S.sermons.unshift(s); }
+  S.modal = false; go2(s.id); toast("Live carregada. Puxe as bordas do vídeo até o início e o fim da pregação.");
+}
+
+/* ---------- Eventos ---------- */
+document.addEventListener("click", e => {
+  if (S.exportOpen && !e.target.closest(".exp")) { S.exportOpen = false; document.querySelector(".exp .menu")?.remove(); }
+  if (S.cutMenu != null && !e.target.closest(".cmenu, [data-act=cutmenu]")) { S.cutMenu = null; document.querySelector(".cc .cmenu")?.remove(); }
+  if (S.pmenu != null && !e.target.closest(".cmenu, [data-act=pmenu]")) { S.pmenu = null; document.querySelector(".pc-menu")?.remove(); }
+  if (e.target.classList.contains("modal-bg")) { if (S.modal) A.closemodal(); else if (S.xdlg) A.xclose(); return; }
+  const el = e.target.closest("[data-act]"); if (!el || el.tagName === "SELECT" || el.disabled) return;
+  const a = A[el.dataset.act]; if (!a) return;
+  if (el.type !== "checkbox") e.preventDefault();
+  a(el.dataset, el, e);
+});
+document.addEventListener("dblclick", e => { const cw = e.target.closest(".caption .cw"); if (cw && S.level === 3) { e.preventDefault(); editCapWord(cw); return; } const c = e.target.closest("[data-cutcard]"); if (c && !e.target.closest("button")) A.opencut({ id: c.dataset.cutcard }); });
+document.addEventListener("change", e => {
+  const el = e.target;
+  if (el.dataset.cs) { S.styleSnap = false; render(); return; }
+  if (el.dataset.act === "model") { S.model = el.value; saved(); }
+  if (el.id === "psel") { S.presetSel = +el.value; render(); }
+  if (el.dataset.act === "trole") { S.team[+el.dataset.i].role = el.value; saved(); }
+  if (el.id === "newkey") saveKey(el);
+});
+document.addEventListener("input", e => {
+  const el = e.target;
+  if (el.dataset.cs && S.level === 3) {
+    const st = capStyle(script()), k = el.dataset.cs;
+    if (!S.styleSnap) { snap(); S.styleSnap = true; }
+    st[k] = el.type === "range" ? +el.value : k === "font" ? el.value : el.value.toUpperCase();
+    applyCap();
+    const out = document.getElementById("v-" + k);
+    if (out) out.textContent = k === "size" ? `${px1080(st.size)} px` : k === "stroke" ? `${px1080(st.stroke / 10)} px` : `${st.pos}%`;
+    return;
+  }
+  if (el.id === "sq") { S.sq = el.value; document.getElementById("snlist").innerHTML = snavList(); return; }
+  if (el.id === "url") { clearTimeout(urlT); urlT = setTimeout(() => loadLive(el.value), 400); return; }
+  if (!el.dataset.c) return;
+  if (el.dataset.c === "nome") {
+    const nome = el.value.trim(), err = document.getElementById("nomeerr");
+    const msg = !nome ? "Dê um nome ao preset." : S.presets.some(x => x.id !== S.presetSel && x.nome === nome) ? "Já existe um preset com esse nome." : "";
+    if (err) { err.textContent = msg; err.hidden = !msg; }
+    if (msg) return;
+    setCrit("nome", nome); const o = document.querySelector(`#psel option[value="${S.presetSel}"]`); if (o) o.textContent = nome + (S.presetSel === S.presetPadrao ? " · padrão" : ""); saved(); return;
+  }
+  if (el.type === "number" && (el.value === "" || +el.value < +el.min)) return;
+  setCrit(el.dataset.c, el.type === "number" ? +el.value : el.value); saved();
+});
+document.addEventListener("submit", e => {
+  e.preventDefault(); const f = e.target, k = f.dataset.form;
+  if (k === "link") loadLive(f.url.value);
+  if (k === "key") saveKey(f.key);
+  if (k === "team") { const email = f.tnew.value.trim(); if (!f.tnew.checkValidity() || !email) return; if (S.team.some(m => m.email === email)) { toast("Esse e-mail já tem acesso."); return; } S.team.push({ email, role: f.trnew.value }); render(); saved(); }
+});
+document.addEventListener("keydown", e => {
+  if (e.target.id === "sq" && e.key === "Enter") { const b = document.querySelector("#snlist .sn-i"); if (b) jumpTo(b.dataset.p, true); return; }
+  if (e.key === "Escape") { if (S.modal) { A.closemodal(); return; } if (S.xdlg) { A.xclose(); return; } if (S.exportOpen || S.cutMenu != null || S.pmenu != null) { S.exportOpen = false; S.cutMenu = null; S.pmenu = null; render(); return; } }
+  if (e.target.closest("input, textarea, select")) return;
+  if (S.screen === "settings") { if (e.key === "Escape") A.closesettings(); return; }
+  if (S.level === 1) return;
+  const mod = e.ctrlKey || e.metaKey;
+  if (S.level === 3 && mod && e.key.toLowerCase() === "z") { e.preventDefault(); e.shiftKey ? A.redo() : A.undo(); return; }
+  if (mod) return;
+  const s = sermon(), step = S.level === 2 && s.status !== "pronta" ? 60 : 5;
+  if (e.key === " " && P) { e.preventDefault(); A.toggle(); }
+  if (e.key === "ArrowRight" && P) seek(P.t + step);
+  if (e.key === "ArrowLeft" && P) seek(P.t - step);
+  if (e.key === "+" || e.key === "=") A.zoom({ z: 1 });
+  if (e.key === "-") A.zoom({ z: -1 });
+  if (S.level === 2 && s.status !== "processando" && (e.key === "i" || e.key === "I")) A.markin();
+  if (S.level === 2 && s.status !== "processando" && (e.key === "o" || e.key === "O")) A.markout();
+});
+/* Arrastos na timeline: bordas da pregação e faixa de cada corte (só o admin move ou redimensiona) */
+let drag = null;
+function setLegendTab(on) {
+  const want = on ? "legenda" : "texto"; if (S.tab === want && (S.panelOpen || !on)) return;
+  S.tab = want; const reopen = on && !S.panelOpen; S.panelOpen = true;
+  if (reopen || !document.querySelector(".side")) { render(); return; }
+  document.querySelector(".side").outerHTML = side();
+  document.querySelectorAll("[data-legend]").forEach(el => el.classList.toggle("on", on));
+}
+document.addEventListener("pointerdown", e => {
+  if (S.level === 3 && S.screen !== "settings" && !S.xdlg) {
+    if (e.target.closest("[data-legend]")) setLegendTab(true);
+    else if (S.tab === "legenda" && !e.target.closest(".side, .caption .cw, .cw-in, .modal-bg, .exp, .cmenu, .sbar")) setLegendTab(false);
+  }
+  if (!P || S.screen === "settings") return;
+  const h = e.target.closest("[data-trim]"), ct = e.target.closest(".clip.ct");
+  const rect = e.target.closest(".tl-content")?.getBoundingClientRect();
+  if (h && rect) { e.preventDefault(); drag = { kind: "sermon", side: h.dataset.trim, rect }; document.body.classList.add("trimming"); return; }
+  if (ct && rect) {
+    const s = sermon(), r = s.scripts.find(x => x.id === +ct.dataset.cut), edge = e.target.closest("[data-cutedge]")?.dataset.cutedge;
+    drag = { kind: "cut", r, el: ct, rect, x0: e.clientX, orig: [...r.range], mode: isAdmin() && r.state !== "descartado" ? edge || "move" : "click", moved: false };
+    e.preventDefault(); return;
+  }
+  const lane = e.target.closest("[data-seek]"); if (!lane) return;
+  const r = lane.parentElement.getBoundingClientRect();
+  seek((e.clientX - r.left) / r.width * P.dur);
+  const clip = e.target.closest(".clip");
+  if (clip && clip.dataset.seg != null) selectSeg(+clip.dataset.seg);
+  if (clip && clip.dataset.block != null) { S.selBlock = +clip.dataset.block; document.querySelectorAll(".clip.cap").forEach(el => el.classList.toggle("sel", +el.dataset.block === S.selBlock)); }
+});
+document.addEventListener("pointermove", e => {
+  if (!drag) return;
+  const s = sermon(), D = s.liveDur, pc = x => x / D * 100;
+  if (drag.kind === "sermon") {
+    const { lo, hi } = bounds(s); let t = Math.round(Math.min(Math.max(0, (e.clientX - drag.rect.left) / drag.rect.width * D), D));
+    if (drag.side === "in") { t = Math.min(t, hi - MINLEN); s.range = [t, hi]; } else { t = Math.max(t, lo + MINLEN); s.range = [lo, t]; }
+    const b = bounds(s);
+    ["trimv", "trima"].forEach(id => { const el = document.getElementById(id); if (!el) return; el.style.left = pc(b.lo) + "%"; el.style.width = pc(b.hi - b.lo) + "%";
+      el.style.backgroundSize = `${D / (b.hi - b.lo) * 100}% 100%`; el.style.backgroundPosition = `${b.lo / (D - (b.hi - b.lo) || 1) * 100}% 0`; });
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    set("trimlbl", `Pregação · ${fmt(b.hi - b.lo)}`); set("kvin", fmt(b.lo)); set("kvout", fmt(b.hi)); set("kvlen", fmt(b.hi - b.lo));
+    document.getElementById("trimv")?.classList.add("on");
+    seek(t); return;
+  }
+  const dx = e.clientX - drag.x0; if (Math.abs(dx) > 3) drag.moved = true;
+  if (drag.mode === "click" || !drag.moved) return;
+  const dt = dx / drag.rect.width * D, [a0, b0] = drag.orig, minA = bounds(s).lo - s.base, maxB = bounds(s).hi - s.base;
+  let a = a0, b = b0;
+  if (drag.mode === "move") { const d = Math.min(Math.max(dt, minA - a0), maxB - b0); a = a0 + d; b = b0 + d; }
+  if (drag.mode === "l") a = Math.min(Math.max(minA, a0 + dt), b0 - 10);
+  if (drag.mode === "r") b = Math.max(Math.min(maxB, b0 + dt), a0 + 10);
+  drag.next = [a, b];
+  drag.el.style.left = pc(s.base + a) + "%"; drag.el.style.width = pc(b - a) + "%";
+  seek(s.base + (drag.mode === "r" ? b : a));
+});
+document.addEventListener("pointerup", () => {
+  if (!drag) return; const d = drag; drag = null; document.body.classList.remove("trimming");
+  if (d.kind === "sermon") { render(); return; }
+  const s = sermon();
+  if (!d.moved || !d.next) { A.selcut({ id: d.r.id }); return; }
+  const ok = refit(d.r, d.next, d.mode === "move" ? d.next[0] - d.orig[0] : null);
+  if (!ok) toast("Nenhuma frase nesse trecho. A faixa voltou para onde estava.");
+  S.selCut = d.r.id; if (P) P.key = viewKey(); render();
+});
+let dragFrom = null;
+document.addEventListener("dragstart", e => { const b = e.target.closest(".clip.vid[draggable]"); if (b) { dragFrom = +b.dataset.seg; e.dataTransfer.effectAllowed = "move"; } });
+document.addEventListener("dragover", e => { const b = e.target.closest(".clip.vid[data-seg]"); if (b && dragFrom != null) { e.preventDefault(); document.querySelectorAll(".clip.drop").forEach(x => x.classList.remove("drop")); b.classList.add("drop"); } });
+document.addEventListener("dragend", () => { dragFrom = null; document.querySelectorAll(".clip.drop").forEach(x => x.classList.remove("drop")); });
+document.addEventListener("drop", e => {
+  const b = e.target.closest(".clip.vid[data-seg]"); if (!b || dragFrom == null) return; e.preventDefault();
+  const from = dragFrom, to = +b.dataset.seg; dragFrom = null;
+  if (to !== from) { snap(); const segs = script().segs, [m] = segs.splice(from, 1); segs.splice(to, 0, m); S.selSeg = to; render(); }
+});
+let rz; window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(render, 200); });
+
+/* ---------- Rotas: #pregacoes, #pregacao/<id>, #corte/<id>/<corte>, #configuracoes/<página> ---------- */
+function route(h) {
+  const [a, b, c] = h.split("/");
+  if (a === "configuracoes") { S.screen = "settings"; if (SPAGE[b]) S.spage = b; S.jump = S.spage; return true; }
+  S.screen = "editor";
+  if (a === "editor") { S.sermonId = 43; S.scriptId = 201; S.level = 3; return true; }
+  if (a === "corte" && S.sermons.some(x => x.id === +b && x.scripts.some(r => r.id === +c))) { S.sermonId = +b; S.scriptId = +c; S.level = 3; return true; }
+  if (a === "pregacao" && S.sermons.some(x => x.id === +b)) { S.sermonId = +b; S.level = 2; fitSermon(); return true; }
+  if (a === "importar") { S.level = 1; S.modal = true; return true; }
+  if (a === "pregacoes" || a === "") { S.level = 1; return true; }
+  return false;
+}
+route(location.hash.slice(1));
+render();
+window.addEventListener("scroll", () => { if (S.screen === "settings") spyScroll(); }, { passive: true });
+window.addEventListener("hashchange", () => { const h = location.hash.slice(1); if (h !== hashFor() && route(h)) render(); });
+</script>

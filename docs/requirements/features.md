@@ -8,6 +8,9 @@ Formato: **BDD in Action** (Smart, 2014); Temas de Investimento conforme
 
 **MVP**: ondas 1–5.
 
+**Protótipo navegável**: [docs/prototype/word-cuts.html](../prototype/word-cuts.html), com dados
+fictícios; abrir no navegador.
+
 ## Requisitos gerais de interface
 
 Valem para todas as features.
