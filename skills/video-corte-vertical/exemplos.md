@@ -14,3 +14,5 @@ Formato: `- [vídeo, tempo] gancho resumido — APROVADO/REJEITADO: motivo`
 - [PICGAMA culto 2026-10-18, 31:11] "Deus em silêncio tem cuidado de nós, para que nada nos aconteça" — DESCARTADO na sugestão: promessa sem cruz
 - [PICGAMA culto 2026-10-18, colagem 16:00–16:43 + 38:09–38:27] "Coragem não é ausência de medo" — APROVADO: aplicação prática; coragem ancorada em Deus, não em esforço próprio
 - [PICGAMA culto 2026-10-18, colagem 35:45–36:48 + 39:27–39:42, tese antecipada] "Violência não é cruz a carregar" — APROVADO: aplicação pastoral com modelo de Cristo; dados estatísticos deixados de fora
+- [PICGAMA culto 2026-10-18, colagem 17:26–17:34 + 18:22–18:44 + 40:53–41:15] "Ela não conquistou o cetro" — APROVADO (roteiro; não renderizado): graça recebida, não conquistada, ligada à dívida paga na cruz
+- [PICGAMA culto 2026-10-18, colagem 23:45–24:38 + 03:53–04:05 + 40:14–40:17] "Dois homens, uma noite" — APROVADO (roteiro; não renderizado): providência sem milagre visível; síntese do início reordenada para depois da cena, aceita
