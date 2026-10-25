@@ -21,6 +21,8 @@ Valem para todas as features.
   timeline) → **Pregação** (prévia 16:9, timeline e painel de cortes) → **Corte** (prévia 9:16,
   timeline do corte e painéis Texto e Legenda). Cada nível mostra só as opções que valem nele;
   "Nova pregação" existe só no primeiro.
+- No corte, o painel abre na aba Texto. Clicar na camada de legenda da timeline abre a aba
+  Legenda; fechá-la, ou clicar em outra área (vídeo, áudio, prévia), volta para Texto.
 - Vocabulário: **corte** é a unidade editável (sugerido, escolhido ou descartado);
   **exportação** é o vídeo renderizado de um corte e fica registrada nele.
 - Configurações ocupam a tela inteira, com navegação própria; o estado da máquina fica numa
