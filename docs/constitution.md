@@ -1,12 +1,29 @@
 <!--
 Sync Impact Report
-- Versão: (nenhuma) → 1.0.0 — primeira ratificação.
-- Princípios adicionados: I. Teologia fora das mãos do editor; II. CLI completa e operável por
-  agentes; III. Economia de tokens; IV. Desempenho com um processamento por vez;
-  V. Simplicidade; VI. Segurança e privacidade.
-- Seções adicionadas: Restrições técnicas; Papéis e permissões; Fluxo de desenvolvimento;
-  Governança.
-- Seções removidas: nenhuma.
+- Versão: 1.2.0 → 1.3.0 — emenda (2026-10-25): os critérios teológicos passam a ser do projeto.
+  A tradição, o prompt base e um trecho de prompt por filtro e por valor, em três níveis de
+  rigidez, ficam fixos no código. O preset guarda só os níveis, o formato, a colagem e as
+  instruções adicionais do administrador.
+  MINOR: orientação ampliada no princípio I; mudam o princípio VI (LGPD) e Restrições técnicas
+  ("Critérios"). Documentos: docs/requirements/inception.md (visão, objetivo 2),
+  docs/requirements/features.md (Tema 2), features/2.1.a-settings.md e
+  2.1.b-llm-script-suggestion.md.
+- Versão: 1.1.0 → 1.2.0 — emenda (2026-10-25): os critérios passam a ser organizados em presets
+  com nome, editáveis no lugar; sai o versionamento dos critérios e o registro da versão em cada
+  sugestão. A sugestão automática usa o preset padrão.
+  MINOR: nenhum princípio removido ou redefinido; muda só a seção Restrições técnicas
+  ("Critérios"). Documentos: docs/requirements/inception.md (F13),
+  docs/requirements/features/2.1.a-settings.md e 2.1.b-llm-script-suggestion.md (2.1.b.3).
+- Versão: 1.0.0 → 1.1.0 — emenda (2026-10-25): retirados os exemplos de calibração. A sugestão
+  passa a depender só dos critérios, que ficam estruturados em campos.
+  MINOR: nenhum princípio removido ou redefinido; a orientação muda dentro dos princípios I, III,
+  VI e das Restrições técnicas.
+- Princípios modificados: I (conteúdo decidido a partir dos critérios); III (sai o limite de
+  exemplos no prompt); VI (LGPD vale para critérios e relatórios).
+- Seções modificadas: Restrições técnicas ("Critérios"); Papéis e permissões (Configurações).
+- Documentos atualizados: docs/requirements/inception.md (J2, F13),
+  docs/requirements/features/2.1.a-settings.md e 2.1.b-llm-script-suggestion.md.
+- Revisão das emendas 1.1.0, 1.2.0 e 1.3.0: pendente. Uma emenda MUST ser revisada por outra pessoa antes de valer (Governance).
 - Pendências:
   - TODO(DOMINIO): confirmar o domínio na Cloudflare para o Tunnel + Access.
   - TODO(AJUSTE_BORDAS): decidir se a entrada/saída da pregação encosta na palavra depois da
@@ -25,8 +42,12 @@ uma equipe de assistentes que edita vídeo, mas não decide teologia.
 ### I. Teologia fora das mãos do editor (NÃO NEGOCIÁVEL)
 
 - O conteúdo de um corte (quais trechos, em que ordem, com que limites) é decidido pelo LLM, a
-  partir dos critérios teológicos e exemplos de calibração da configuração. Ou pelo
+  partir dos critérios teológicos do projeto, na rigidez escolhida no preset. Ou pelo
   administrador.
+- Os critérios teológicos são parte do código: a tradição, o prompt base e o texto de cada
+  filtro e de cada valor, em três níveis de rigidez. Mudá-los MUST passar por commit e revisão,
+  como qualquer código. Pela configuração, o administrador escolhe só os níveis e escreve
+  instruções adicionais.
 - O editor MUST NOT alterar o conteúdo: não inclui, não remove, não reordena trechos, não muda
   limites e não cria roteiro do zero. Ele escolhe entre os roteiros sugeridos e mexe só na
   forma: enquadramento e grafia da legenda.
@@ -64,8 +85,6 @@ evita que a web e a CLI divirjam.
   frases, e o servidor converte para os tempos das palavras.
 - A resposta MUST seguir um esquema JSON e ser validada. Em caso de falha: uma nova tentativa,
   depois o erro aparece para o usuário. Não há "conserto" heurístico.
-- Os exemplos de calibração entram no prompt limitados aos N mais recentes (padrão 30,
-  configurável).
 - Só a faixa da pregação vai ao LLM, nunca a live inteira.
 
 Razão: o custo fica previsível (uma chamada por pregação) e não cresce com a edição.
@@ -110,8 +129,8 @@ infraestrutura.
   aparecem só os últimos 4 caracteres. Ela MUST NOT aparecer em resposta da API, em log ou em
   mensagem de erro. Fica num arquivo com permissão `600` ou no banco, cifrada.
 - Os cookies do YouTube seguem a mesma regra.
-- LGPD: dos editores se guarda só o e-mail. Os exemplos de calibração e os relatórios MUST NOT
-  conter nomes de pessoas.
+- LGPD: dos editores se guarda só o e-mail. As instruções adicionais dos presets e os
+  relatórios MUST NOT conter nomes de pessoas.
 
 ## Restrições técnicas
 
@@ -130,9 +149,16 @@ infraestrutura.
   sincronizada que mostra os trechos e a duração (meta de 40 a 75 s). A borda arrastada na
   trilha encosta na palavra.
 - **LLM:** pelo OpenRouter. O modelo e a chave se escolhem na página de configurações.
-- **Critérios e exemplos:** editáveis na configuração e pela CLI, guardados no banco com
-  versões. Cada sugestão registra a versão que a gerou. O conteúdo inicial vem de
-  `skills/video-corte-vertical/sugerir-cortes.md` e `exemplos.md`.
+- **Critérios (fixos no código):** o prompt base, com a tradição teológica, e um trecho de
+  prompt para cada filtro e cada valor, nos níveis brando, moderado e rigoroso. Ficam em
+  arquivos no pacote, um por critério, validados ao carregar: todo critério MUST ter os três
+  níveis. O conteúdo inicial vem de `skills/video-corte-vertical/sugerir-cortes.md`. Não há
+  exemplos de calibração no prompt.
+- **Presets (no banco):** têm nome e guardam só o nível de cada critério, pelo ID do critério,
+  os números do formato, as opções de colagem e as instruções adicionais (texto livre do
+  administrador, acrescentado ao prompt). São editáveis na configuração e pela CLI. A sugestão
+  automática usa o preset padrão. Critério novo no código entra nos presets com o nível padrão
+  dele; critério removido do código é ignorado.
 
 ## Papéis e permissões
 
@@ -149,7 +175,7 @@ infraestrutura.
 | Criar roteiro do zero | ❌ | ✅ |
 | Renderizar e baixar | ✅ | ✅ |
 | Apagar pregação ou corte | ❌ | ✅ |
-| Configurações (modelo, chave, critérios, exemplos, equipe) | ❌ | ✅ |
+| Configurações (modelo, chave, critérios, equipe) | ❌ | ✅ |
 
 ## Fluxo de desenvolvimento
 
@@ -170,4 +196,4 @@ infraestrutura.
   - PATCH: redação e esclarecimentos.
 - Uma emenda MUST ser revisada por uma pessoa diferente de quem a redigiu antes de valer.
 
-**Version**: 1.0.0 | **Ratified**: 2026-10-24 | **Last Amended**: 2026-10-24
+**Version**: 1.3.0 | **Ratified**: 2026-10-24 | **Last Amended**: 2026-10-25

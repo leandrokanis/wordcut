@@ -24,7 +24,7 @@ cujos cortes da pregação exigem edição demorada e julgamento teológico,
 o Word Cuts é uma aplicação web com CLI
 que transforma o link da live em cortes verticais prontos.
 Diferentemente de ferramentas automáticas de cortes,
-ele escolhe os trechos por critérios teológicos definidos pelo administrador.
+ele escolhe os trechos por critérios teológicos do projeto, na rigidez do administrador.
 ```
 
 Nome: "Word Cuts" — a Palavra e a edição palavra a palavra.
@@ -51,7 +51,8 @@ Nome: "Word Cuts" — a Palavra e a edição palavra a palavra.
 1. **Autonomia da equipe** — investir em autonomia da equipe para que os assistentes produzam
    cortes sem depender do admin.
 2. **Curadoria confiável** — investir em curadoria teológica automática para que nenhum trecho
-   chegue à edição sem passar pelo critério definido pelo administrador.
+   chegue à edição sem passar pelos critérios do projeto, na rigidez escolhida pelo
+   administrador.
 3. **Rapidez e custo previsível** — investir em desempenho e economia para que um corte fique
    pronto em minutos, com uma chamada de LLM por pregação.
 
@@ -74,9 +75,8 @@ baixa os cortes (9:16)
 *Resultado: a pregação e os cortes prontos para a revisão do supervisor.*
 
 **J2. Curar o conteúdo** · Administrador · Tema 2
-configura o modelo e a chave → ajusta os critérios e os exemplos → lê as sugestões de uma
-pregação → edita o conteúdo de um roteiro ou cria um do zero → pede novas sugestões, se
-precisar → registra a decisão como exemplo
+configura o modelo e a chave → ajusta os critérios → lê as sugestões de uma pregação → edita
+o conteúdo de um roteiro ou cria um do zero → pede novas sugestões, se precisar
 *Resultado: sugestões cada vez mais alinhadas ao critério.*
 
 **J3. Operar pela CLI** · Agente operador · Tema 3
@@ -108,7 +108,7 @@ lógica pronta no pacote atual, falta o produto em volta.
 | F10 | Renderizar o corte em 9:16 | J1.7, J3.5 | motor já existe (`short`) |
 | F11 | Baixar os cortes (9:16) | J1.8, J3.6 | nova |
 | F12 | Editar o conteúdo pelo texto e pela trilha (admin) | J2.4 | nova |
-| F13 | Configurações: modelo e chave do OpenRouter, critérios e exemplos com versões | J2.1, J2.2, J2.6 | nova |
+| F13 | Configurações: modelo e chave do OpenRouter, critérios em campos, organizados em presets | J2.1, J2.2 | nova |
 | F14 | Equipe e papéis por e-mail (Cloudflare Access) | J4.1 | nova |
 | F15 | Apagar pregações e cortes | J4.3 | nova |
 

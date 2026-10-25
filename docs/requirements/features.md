@@ -77,7 +77,7 @@ A fim de que a equipe acesse com segurança e a máquina não lote, o administra
 
 # Tema 2 — Curadoria confiável
 
-Investir em curadoria teológica automática para que nenhum trecho chegue à edição sem passar pelo critério definido pelo administrador.
+Investir em curadoria teológica automática para que nenhum trecho chegue à edição sem passar pelos critérios do projeto, na rigidez escolhida pelo administrador.
 
 ## Épico 2.1 — Curar o conteúdo
 
