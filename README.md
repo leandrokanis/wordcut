@@ -172,6 +172,10 @@ uv run ruff check . && uv run ruff format --check .
 uv run mypy
 ```
 
+A suíte não usa a rede real: ela define `WORDCUT_FORBID_NETWORK`, e com essa variável o
+OpenRouter e o YouTube recusam com `network_error`, até numa tarefa destacada
+([ADR-0017](docs/adr/0017-testes-sem-rede-real.md)).
+
 Web:
 
 ```sh

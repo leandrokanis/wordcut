@@ -57,28 +57,31 @@ class CutRow:
 
 def insert_many(
     connection: sqlite3.Connection, sermon_id: int, new: Sequence[NewCut], now: datetime
-) -> None:
-    """Add the cuts to the sermon, in the order given."""
-    connection.executemany(
+) -> list[int]:
+    """Add the cuts to the sermon, in the order given, and give their IDs in that order."""
+    return [_inserted_id(connection, sermon_id, cut, now) for cut in new]
+
+
+def _inserted_id(connection: sqlite3.Connection, sermon_id: int, cut: NewCut, now: datetime) -> int:
+    cursor = connection.execute(
         "INSERT INTO cuts (sermon_id, status, title, segments, range_start_word,"
         " range_end_word, source, preset_id, created_at, updated_at)"
         " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        [
-            (
-                sermon_id,
-                cut.status,
-                cut.title,
-                _segments_json(cut.segments),
-                cut.range_start_word,
-                cut.range_end_word,
-                cut.source,
-                cut.preset_id,
-                now.isoformat(),
-                now.isoformat(),
-            )
-            for cut in new
-        ],
+        (
+            sermon_id,
+            cut.status,
+            cut.title,
+            _segments_json(cut.segments),
+            cut.range_start_word,
+            cut.range_end_word,
+            cut.source,
+            cut.preset_id,
+            now.isoformat(),
+            now.isoformat(),
+        ),
     )
+    assert cursor.lastrowid is not None
+    return cursor.lastrowid
 
 
 def of_sermon(connection: sqlite3.Connection, sermon_id: int) -> list[CutRow]:
@@ -100,6 +103,14 @@ def counts_of(connection: sqlite3.Connection, sermon_id: int) -> dict[str, int]:
 def delete_of(connection: sqlite3.Connection, sermon_id: int) -> None:
     """Remove every cut of the sermon."""
     connection.execute("DELETE FROM cuts WHERE sermon_id = ?", (sermon_id,))
+
+
+def delete_unedited_suggestions(connection: sqlite3.Connection, sermon_id: int) -> None:
+    """Remove the sermon's ``suggested`` cuts nobody has edited."""
+    connection.execute(
+        "DELETE FROM cuts WHERE sermon_id = ? AND status = 'suggested' AND edited = 0",
+        (sermon_id,),
+    )
 
 
 def _segments_json(segments: Sequence[Segment]) -> str:

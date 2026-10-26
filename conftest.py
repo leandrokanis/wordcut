@@ -33,6 +33,17 @@ StartLockOwner = Callable[[str, str], "subprocess.Popen[str]"]
 
 
 @pytest.fixture(autouse=True)
+def no_network(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Make the real outside world refuse here and in every process the test starts (ADR-0017).
+
+    A detached task process inherits the variable but not the doubles of this process.
+    """
+    from wordcut.network import FORBID_NETWORK
+
+    monkeypatch.setenv(FORBID_NETWORK, "1")
+
+
+@pytest.fixture(autouse=True)
 def no_real_processing(monkeypatch: pytest.MonkeyPatch) -> None:
     """Fail a test that would process with YouTube, WhisperX and ffmpeg for real."""
     from wordcut import processing

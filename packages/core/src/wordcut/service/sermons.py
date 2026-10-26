@@ -175,6 +175,15 @@ class SermonVideo:
 
 def sermon_video(connection: sqlite3.Connection, home: Home, sermon_id: int) -> SermonVideo:
     """The processed video of the sermon, named ``AAAA-MM-DD - Título.mp4``."""
+    row = processed_row(connection, sermon_id)
+    return SermonVideo(
+        path=_video_file(home, row),
+        suggested_name=f"{folder_name(row.service_date, row.title)}.mp4",
+    )
+
+
+def processed_row(connection: sqlite3.Connection, sermon_id: int) -> SermonRow:
+    """The sermon, once processed; otherwise ``not_found`` or ``sermon_not_processed``."""
     row = _existing(connection, sermon_id)
     if row.status != "processed":
         raise WordcutError(
@@ -183,10 +192,7 @@ def sermon_video(connection: sqlite3.Connection, home: Home, sermon_id: int) -> 
             f" rode wordcut sermon process {sermon_id}.",
             {"sermon_id": sermon_id, "status": row.status},
         )
-    return SermonVideo(
-        path=_video_file(home, row),
-        suggested_name=f"{folder_name(row.service_date, row.title)}.mp4",
-    )
+    return row
 
 
 def _video_file(home: Home, row: SermonRow) -> Path:
@@ -307,7 +313,7 @@ def _shown(connection: sqlite3.Connection, row: SermonRow) -> dict[str, Any]:
         "sermon_end": row.sermon_end,
         "processed_at": None if row.processed_at is None else row.processed_at.isoformat(),
         "last_task": _last_task(connection, row.id),
-        "cuts": [_cut(cut) for cut in cuts.of_sermon(connection, row.id)],
+        "cuts": [shown_cut(cut) for cut in cuts.of_sermon(connection, row.id)],
         "suggestion_error": _suggestion_error(row.suggestion_error),
     }
 
@@ -316,7 +322,8 @@ def _suggestion_error(error: SuggestionError | None) -> dict[str, str] | None:
     return None if error is None else {"code": error.code, "message": error.message}
 
 
-def _cut(row: CutRow) -> dict[str, Any]:
+def shown_cut(row: CutRow) -> dict[str, Any]:
+    """The cut as ``show_sermon`` gives it."""
     return {
         "id": row.id,
         "status": row.status,

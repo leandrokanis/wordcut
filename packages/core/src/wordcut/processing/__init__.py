@@ -10,6 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Protocol
 
+from wordcut import network
 from wordcut.asr import Transcriber
 from wordcut.asr.local import LocalTranscriber
 from wordcut.media import cut_with_fades, duration_seconds, extract_speech_audio
@@ -71,5 +72,7 @@ class LocalGateways:
 
 
 def default_gateways(whisper_model: str) -> ProcessingGateways:
-    """The gateways of a real processing, transcribing with the WhisperX ``whisper_model``."""
+    """The gateways of a real processing, transcribing with the WhisperX ``whisper_model``;
+    refused with ``network_error`` while the network is forbidden (ADR-0017)."""
+    network.refuse_when_forbidden("o YouTube")
     return LocalGateways(YouTube(), LocalTranscriber(whisper_model))
