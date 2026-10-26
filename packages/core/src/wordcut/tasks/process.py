@@ -1,9 +1,13 @@
-"""The ``process`` task: download, transcribe and cut a trimmed sermon (docs/cli.md §7.4).
+"""The ``process`` task: download, transcribe and cut a trimmed sermon, then have the LLM
+suggest its cuts (docs/cli.md §7.4).
 
-Parameters: ``force`` true to redo a processed sermon. The sermon is ``processing`` while
-the task runs and ends ``processed`` or ``failed``. ``service.processing.start_processing``
-checks, under the lock, that the sermon can be processed before the task is recorded. The
-transcription uses the WhisperX model of the settings (``service.settings.whisper_model``).
+Parameters: ``force`` true to redo a processed sermon, its cuts included. The sermon is
+``processing`` while the task runs and ends ``processed`` or ``failed``.
+``service.processing.start_processing`` checks, under the lock, that the sermon can be
+processed before the task is recorded. The transcription uses the WhisperX model of the
+settings (``service.settings.whisper_model``). The suggestion uses the default preset; when it
+fails, the error stays on the sermon as its ``suggestion_error`` and the sermon stays
+``processed`` (2.1.b.1, FR-005).
 """
 
 from __future__ import annotations
@@ -14,17 +18,21 @@ import sqlite3
 from contextlib import closing
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
-from wordcut import processing
-from wordcut.db import connect, sermons, transcripts
+from wordcut import processing, suggestion
+from wordcut.db import connect, cuts, sermons, transcripts
 from wordcut.db.sermons import SermonRow
+from wordcut.errors import WordcutError
 from wordcut.processing import pipeline
 from wordcut.processing.pipeline import Processed
+from wordcut.service.presets import default_preset
 from wordcut.service.sermons import processed_sermon
 from wordcut.service.settings import whisper_model
 from wordcut.tasks import Result, TaskContext, TaskKind, register
 
 SAVING = (0.95, "gravando")
+SUGGESTING = (0.96, "sugerindo")
 VIDEO_FILE = "sermon.mp4"
 WORK_FOLDER = "work"
 
@@ -38,6 +46,7 @@ def _run(ctx: TaskContext) -> Result:
         model = whisper_model(connection)
         with connection:
             if force:
+                cuts.delete_of(connection, sermon_id)
                 transcripts.delete_of(connection, sermon_id)
             sermons.set_status(connection, sermon_id, "processing", _now())
     try:
@@ -66,9 +75,20 @@ def _processed(ctx: TaskContext, sermon: SermonRow, transcription_model: str) ->
     os.replace(made.video, video)
     with closing(connect(ctx.home)) as connection:
         _store(connection, sermon.id, made, str(video.relative_to(ctx.home.root)))
-        result = processed_sermon(connection, sermon.id)
+        ctx.progress(*SUGGESTING)
+        warnings = _suggestion_warnings(connection, sermon.id)
+        result = {**processed_sermon(connection, sermon.id), "suggestion_warnings": warnings}
     shutil.rmtree(work)
     return result
+
+
+def _suggestion_warnings(connection: sqlite3.Connection, sermon_id: int) -> list[dict[str, Any]]:
+    """The warnings of the suggestion; its failure is already kept on the sermon."""
+    try:
+        made = suggestion.suggest(connection, sermon_id, default_preset(connection))
+    except WordcutError:
+        return []
+    return list(made.warnings)
 
 
 def _fresh_folder(folder: Path) -> Path:

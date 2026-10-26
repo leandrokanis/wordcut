@@ -72,6 +72,7 @@ flowchart LR
     LOCK["lock<br/>trava global"]
     TASK["tasks<br/>processo destacado"]
     PROC["processing<br/>pipeline + ProcessingGateways"]
+    SUG["suggestion<br/>SuggestionModel + OpenRouterModel"]
     DOM["domínio<br/>youtube, asr, edit, vertical"]
   end
   CLI --> SVC
@@ -82,6 +83,8 @@ flowchart LR
   SVC --> DOM
   SVC --> ERR
   TASK --> PROC
+  TASK --> SUG
+  SUG --> DB
   PROC --> DOM
 ```
 
@@ -95,10 +98,11 @@ flowchart LR
 | Erros (`errors`), raiz de dados (`home`), banco com migrações (`db`), trava global (`lock`) | existe em `packages/core` (item 3.1.a.3; ADR-0005, ADR-0006) |
 | Tabela `sermons` (migração 0002, repositório `db.sermons`) e pasta de segredos (`config`, `WORDCUT_CONFIG`) | existe em `packages/core` (item 1.1.a.1) |
 | Configurações | tabela `settings` chave-valor (migração 0005, repositório `db.settings`) com o modelo do LLM (sem padrão) e o do WhisperX (`large-v3` por padrão); segredos em arquivos de `WORDCUT_CONFIG` com permissão 600 (`openrouter-key` e `youtube-cookies.txt`), gravados de uma vez por `config.write_secret` (temporário na mesma pasta + `os.replace`); a chave só sai mascarada (`••••` e os 4 últimos), os cookies só como presentes ou ausentes; pasta somente leitura dá `config_not_writable` (item 2.1.a.1) |
-| Critérios e presets | `wordcut.criteria`: textos do prompt no pacote (`criteria/texts/`: `base.md` com vagas para os critérios e as durações, um arquivo por critério com os três níveis, `options/` com reordenar, palavras protegidas e instruções), carregados e validados no primeiro uso (`CatalogError` é erro de programação); tabela `presets` (migração 0006, repositório `db.presets`) com os níveis em JSON por ID de critério, índice único parcial para um só padrão e o "Padrão" semeado com `levels '{}'`; `service.presets` lista, mostra, cria, altera, troca o padrão, apaga (o padrão não), completa critérios novos e ignora removidos na leitura e monta o prompt (`build_prompt`) para a sugestão do item 9; o texto dos critérios aguarda revisão humana qualificada (item 2.1.a.2) |
+| Critérios e presets | `wordcut.criteria`: textos do prompt no pacote (`criteria/texts/`: `base.md` com vagas para os critérios e as durações, um arquivo por critério com os três níveis, `options/` com reordenar, palavras protegidas e instruções), carregados e validados no primeiro uso (`CatalogError` é erro de programação); tabela `presets` (migração 0006, repositório `db.presets`) com os níveis em JSON por ID de critério, índice único parcial para um só padrão e o "Padrão" semeado com `levels '{}'`; `service.presets` lista, mostra, cria, altera, troca o padrão, apaga (o padrão não), completa critérios novos e ignora removidos na leitura e monta o prompt (`build_prompt`) que a sugestão usa (item 2.1.b.1); o texto dos critérios aguarda revisão humana qualificada (item 2.1.a.2) |
 | Camada de serviço | `service.status` (trava e tarefas em andamento), `service.sermons` (criar a pregação pelo link, listar, detalhar com a última tarefa e a transcrição, delimitar e reconciliar a pregação `processing` órfã; itens 1.1.a.1, 1.1.b, 1.1.c.1), `service.processing` (lançar o processamento; item 1.1.c.1), `service.settings` (ver e trocar os modelos, gravar a chave do LLM e os cookies; item 2.1.a.1), `service.presets` (critérios e presets; item 2.1.a.2) e `service.tasks` (listar, detalhar e esperar tarefas; item 3.1.a.2) existem; as demais operações em construção (roadmap, fase 1) |
 | Tarefas | tabela `tasks` (migração 0003) e `wordcut.tasks`: registro de tipos, execução em primeiro plano ou em processo destacado que herda a trava (`wordcut.tasks.runner`, saída em `tasks/<id>.log`), gancho `admit` sob a trava antes de gravar a tarefa, progresso no banco e tarefa órfã marcada `interrupted` na leitura; o tipo interno `diagnostic` exercita o mecanismo; o tipo `process` existe (item 1.1.c.1); `render` e `suggest` chegam com as operações (item 3.1.a.2; ADR-0007, ADR-0013, ADR-0014) |
-| Processamento da pregação | `wordcut.processing`: `pipeline.process` (baixa só a faixa e uma janela de áudio, sincroniza, transcreve, ajusta as bordas às palavras e corta com fades), frases (`processing.sentences`, reaproveitadas por `overview`) e a porta `ProcessingGateways` com `LocalGateways`/`default_gateways(whisper_model)`, que transcreve com o modelo do WhisperX das configurações (item 2.1.a.1); tabelas `words` e `sentences` e colunas `sermon_start`, `sermon_end`, `video_path`, `processed_at` em `sermons` (migração 0004, repositório `db.transcripts`); mídias em `media/sermons/<id>/` na pasta de dados; a sugestão de cortes pelo LLM ao fim chega no item 9 (item 1.1.c.1; ADR-0014) |
+| Processamento da pregação | `wordcut.processing`: `pipeline.process` (baixa só a faixa e uma janela de áudio, sincroniza, transcreve, ajusta as bordas às palavras e corta com fades), frases (`processing.sentences`, reaproveitadas por `overview`) e a porta `ProcessingGateways` com `LocalGateways`/`default_gateways(whisper_model)`, que transcreve com o modelo do WhisperX das configurações (item 2.1.a.1); tabelas `words` e `sentences` e colunas `sermon_start`, `sermon_end`, `video_path`, `processed_at` em `sermons` (migração 0004, repositório `db.transcripts`); mídias em `media/sermons/<id>/` na pasta de dados; ao fim, a sugestão de cortes pelo LLM com o preset padrão, cuja falha não desfaz o processamento (item 1.1.c.1; ADR-0014, ADR-0016) |
+| Sugestão de cortes | `wordcut.suggestion`: entrada (`request`: prompt do preset + formato da resposta; frases numeradas de 1 em diante, sem tempos), validação estrita do esquema (`response`), porta `SuggestionModel` com `OpenRouterModel` (`httpx`, toda falha vira `llm_error`) e `default_model(llm_model, key)`, que os testes substituem; `suggest` confere modelo e chave (`llm_not_configured`), pede uma vez e mais uma em resposta fora do esquema, monta trechos e faixa contínua, descarta por duração estimada (×0,82) com aviso e grava os cortes `suggested`; tabela `cuts` (migração 0007, repositório `db.cuts`; `preset_id` com `ON DELETE SET NULL`) e `suggestion_error_code`/`suggestion_error_message` em `sermons`; `sermon show` e `list` trazem cortes e contagens reais (item 2.1.b.1; ADR-0010, ADR-0016) |
 | CLI | contrato de saída e erros (ADR-0012), erro de uso sem repetir valor digitado (ADR-0015), `wordcut status`, `wordcut sermon create` (com `--process`), `list`, `show` (com `--transcript`), `trim` e `process`, `wordcut task list`, `show` e `wait`, `wordcut settings show`, `set`, `set-key` e `set-cookies` (segredo só pelo stdin; argumento sobrando recusado sem eco), `wordcut criteria list` e `wordcut preset list`, `show`, `create`, `update`, `set-default` e `delete` e o auxiliar de `--wait` dos comandos que lançam tarefa existem; os comandos da CLI anterior seguem no mesmo executável, com saída e erros de execução fora do contrato (o erro de uso segue o contrato), até o item `cli-migration`; os demais comandos de `docs/cli.md` em construção (roadmap, fase 1) |
 | API | esqueleto em `apps/api` com `GET /api/health`; rotas planejadas (roadmap, fase 2) |
 | Web | esqueleto em `apps/web` que mostra o estado da API; protótipo em `docs/prototype/wordcut.html`; interface planejada (roadmap, fase 3) |
@@ -118,6 +122,7 @@ sequenceDiagram
   participant Lock as processing.lock
   participant YT as YouTube
   participant ASR as WhisperX + ffmpeg
+  participant LLM as OpenRouter
 
   Op->>CLI: sermon create <link> --start T --end T
   CLI->>SVC: create_sermon(link, start, end)
@@ -141,11 +146,16 @@ sequenceDiagram
     SVC-->>CLI: task_id
     CLI-->>Op: {"task_id": …}
     Child->>Lock: dono = PID do filho
-    Child->>DB: confirma processing; com --force, apaga palavras e frases
+    Child->>DB: confirma processing; com --force, apaga cortes, palavras e frases
     Child->>YT: baixa só a faixa e a janela de áudio
     Child->>ASR: sincroniza, transcreve a faixa, corta 16:9 com fades
     Child->>DB: palavras, frases e processed (uma transação)
-    Note over Child: a sugestão de cortes pelo LLM chega no item 9
+    Child->>LLM: prompt do preset padrão + frases numeradas (uma chamada, mais uma se fora do esquema)
+    alt resposta válida
+      Child->>DB: cortes suggested, suggestion_error limpo
+    else sem configuração, falha do OpenRouter ou fora do esquema duas vezes
+      Child->>DB: suggestion_error (a pregação continua processed)
+    end
     Child->>Lock: libera
     Child->>DB: tarefa succeeded
   end

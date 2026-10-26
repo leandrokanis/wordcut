@@ -9,6 +9,7 @@ description = "Domínio do Wordcut: pregação, transcrição, edição e corte 
 license = "MIT"
 requires-python = ">=3.10"
 dependencies = [
+    "httpx>=0.27",
     "numpy>=2.2.6",
     "opencv-python-headless>=4.10,<5",
     "pillow>=12.3.0",

@@ -9,8 +9,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from wordcut.db import sermons, tasks, transcripts
-from wordcut.db.sermons import NewSermon, SermonRow
+from wordcut.db import cuts, sermons, tasks, transcripts
+from wordcut.db.cuts import CutRow
+from wordcut.db.sermons import NewSermon, SermonRow, SuggestionError
 from wordcut.db.transcripts import SentenceRow
 from wordcut.errors import WordcutError
 from wordcut.home import Home
@@ -22,7 +23,7 @@ from wordcut.youtube import LiveInfo, LiveSource, YouTubeError, video_id
 
 # docs/cli.md §7; the CHECK of migration 0002 lists the same states.
 SERMON_STATES = ("created", "trimmed", "processing", "processed", "failed")
-# docs/cli.md §8: cut states. Cuts arrive in a later item; until then every count is 0.
+# docs/cli.md §8: cut states; the CHECK of migration 0007 lists the same states.
 CUT_STATES = ("suggested", "chosen", "discarded")
 # 1.1.b: a sermon lasts at least one minute.
 MIN_SERMON_SECONDS = 60
@@ -127,7 +128,7 @@ def list_sermons(
     """Sermons with the latest service first, only those in ``status`` when given."""
     for row in sermons.newest_first(connection, "processing"):
         _reconciled(home, connection, row)
-    return {"items": [_listed(row) for row in sermons.newest_first(connection, status)]}
+    return {"items": [_listed(connection, row) for row in sermons.newest_first(connection, status)]}
 
 
 def show_sermon(
@@ -299,14 +300,35 @@ def _to_millisecond(seconds: float) -> float:
 
 def _shown(connection: sqlite3.Connection, row: SermonRow) -> dict[str, Any]:
     return {
-        **_listed(row),
+        **_listed(connection, row),
         "live_start": row.live_start,
         "live_end": row.live_end,
         "sermon_start": row.sermon_start,
         "sermon_end": row.sermon_end,
         "processed_at": None if row.processed_at is None else row.processed_at.isoformat(),
         "last_task": _last_task(connection, row.id),
-        "cuts": [],
+        "cuts": [_cut(cut) for cut in cuts.of_sermon(connection, row.id)],
+        "suggestion_error": _suggestion_error(row.suggestion_error),
+    }
+
+
+def _suggestion_error(error: SuggestionError | None) -> dict[str, str] | None:
+    return None if error is None else {"code": error.code, "message": error.message}
+
+
+def _cut(row: CutRow) -> dict[str, Any]:
+    return {
+        "id": row.id,
+        "status": row.status,
+        "title": row.title,
+        "segments": [
+            {"from_word": segment.from_word, "to_word": segment.to_word} for segment in row.segments
+        ],
+        "range_start_word": row.range_start_word,
+        "range_end_word": row.range_end_word,
+        "source": row.source,
+        "preset_id": row.preset_id,
+        "edited": row.edited,
     }
 
 
@@ -315,11 +337,11 @@ def _last_task(connection: sqlite3.Connection, sermon_id: int) -> dict[str, Any]
     return shown_task(found[0]) if found else None
 
 
-def _listed(row: SermonRow) -> dict[str, Any]:
+def _listed(connection: sqlite3.Connection, row: SermonRow) -> dict[str, Any]:
     return {
         **_sermon(row),
         "duration": _sermon_duration(row),
-        "cut_counts": dict.fromkeys(CUT_STATES, 0),
+        "cut_counts": {**dict.fromkeys(CUT_STATES, 0), **cuts.counts_of(connection, row.id)},
     }
 
 

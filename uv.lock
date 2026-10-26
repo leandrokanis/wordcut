@@ -6449,6 +6449,7 @@ name = "wordcut-core"
 version = "0.1.0"
 source = { editable = "packages/core" }
 dependencies = [
+    { name = "httpx" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.11.*'" },
     { name = "numpy", version = "2.5.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
@@ -6467,6 +6468,7 @@ asr = [
 
 [package.metadata]
 requires-dist = [
+    { name = "httpx", specifier = ">=0.27" },
     { name = "numpy", specifier = ">=2.2.6" },
     { name = "opencv-python-headless", specifier = ">=4.10,<5" },
     { name = "pillow", specifier = ">=12.3.0" },

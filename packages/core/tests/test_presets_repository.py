@@ -147,4 +147,4 @@ def test_a_database_of_the_previous_version_gains_the_factory_preset_and_keeps_i
         names = [row.name for row in presets.all_presets(connection)]
         version = connection.execute("PRAGMA user_version").fetchone()[0]
 
-    assert (kept, names, version) == ([("medium",)], ["Padrão"], 6)
+    assert (kept, names, version >= 6) == ([("medium",)], ["Padrão"], True)

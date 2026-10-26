@@ -43,15 +43,29 @@ def llm_key_file() -> Path:
     return config_dir() / LLM_KEY_FILE
 
 
+def llm_key() -> str | None:
+    """The stored LLM key in clear, ``None`` without one.
+
+    Only the LLM client calls this; anything else shows ``masked_llm_key`` at most.
+    """
+    return _stored_llm_key() or None
+
+
 def masked_llm_key() -> str | None:
     """The stored LLM key as ``"••••"`` and its last characters; ``None`` without a key."""
-    try:
-        key = llm_key_file().read_text(encoding="utf-8")
-    except FileNotFoundError:
+    key = _stored_llm_key()
+    if key is None:
         return None
     if len(key) < MIN_KEY_LENGTH_TO_SHOW:
         return MASK
     return MASK + key[-VISIBLE_KEY_CHARACTERS:]
+
+
+def _stored_llm_key() -> str | None:
+    try:
+        return llm_key_file().read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return None
 
 
 def write_secret(path: Path, content: str) -> None:

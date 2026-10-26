@@ -273,6 +273,8 @@ def _render_shown(result: dict[str, Any]) -> str:
         f"Bordas: {_borders(result)}",
         f"Cortes: {len(result['cuts']) or 'nenhum'}",
     ]
+    if result["suggestion_error"] is not None:
+        lines.append(f"Sugestão de cortes falhou: {result['suggestion_error']['message']}")
     if "sentences" in result:
         lines += ["Transcrição:", *(_sentence_line(item) for item in result["sentences"])]
     return "\n".join(lines)

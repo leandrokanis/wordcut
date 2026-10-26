@@ -116,6 +116,7 @@ def test_process_with_wait_prints_the_processed_sermon_and_the_stages_on_stderr(
             "[process] transcrevendo 35%",
             "[process] cortando 85%",
             "[process] gravando 95%",
+            "[process] sugerindo 96%",
         ],
     )
 

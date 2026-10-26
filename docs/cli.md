@@ -237,6 +237,7 @@ Sem `--json`, o `message` vai para o stderr.
 | `default_preset` | 5 | apagar o preset padrão |
 | `last_admin` | 5 | remover ou rebaixar o último administrador |
 | `config_not_writable` | 5 | gravar um segredo numa pasta de configuração sem escrita (montada só para leitura no contêiner); a mensagem não traz o segredo |
+| `llm_not_configured` | 5 | sugerir cortes sem o modelo do LLM ou sem a chave; `details.missing` lista o que falta (`llm_model`, `llm_key`); a mensagem não traz a chave |
 | `youtube_error` | 6 | falha ao consultar ou baixar do YouTube |
 | `llm_error` | 6 | falha do LLM depois da nova tentativa (constituição §III) |
 | `network_error` | 6 | falha de rede genérica |
@@ -323,7 +324,24 @@ wordcut sermon create https://youtube.com/live/… --start 1:02:10 --end 1:48:30
 - `show`: os mesmos dados, mais as bordas na live (`live_start`, `live_end`), as bordas
   ajustadas às palavras pelo processamento (`sermon_start`, `sermon_end`, em tempo da live;
   `null` antes de processar), `processed_at`, a última tarefa da pregação (`last_task`, no
-  formato de `task show`, ou `null`) e os cortes.
+  formato de `task show`, ou `null`), os cortes (`cuts`) e o erro da última sugestão
+  (`suggestion_error`).
+- Cada corte em `cuts`, na ordem em que foi criado: `id`, `status`, `title`, `segments` (no
+  formato de `cut segments`, §8.10, na ordem em que o corte toca), `range_start_word` e
+  `range_end_word` (primeira e última palavra da faixa contínua, na ordem da pregação),
+  `source` (`llm` ou `admin`), `preset_id` (o preset da sugestão; `null` se o preset foi
+  apagado ou o corte não veio do LLM) e `edited`.
+- `suggestion_error`: `{"code", "message"}` da última sugestão que falhou, ou `null` quando
+  ela deu certo ou nunca rodou. Sem `--json`, o `show` termina com a linha
+  `Sugestão de cortes falhou: <mensagem>`.
+
+```json
+{ "cuts": [ { "id": 34, "status": "suggested", "title": "Graça que alcança",
+              "segments": [ { "from_word": 1201, "to_word": 1230 } ],
+              "range_start_word": 1201, "range_end_word": 1230, "source": "llm",
+              "preset_id": 1, "edited": false } ],
+  "suggestion_error": null }
+```
 - `--transcript`: acrescenta a transcrição, uma frase por linha, com ID da frase, tempo e IDs
   da primeira e da última palavra. No JSON, `sentences`, em ordem e em tempo da pregação:
 
@@ -347,18 +365,30 @@ Define as bordas da pregação, em tempo da live (1.1.b.2).
 ### 7.4. `sermon process <id> [--force] [--wait]`
 
 Tarefa com trava (1.1.c): baixa só a faixa delimitada, transcreve na GPU local, corta em 16:9 e
-pede as sugestões ao LLM com o preset padrão (2.1.b.1). A sugestão pelo LLM chega no item 9
-do roadmap; até lá, o processamento termina ao gravar palavras e frases.
+pede as sugestões ao LLM com o preset padrão (2.1.b.1).
 
 - Exige bordas (`sermon_not_trimmed`) e live terminada (`live_not_finished`). Uma pregação
   criada com a live no ar é consultada de novo no YouTube antes da recusa.
 - Numa pregação já processada, MUST exigir `--force`, porque os cortes e suas edições são
-  refeitos (1.1.b.3); sem ele, `would_discard_edits`.
+  refeitos (1.1.b.3); sem ele, `would_discard_edits`. Com `--force`, os cortes da pregação
+  são apagados junto com as palavras e as frases.
 - Uma pregação `failed` é refeita pelo mesmo comando (1.1.c.3).
 - A pregação fica `processing` desde o lançamento e termina `processed` ou `failed`.
-- Etapas no progresso: `baixando`, `sincronizando`, `transcrevendo`, `cortando`, `gravando`.
+- Depois de gravar palavras e frases, a tarefa pede os cortes ao LLM uma vez (constituição
+  §III), com o prompt do preset padrão e as frases numeradas de 1 em diante, sem tempos. A
+  resposta é validada por esquema; fora dele, uma nova tentativa; fora de novo, `llm_error`.
+  Os cortes válidos ficam `suggested`, com o `preset_id` do padrão. Um corte cuja duração
+  estimada (soma dos trechos, menos 18% de limpeza) sai da duração permitida do preset é
+  descartado com aviso.
+- A falha da sugestão (`llm_not_configured`, `llm_error`) MUST NOT desfazer o processamento:
+  a tarefa termina `succeeded`, a pregação `processed`, sem cortes, e o erro fica em
+  `suggestion_error` (§7.2). Sem o modelo ou sem a chave, o LLM não é chamado.
+- Etapas no progresso: `baixando`, `sincronizando`, `transcrevendo`, `cortando`, `gravando`,
+  `sugerindo`.
 - Com `--wait`, devolve a pregação como `sermon show`. O resultado gravado na tarefa, que
-  `task wait` devolve, é o mesmo objeto sem `last_task`.
+  `task wait` devolve, é o mesmo objeto sem `last_task`, mais `suggestion_warnings`: um item
+  `{"title", "estimated_duration", "message"}` por corte descartado pela duração (lista vazia
+  quando nenhum foi descartado ou a sugestão falhou).
 
 ### 7.5. `sermon download <id> [-o caminho]`
 

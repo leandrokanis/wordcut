@@ -89,6 +89,7 @@ def test_the_task_reports_each_stage_up_to_saving(home: Home) -> None:
         (0.35, "transcrevendo"),
         (0.85, "cortando"),
         (0.95, "gravando"),
+        (0.96, "sugerindo"),
     ]
 
 
@@ -102,7 +103,7 @@ def test_the_task_result_is_the_processed_sermon_as_shown_without_its_last_task(
     with closing(connect(home)) as connection:
         shown = show_sermon(connection, sermon_id, home=home)
     del shown["last_task"]
-    assert task.result == shown
+    assert task.result == {**shown, "suggestion_warnings": []}
 
 
 @pytest.mark.parametrize(
