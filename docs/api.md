@@ -3,8 +3,9 @@
 A API (`apps/api`, FastAPI) expõe à web as mesmas operações da CLI, sobre a mesma camada de
 serviço ([ADR-0004](adr/0004-camada-de-servico-no-core.md)). Este documento lista as rotas,
 os corpos, os status e os eventos de progresso. As decisões estão na
-[ADR-0019](adr/0019-identidade-e-erros-na-api.md) e na
-[ADR-0020](adr/0020-rotas-e-progresso-por-sse-na-api.md).
+[ADR-0019](adr/0019-identidade-e-erros-na-api.md), na
+[ADR-0020](adr/0020-rotas-e-progresso-por-sse-na-api.md) e na
+[ADR-0021](adr/0021-rotas-de-cortes-e-administracao-na-api.md).
 
 As palavras-chave DEVE, NÃO DEVE e PODE seguem o BCP 14
 ([RFC 2119](https://www.rfc-editor.org/rfc/rfc2119),
@@ -23,7 +24,20 @@ As palavras-chave DEVE, NÃO DEVE e PODE seguem o BCP 14
   `invalid_argument`, com o nome do argumento em `details.argument` e, num filtro com
   escolhas, a lista em `details.choices`. A resposta nunca repete o valor enviado
   ([ADR-0015](adr/0015-erro-de-uso-nao-repete-valor-digitado.md)).
+- Um campo do corpo ou um parâmetro da query que a rota não declara dá 400
+  `invalid_argument` com a mensagem "Argumento não reconhecido; veja docs/api.md.", sem
+  `details` e sem o nome enviado.
+- Os corpos são estritos: número e chave (`true`/`false`) vão como número e booleano do
+  JSON, nunca como texto, e um campo opcional enviado não pode ser `null`. Num `PATCH`, só
+  os campos enviados mudam. Um campo de escolha fora das escolhas dá 400 com
+  `details.choices`.
 - Uma rota que não existe dá 404 `not_found`.
+- As exportações saem sem `path`, o caminho local que a CLI mostra: a web baixa o arquivo
+  por `GET /api/renders/{id}/file`.
+- O e-mail de um membro vai só no corpo, nunca no caminho, que os proxies registram.
+- Um segredo (chave do LLM, cookies do YouTube) só entra, no corpo `{"value"}`. A resposta
+  traz a chave mascarada (`"••••"` e os 4 últimos caracteres) e os cookies só como presentes;
+  o valor nunca volta em resposta, erro ou log.
 - Toda rota, menos `GET /api/health`, exige um membro da equipe identificado pelo Cloudflare
   Access. Sem identificação, 401 `unauthenticated`; e-mail fora da equipe ou papel abaixo do
   da rota, 403 `forbidden`. O papel mínimo de cada rota está na tabela; o administrador
@@ -49,6 +63,36 @@ As palavras-chave DEVE, NÃO DEVE e PODE seguem o BCP 14
 | `GET /api/tasks/{id}` | — | 200 a tarefa de `task show` | 404 | assistente |
 | `GET /api/tasks/{id}/events` | — | 200 `text/event-stream` (§3) | 404 em JSON, antes de abrir o fluxo | assistente |
 | `GET /api/status` | — | 200 `{"lock", "running_tasks"}` de `wordcut status` | — | assistente |
+| `GET /api/sermons/{id}/cuts[?status=]` | — | 200 `{"items"}` de `cut list`, os descartados por último | 400 `status` fora de `suggested`, `chosen`, `discarded`; 404 | assistente |
+| `GET /api/cuts/{id}` | — | 200 o corte de `cut show`, com as exportações sem `path` | 404 | assistente |
+| `GET /api/cuts/{id}/preview` | — | 200 a sequência de `cut preview`; nunca espera a trava | 404 | assistente |
+| `POST /api/cuts/{id}/choose` | — | 200 o corte como o `GET` o mostra | 404 | assistente |
+| `POST /api/cuts/{id}/discard` | — | 200 o corte como o `GET` o mostra | 404 | assistente |
+| `POST /api/cuts/{id}/restore` | — | 200 o corte como o `GET` o mostra; um corte não descartado fica como está | 404 | assistente |
+| `PUT /api/cuts/{id}/words/{word_id}` | `{"text"}` | 200 `{"cut_id", "word_id", "text", "start", "end", "corrected"}` de `cut fix-word`; o texto original remove a correção | 400 `text` vazio ou com mais de uma palavra, `word_id` fora dos trechos; 404; 409 `spelling_too_different` com `distance`, `limit` e `original` | assistente |
+| `GET /api/cuts/{id}/caption` | — | 200 o estilo da legenda de `cut caption` | 404 | assistente |
+| `PATCH /api/cuts/{id}/caption` | campos do estilo | 200 o estilo inteiro | 400 sem campo, valor fora da faixa (`min`, `max`), escolha fora (`choices`), cor fora de `#RRGGBB`; 404 | assistente |
+| `DELETE /api/cuts/{id}/caption` | — | 200 o estilo padrão, ligado | 404 | assistente |
+| `POST /api/cuts/{id}/renders` | opções da exportação, opcional | 202 a tarefa `render` lançada | 400 opção fora das escolhas; 404; 409 `sermon_not_processed`, `busy` | assistente |
+| `GET /api/cuts/{id}/renders/estimate[?opções]` | — | 200 `{"duration", "options"}` de `cut render --estimate`, sem tarefa, sem salvar e sem a trava | 400 opção fora das escolhas; 404 | assistente |
+| `GET /api/cuts/{id}/renders` | — | 200 `{"items"}` de `render list`, da mais recente para a mais antiga, sem `path` | 404 | assistente |
+| `GET /api/renders/{id}` | — | 200 a exportação de `render show`, sem `path` | 404 | assistente |
+| `GET /api/renders/{id}/file` | — | 200 o vídeo 9:16 (`video/mp4`), `Content-Disposition: attachment` com o nome `AAAA-MM-DD - Título do corte.mp4` | 404; 500 `internal_error` se o arquivo sumiu | assistente |
+| `GET /api/settings` | — | 200 as configurações de `settings show` | — | administrador |
+| `PATCH /api/settings` | `{"llm_model"?, "whisper_model"?}` | 200 as configurações | 400 sem modelo ou modelo em branco | administrador |
+| `PUT /api/settings/llm-key` | `{"value"}` | 200 as configurações, com `llm_key` mascarada | 400 `value` vazio; 409 `config_not_writable` | administrador |
+| `PUT /api/settings/youtube-cookies` | `{"value"}` | 200 as configurações, com `youtube_cookies: true` | 400 `value` fora do formato Netscape; 409 `config_not_writable` | administrador |
+| `GET /api/criteria` | — | 200 `{"items"}` de `criteria list`, sem texto de prompt | — | administrador |
+| `GET /api/presets` | — | 200 `{"items"}` de `preset list` | — | administrador |
+| `POST /api/presets` | `{"name", "from_id"?}` | 201 o preset criado, cópia de `from_id` ou do padrão, não padrão | 400 nome vazio ou repetido; 404 `from_id` | administrador |
+| `GET /api/presets/{id}` | — | 200 o preset de `preset show` | 404 | administrador |
+| `PATCH /api/presets/{id}` | campos do preset | 200 o preset | 400 sem campo, nome repetido, critério ou nível inválido (`levels`), duração inválida; 404 | administrador |
+| `POST /api/presets/{id}/set-default` | — | 200 o preset, agora o padrão | 404 | administrador |
+| `DELETE /api/presets/{id}` | — | 200 `{"id", "deleted": true}` | 404; 409 `default_preset` | administrador |
+| `GET /api/members` | — | 200 `{"items"}` de `member list`, por e-mail | — | administrador |
+| `POST /api/members` | `{"email", "role"}` | 201 o membro, com o e-mail em minúsculas | 400 e-mail inválido ou já na equipe, `role` fora de `assistant`, `admin` | administrador |
+| `POST /api/members/set-role` | `{"email", "role"}` | 200 o membro com o papel novo | 400; 404 e-mail fora da equipe; 409 `last_admin` | administrador |
+| `POST /api/members/remove` | `{"email"}` | 200 `{"email", "removed": true}` | 400; 404 e-mail fora da equipe; 409 `last_admin` | administrador |
 
 Corpos de entrada:
 
@@ -57,11 +101,32 @@ Corpos de entrada:
   pregação já processada, o estado continua `processed` e as bordas novas valem depois de
   processar de novo com `force`.
 - A pregação nasce sem bordas no `POST /api/sermons`; as bordas vão no `PATCH`.
+- O `PATCH` da legenda aceita `enabled` (booleano), `font`, `color` e `border_color`
+  (`#RRGGBB`), `position` (`top`, `center`, `bottom`), `shadow` (`none`, `soft`, `strong`)
+  e `size`, `offset` e `border` (inteiros), com os nomes e as faixas de `cut caption`
+  ([docs/cli.md](cli.md) §8.6). Sem nenhum campo, dá 400 e não grava nada.
+- As opções da exportação são `fillers`, `stammers`, `pauses`, `resolution` e `quality`
+  (texto) e `smooth_joins`, `fade`, `normalize` e `caption` (booleanos), com as escolhas de
+  `cut render` (§8.7). No `POST`, a opção omitida repete a última salva no corte, e
+  `caption` liga ou desliga a legenda como `cut caption --on/--off`. Na estimativa, as
+  mesmas opções vão na query, com os booleanos como `true` ou `false`
+  (`?fade=false&pauses=short`).
+- O `PATCH` do preset aceita `name`, `levels` (objeto `{"<critério>": "<nível>"}`, que muda
+  só os critérios citados), `duration_allowed` e `duration_ideal` (`{"min", "max"}` em
+  segundos inteiros), `reorder`, `protected_words` (lista) e `instructions`, no formato do
+  `GET`.
+- Os segredos vão em `{"value"}`: a chave do LLM sem os brancos em volta e os cookies no
+  formato Netscape (`cookies.txt`), inteiros. No Docker Compose, a pasta de segredos é
+  montada só para leitura na `api` ([ADR-0003](adr/0003-docker-compose.md)), e essas duas
+  rotas dão 409 `config_not_writable`, com mensagem genérica e sem `details`: a API não mostra
+  caminho do servidor. Nesse caso, grave o segredo pela CLI no host
+  (`wordcut settings set-key < chave.txt`, `wordcut settings set-cookies < cookies.txt`).
 
 A tarefa lançada (202):
 
 ```json
 { "task_id": 9, "kind": "process", "status": "running", "sermon_id": 12 }
+{ "task_id": 10, "kind": "render", "status": "running", "cut_id": 34 }
 ```
 
 ## 3. Eventos de uma tarefa (SSE)

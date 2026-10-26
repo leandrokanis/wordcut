@@ -7,6 +7,7 @@ from typing import Annotated, Any
 
 import pytest
 from fastapi import Depends, FastAPI
+from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
 from wordcut.db import connect
@@ -16,6 +17,7 @@ from wordcut.network import FORBID_NETWORK
 from wordcut.service.members import add_member, set_role
 from wordcut_api.app import create_app
 from wordcut_api.auth import Member, require
+from wordcut_api.routes import ROUTERS
 from wordcut_api.settings import ApiSettings
 
 TOKEN_HEADER = "Cf-Access-Jwt-Assertion"
@@ -301,26 +303,24 @@ def test_access_read_from_the_environment_reaches_for_the_team_keys(
     assert response.json()["error"]["details"] == {"forbidden_by": FORBID_NETWORK}
 
 
-def business_routes(app: FastAPI) -> list[tuple[str, str]]:
-    """Method and path, with ``1`` for each path parameter, of every route but health.
-
-    Read from the OpenAPI schema: included routers are not flat in ``app.routes``.
-    """
-    return [
-        (method.upper(), re.sub(r"\{[^}]+\}", "1", path))
-        for path, operations in app.openapi()["paths"].items()
-        if path != "/api/health"
-        for method in operations
+def business_routes() -> list[tuple[str, str]]:
+    """Method and path, with ``1`` for each path parameter, of ``/api/me`` and every route of
+    ``ROUTERS``, read from the routers: a route left out of the OpenAPI schema counts too."""
+    return [("GET", "/api/me")] + [
+        (method, re.sub(r"\{[^}]+\}", "1", route.path))
+        for router in ROUTERS
+        for route in router.routes
+        if isinstance(route, APIRoute)
+        for method in route.methods
     ]
 
 
 def test_every_route_but_health_requires_someone_identified(wordcut_home: Path) -> None:
-    app = create_app(settings=ApiSettings())
-    client = TestClient(app)
+    client = TestClient(create_app(settings=ApiSettings()))
 
     answers = {
         f"{method} {path}": client.request(method, path).status_code
-        for method, path in business_routes(app)
+        for method, path in business_routes()
     }
 
     assert (len(answers) > 2, set(answers.values())) == (True, {401})

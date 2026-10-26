@@ -1,6 +1,5 @@
 from contextlib import closing
 from datetime import date, datetime, timedelta, timezone
-from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
@@ -55,11 +54,6 @@ def live(monkeypatch: pytest.MonkeyPatch) -> FakeLive:
     fake = FakeLive()
     monkeypatch.setattr(deps, "live_source", lambda: fake)
     return fake
-
-
-@pytest.fixture
-def home(wordcut_home: Path) -> Home:
-    return Home(wordcut_home)
 
 
 def processed_sermon(home: Home, title: str = "Culto de domingo") -> int:

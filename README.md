@@ -199,8 +199,11 @@ WORDCUT_DEV_EMAIL=admin@exemplo.org uv run uvicorn wordcut_api.app:create_app --
 A API identifica quem chama pelo token do Cloudflare Access (`WORDCUT_ACCESS_TEAM_DOMAIN` e
 `WORDCUT_ACCESS_AUD`). Sem o Access, `WORDCUT_DEV_EMAIL` fixa o e-mail de um membro da equipe,
 só em desenvolvimento; sem nenhum dos dois, toda rota menos `/api/health` dá 401
-([ADR-0019](docs/adr/0019-identidade-e-erros-na-api.md)). As rotas estão em
-[docs/api.md](docs/api.md); em desenvolvimento, o esquema OpenAPI fica em `/api/docs`.
+([ADR-0019](docs/adr/0019-identidade-e-erros-na-api.md)). Configurações, critérios, presets e
+equipe são só do administrador; o e-mail de um membro e os segredos vão só no corpo, e os
+segredos nunca voltam ([ADR-0021](docs/adr/0021-rotas-de-cortes-e-administracao-na-api.md)).
+As rotas estão em [docs/api.md](docs/api.md); em desenvolvimento, o esquema OpenAPI fica em
+`/api/docs`.
 
 ## Docker Compose
 
@@ -220,7 +223,9 @@ Os contêineres Python rodam com o usuário do host (`UID`/`GID`, padrão `1000`
 - `${WORDCUT_DATA:-~/.local/share/wordcut}` em `/data` (`WORDCUT_HOME`), o estado compartilhado
   com a CLI do host;
 - `~/.config/wordcut` em `/config` (`WORDCUT_CONFIG`), só leitura. Segredos nunca entram na
-  imagem nem no contexto de build (`.dockerignore`).
+  imagem nem no contexto de build (`.dockerignore`). Por isso, gravar a chave do LLM ou os
+  cookies pela web dá 409 `config_not_writable`; grave-os pela CLI no host
+  (`wordcut settings set-key`, `set-cookies`).
 
 Crie os dois diretórios antes do primeiro `up`; se não existirem, o Docker os cria como
 `root`. Portas e usuário mudam por variável de ambiente: `WORDCUT_WEB_PORT`,
