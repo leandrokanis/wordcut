@@ -76,27 +76,34 @@ Sem serviço externo. Os testes usam `WORDCUT_HOME` num `tmp_path` (via `monkeyp
 | Trava | `fcntl.flock(LOCK_EX \| LOCK_NB)` em `<home>/processing.lock`; o dono grava no próprio arquivo um JSON `{kind, resource, pid, started_at}` | Liberada pelo kernel quando o processo morre (§IV) |
 | Saber se está livre | `holder()` tenta `LOCK_SH \| LOCK_NB`: se consegue, está livre (solta na hora) e ignora o conteúdo velho; senão, lê o JSON | Conteúdo de processo morto nunca aparece como dono |
 | Datas | ISO 8601 com fuso local, `timespec="seconds"` | docs/cli.md §4.3 |
-| `--version` | `importlib.metadata.version("wordcut")` | Uma fonte só da versão |
+| `--version` | `importlib.metadata.version("wordcut-cli")` | Uma fonte só da versão; a distribuição `wordcut` não existe (decisão do orquestrador, rodada 1) |
 | Comandos antigos | movidos para `wordcut_cli/legacy.py`, registrados no mesmo parser, fora do contrato novo | Continuam utilizáveis até o item `cli-migration` |
 | Testes de trava entre processos | subprocesso Python que adquire a trava e espera; o teste mata o processo para provar a liberação | Prova o comportamento real do `flock` |
+| `busy` → saída 4 pelo contrato | provado em `apps/cli/tests/test_cli_contract.py` com um handler injetado que adquire a trava ocupada por outro processo | Nenhum comando real usa a trava ainda (decisão do orquestrador, rodada 1) |
+| `--quiet` | aceito nas duas posições e disponível no contexto do handler | Não há progresso para suprimir neste item (decisão do orquestrador, rodada 1) |
+| Migrações injetáveis | a função de migração recebe o diretório de migrações, com o padrão do pacote; o teste injeta uma migração extra, inclusive uma que falha no meio | Prova a atomicidade por arquivo; `executescript` só dentro de `BEGIN`/`COMMIT` com `ROLLBACK` na falha (decisão do orquestrador, rodada 1) |
+| Janela entre o `flock` e a gravação do JSON | `holder()` com arquivo vazio ou inválido e trava ocupada devolve `held: true` com os campos desconhecidos como `null` | O `status` nunca vira `internal_error` por isso (decisão do orquestrador, rodada 1) |
+| `apps/cli/tests/test_cli.py` | passa a incluir `status` e a aceitar o retorno de `main`, sem afrouxar a verificação dos 7 comandos antigos | O teste fixa a lista de comandos (decisão do orquestrador, rodada 1) |
+| Erro de uso | `details.argument` quando o `argparse` identificar o argumento | docs/cli.md §5.3 (decisão do orquestrador, rodada 1) |
+| Erro de uso dos comandos antigos | segue o contrato (`invalid_argument`, saída 2, mensagem em português, JSON com `--json`); só a saída de sucesso e os erros de execução continuam próprios deles; comentário em `contract.py` e ADR-0012 dizem isso, e `test_legacy_commands.py` fixa o comportamento | Os subparsers antigos herdam o `Parser` do contrato; um erro de uso igual em todo comando (decisão do orquestrador, rodada 2) |
 
 ---
 
 ## Ordem de implementação
 
-- [ ] **Passo 1 — Erros e contrato de saída** — `errors.py` com a tabela código → saída;
+- [x] **Passo 1 — Erros e contrato de saída** — `errors.py` com a tabela código → saída;
   pacote `cli/` com `main(argv) -> int`, opções globais nas duas posições, emissão de
   resultado (`--json` e texto), erro (`{"error": …}` no stdout com `--json`, mensagem no
   stderr sem ele), `internal_error`, 130 e `--version`. Mover os comandos antigos para
   `wordcut_cli/legacy.py` sem mudar o comportamento.
-- [ ] **Passo 2 — `Home` e banco** — `home.py` e `db/` com migrações por `user_version`,
+- [x] **Passo 2 — `Home` e banco** — `home.py` e `db/` com migrações por `user_version`,
   `0001_base.sql`, criação automática no primeiro uso, migração incremental de um banco
   antigo.
-- [ ] **Passo 3 — Trava global** — `lock.py` com `acquire(kind, resource)` (falha com `busy`
+- [x] **Passo 3 — Trava global** — `lock.py` com `acquire(kind, resource)` (falha com `busy`
   e `details`) e `holder()`; liberação quando o processo morre.
-- [ ] **Passo 4 — `wordcut status`** — `service/status.py` e `cli/status.py`: trava livre ou
+- [x] **Passo 4 — `wordcut status`** — `service/status.py` e `cli/status.py`: trava livre ou
   dono com tempo decorrido; texto legível e JSON; nunca bloqueado pela trava.
-- [ ] **Passo 5 — Documentação** — README: seção curta da CLI nova (`wordcut status`,
+- [x] **Passo 5 — Documentação** — README: seção curta da CLI nova (`wordcut status`,
   `WORDCUT_HOME`); ADR-0012 (contrato da CLI) e índice; `docs/architecture/README.md` §4;
   docs/cli.md só se algo do contrato mudar.
 
@@ -122,19 +129,19 @@ Sem serviço externo. Os testes usam `WORDCUT_HOME` num `tmp_path` (via `monkeyp
 
 ## Verificação
 
-- [ ] `WORDCUT_HOME` vazio → `wordcut status --json` cria o banco e devolve
+- [x] `WORDCUT_HOME` vazio → `wordcut status --json` cria o banco e devolve
   `{"lock": {"held": false}}` com saída 0.
-- [ ] Outro processo segura a trava → `wordcut status --json` traz `held: true`, `kind`,
+- [x] Outro processo segura a trava → `wordcut status --json` traz `held: true`, `kind`,
   `resource`, `pid`, `started_at` e o tempo decorrido; saída 0.
-- [ ] Outro processo segura a trava → `acquire` falha com `busy`, saída 4 pelo contrato, com
+- [x] Outro processo segura a trava → `acquire` falha com `busy`, saída 4 pelo contrato, com
   `details`.
-- [ ] Processo dono morto → `status` mostra a trava livre.
-- [ ] `wordcut --json status` e `wordcut status --json` dão o mesmo resultado.
-- [ ] Argumento inválido com `--json` → stdout só com `{"error": {"code": "invalid_argument", …}}`
+- [x] Processo dono morto → `status` mostra a trava livre.
+- [x] `wordcut --json status` e `wordcut status --json` dão o mesmo resultado.
+- [x] Argumento inválido com `--json` → stdout só com `{"error": {"code": "invalid_argument", …}}`
   e saída 2; sem `--json`, stdout vazio e mensagem no stderr.
-- [ ] Exceção inesperada → `internal_error`, saída 1, sem traceback no stdout.
-- [ ] `KeyboardInterrupt` → saída 130.
-- [ ] `--version` imprime a versão e sai com 0.
-- [ ] Banco com `user_version` antigo → migrações pendentes aplicadas sem perder dados.
-- [ ] Um comando antigo (`wordcut overview <arquivo>`) continua funcionando.
-- [ ] Quality gates limpos.
+- [x] Exceção inesperada → `internal_error`, saída 1, sem traceback no stdout.
+- [x] `KeyboardInterrupt` → saída 130.
+- [x] `--version` imprime a versão e sai com 0.
+- [x] Banco com `user_version` antigo → migrações pendentes aplicadas sem perder dados.
+- [x] Um comando antigo (`wordcut overview <arquivo>`) continua funcionando.
+- [x] Quality gates limpos.

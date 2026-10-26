@@ -1,1 +1,1 @@
-active_plan: specs/monorepo-workspace-docker/plan.md
+active_plan: specs/3.1.a.3-cli-foundation-lock/plan.md

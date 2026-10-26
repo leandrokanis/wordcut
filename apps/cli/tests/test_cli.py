@@ -2,11 +2,10 @@ import pytest
 
 from wordcut_cli import main
 
-COMMANDS = "{info,transcribe,transcribe-live,overview,cut,preview,short}"
+COMMANDS = "{info,transcribe,transcribe-live,overview,cut,preview,short,status}"
 
 
 def test_help_lists_every_command(capsys: pytest.CaptureFixture[str]) -> None:
-    with pytest.raises(SystemExit):
-        main(["--help"])
+    exit_code = main(["--help"])
 
-    assert COMMANDS in capsys.readouterr().out
+    assert (exit_code, COMMANDS in capsys.readouterr().out) == (0, True)

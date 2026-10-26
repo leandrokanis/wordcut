@@ -93,6 +93,22 @@ O caminho normal é pelas skills: `video-cortar-pregacao` com o link da live e, 
 `video-corte-vertical` na pasta gerada. Elas chamam os comandos abaixo e pedem aprovação
 antes de cortar e de renderizar.
 
+### Estado da máquina (CLI nova)
+
+A CLI nova ([docs/cli.md](docs/cli.md), [ADR-0012](docs/adr/0012-contrato-da-cli.md)) convive
+com os comandos abaixo até a migração. Por enquanto, ela tem o `status`:
+
+```sh
+uv run wordcut status          # máquina livre ou qual processamento segura a trava
+uv run wordcut status --json   # o mesmo em JSON; --json vale antes ou depois do comando
+```
+
+Os dados (banco SQLite, criado e migrado na primeira chamada, e a trava `processing.lock`)
+ficam em `~/.local/share/wordcut/`, ou em `WORDCUT_HOME` quando definida. Essa pasta deve
+estar em disco local: a trava usa `flock`, que não é garantido em sistema de arquivos de rede.
+Com `--json`, um erro sai no stdout como `{"error": {"code": …}}`; o código de saída diz o
+tipo (2 uso inválido, 4 máquina ocupada; tabela em `docs/cli.md` §5).
+
 ### 1. Pregação
 
 ```sh
