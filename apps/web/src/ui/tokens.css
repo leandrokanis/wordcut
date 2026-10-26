@@ -1,0 +1,21 @@
+/* Colours and type of docs/prototype/wordcut.html; ADR-0022. */
+:root {
+  color-scheme: dark;
+  --bg: #0d0e10;
+  --panel: #141619;
+  --raised: #1b1e22;
+  --hover: #23272c;
+  --line: #262a2f;
+  --line-2: #343940;
+  --fg: #e6e7e9;
+  --muted: #8b9198;
+  --faint: #5b6168;
+  --accent: #ffd600;
+  --on-accent: #141414;
+  --ok: #4cc38a;
+  --warn: #f0a43a;
+  --danger: #f2555a;
+  --font-ui: "Geist", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --r: 8px;
+}

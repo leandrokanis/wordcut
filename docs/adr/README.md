@@ -25,3 +25,4 @@ Uma decisão por arquivo, no formato de Michael Nygard ([ADR-0001](0001-registra
 | [ADR-0019](0019-identidade-e-erros-na-api.md) | Identidade e erros na API (complementa a ADR-0009 e a ADR-0012) | Aceita |
 | [ADR-0020](0020-rotas-e-progresso-por-sse-na-api.md) | Rotas e progresso por SSE na API (complementa a ADR-0019 e a ADR-0015) | Aceita |
 | [ADR-0021](0021-rotas-de-cortes-e-administracao-na-api.md) | Rotas de cortes e de administração na API (complementa a ADR-0020 e a ADR-0019) | Aceita |
+| [ADR-0022](0022-arquitetura-do-cliente-web.md) | Arquitetura do cliente web (complementa a ADR-0008 e a ADR-0019) | Aceita |

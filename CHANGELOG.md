@@ -217,9 +217,18 @@ Formato de [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões
   critérios, presets e equipe, só para o administrador, com o e-mail só no corpo. Toda rota de
   negócio passa pela identidade num só lugar (`routes.ROUTERS`), as exportações saem sem o
   caminho local, os corpos são estritos e um campo desconhecido dá 400 sem repetir o nome.
+- Interface web (item 21, ADR-0022): rotas dos três níveis e das configurações pelo React
+  Router, cliente da API tipado com erro único (inclusive API fora do ar), identidade por
+  `GET /api/me` com tela própria para 401 e 403, caminho no topo com navegação por clique,
+  lista de pregações com data, título, estado e duração, estado vazio, diálogo "Nova
+  pregação" com aviso de live no ar e motivo junto ao campo, barra de status atualizada a
+  cada 3 s, configurações em tela inteira só para o administrador e indicador "Salvo". O
+  visual segue o protótipo, com as fontes Geist empacotadas no build.
 
 ### Alterado
 
+- A web deixa de ser o esqueleto que mostrava só o estado da API (`fetchHealth`) e passa a
+  ser a interface do item 21.
 - `cut show` traz em `render_options` as opções efetivas da próxima exportação (padrões mais
   as salvas, com `caption` igual ao estado da legenda), não mais o JSON gravado ou `{}`, e em
   `renders` as exportações do corte, da mais antiga para a mais nova, com `path` absoluto.

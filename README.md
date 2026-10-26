@@ -205,6 +205,12 @@ segredos nunca voltam ([ADR-0021](docs/adr/0021-rotas-de-cortes-e-administracao-
 As rotas estão em [docs/api.md](docs/api.md); em desenvolvimento, o esquema OpenAPI fica em
 `/api/docs`.
 
+A web navega pelos três níveis (`/`, `/sermons/:id`, `/cuts/:id`) e pelas configurações
+(`/settings`, só do administrador) com o React Router, fala com a API por um cliente próprio
+e mostra a tela só depois de `GET /api/me`. O visual segue o protótipo
+(`docs/prototype/wordcut.html`), com as fontes Geist empacotadas no build e nenhum recurso de
+outro host ([ADR-0022](docs/adr/0022-arquitetura-do-cliente-web.md)).
+
 ## Docker Compose
 
 O projeto Compose se chama `wordcut`. A `web` responde em `http://127.0.0.1:8780/` e repassa
