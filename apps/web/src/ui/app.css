@@ -121,6 +121,8 @@ a.cr:hover { background: var(--raised); color: var(--fg); }
 .mi { display: grid; gap: 1px; text-align: left; padding: 8px 10px; border: 0; border-radius: 7px; background: none; cursor: pointer; }
 .mi:hover { background: var(--hover); }
 .mi b { font-weight: 500; font-size: 13.5px; }
+.mi small { color: var(--muted); font-size: 12px; }
+.mi:disabled { opacity: .45; cursor: not-allowed; }
 .work { display: grid; grid-template-rows: auto minmax(0, 1fr) auto auto auto; min-width: 0; min-height: 0; }
 .l2-bar { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-bottom: 1px solid var(--line); min-width: 0; }
 .l2-action { display: flex; align-items: center; gap: 10px; min-width: 0; flex-wrap: wrap; justify-content: flex-end; }
@@ -178,9 +180,34 @@ video.frame { object-fit: contain; }
 .playhead::before { content: ""; position: absolute; top: 0; left: -5px; width: 12px; height: 12px; background: var(--fg); clip-path: polygon(0 0, 100% 0, 50% 100%); }
 .tl-empty { grid-column: 1 / -1; display: grid; place-items: center; margin: 0; color: var(--faint); font-size: 12.5px; }
 
+/* Level 3: the Exportar menu and the Exportar 9:16 dialog (docs/prototype/wordcut.html) */
+.exp { position: relative; }
+.menu { position: absolute; right: 0; top: calc(100% + 6px); width: min(310px, calc(100vw - 32px)); background: var(--raised); border: 1px solid var(--line-2); border-radius: 10px; padding: 6px; box-shadow: 0 14px 36px rgba(0,0,0,.55); z-index: 30; display: grid; gap: 2px; }
+.msep { margin: 4px 0 0; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--faint); padding: 10px 10px 2px; border-top: 1px solid var(--line); }
+.mnote { margin: 2px 10px 4px; color: var(--warn); font-size: 12px; }
+.mlist { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.mlist .mi { grid-template-columns: minmax(0, 1fr) auto; cursor: default; }
+.mlist .mi small { grid-column: 1; }
+.mlist .mi a { grid-column: 2; grid-row: 1 / span 2; align-self: center; text-decoration: none; }
+.modal-bg:has(.xmodal) { padding-top: 6vh; }
+.xmodal { width: min(600px, 100%); max-height: calc(100vh - 12vh - 24px); grid-template-rows: auto minmax(0, 1fr) auto; padding: 18px 20px; }
+.xhead { flex: 1; min-width: 0; }
+.xhead .note { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.xbody { overflow: auto; min-height: 0; margin: 0 -20px; padding: 0 20px; }
+.xsec { padding: 6px 0 4px; border-top: 1px solid var(--line); }
+.xsec:first-child { border-top: 0; }
+.xsec h3 { margin: 10px 0 0; font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: .08em; color: var(--faint); }
+.srow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 20px; align-items: center; padding: 8px 0; }
+.srow > div:first-child { min-width: 0; }
+.srow .sl { display: block; font-weight: 500; font-size: 13.5px; }
+.srow .sd { margin: 2px 0 0; color: var(--muted); font-size: 12.5px; }
+.srow .ctl { display: flex; align-items: center; gap: 6px; justify-self: end; min-width: 0; flex-wrap: wrap; }
+.xfoot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-top: 12px; border-top: 1px solid var(--line); }
+.xfoot .ferr { margin: 0; flex-basis: 100%; }
+
 /* Level 3: the cut's 9:16 preview, its timeline and the Texto and Legenda tabs */
 .l3 { display: grid; grid-template-columns: 340px minmax(0, 1fr); min-height: 0; }
-.l3 .work { grid-template-rows: minmax(0, 1fr) auto auto auto; }
+.l3 .work { grid-template-rows: auto minmax(0, 1fr) auto auto; }
 .frame.v { height: min(100cqh, calc(100cqw * 16 / 9)); aspect-ratio: 9 / 16; container-type: inline-size; }
 /* The vertical crop of the export follows the preacher; the preview only crops at the centre. */
 .frame.v video { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center; }
@@ -254,6 +281,7 @@ button.th { width: 100%; border: 0; border-bottom: 1px solid var(--line); backgr
   .l2 { grid-template-columns: minmax(0, 1fr); }
   .l3 { grid-template-columns: minmax(0, 1fr); }
   .l3 .work { grid-template-rows: auto auto auto auto; }
+  .xmodal { padding: 16px; }
   .side { order: 3; border-right: 0; border-top: 1px solid var(--line); }
   .side-b { overflow: visible; }
 }

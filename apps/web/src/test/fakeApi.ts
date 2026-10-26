@@ -5,6 +5,8 @@ export interface RecordedCall {
   url: string;
   headers: Headers;
   body: unknown;
+  /** The ``AbortSignal`` the code gave ``fetch``, to see whether it cancelled the call. */
+  signal?: AbortSignal;
 }
 
 export type Reply =
@@ -26,6 +28,7 @@ export function fakeApi(routes: Record<string, Route>): RecordedCall[] {
         url: input,
         headers: new Headers(init.headers),
         body: typeof init.body === "string" ? JSON.parse(init.body) : undefined,
+        signal: init.signal ?? undefined,
       };
       calls.push(call);
       const route = routes[`${call.method} ${call.url}`];

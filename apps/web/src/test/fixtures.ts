@@ -6,6 +6,8 @@ import type {
   ListedCut,
   MachineStatus,
   Me,
+  Render,
+  RenderOptions,
   SermonCreated,
   SermonListItem,
   SermonShown,
@@ -77,12 +79,25 @@ export function runningTask(overrides: Partial<Task> = {}): Task {
   };
 }
 
+/** An export of cut 34 running, as ``running_tasks`` lists it. */
+export function renderTask(overrides: Partial<Task> = {}): Task {
+  return runningTask({
+    id: 10,
+    kind: "render",
+    sermon_id: undefined,
+    cut_id: 34,
+    progress_message: null,
+    ...overrides,
+  });
+}
+
+/** The machine locked by ``task``, on its cut or else its sermon. */
 export function busyMachine(task: Task = runningTask()): MachineStatus {
   return {
     lock: {
       held: true,
       kind: task.kind,
-      resource: `sermon ${task.sermon_id ?? 0}`,
+      resource: task.cut_id === undefined ? `sermon ${task.sermon_id ?? 0}` : `cut ${task.cut_id}`,
       pid: task.pid,
       started_at: task.started_at,
       task_id: task.id,
@@ -201,6 +216,8 @@ export function shownCut(overrides: Partial<Cut> = {}): Cut {
     ],
     words: cutWords(),
     caption: churchCaption(),
+    render_options: defaultRenderOptions(),
+    renders: [],
     range_start_word: 1101,
     range_end_word: 1106,
     source: "llm",
@@ -220,6 +237,34 @@ export function cutPreview(overrides: Partial<CutPreview> = {}): CutPreview {
       { start: 0.3, end: 1.2, text: "Irmãos, graça", out_of_order: true },
       { start: 1.35, end: 1.9, text: "paz.", out_of_order: false },
     ],
+    ...overrides,
+  };
+}
+
+/** The export options of docs/cli.md §8.7 with their defaults, the caption on. */
+export function defaultRenderOptions(overrides: Partial<RenderOptions> = {}): RenderOptions {
+  return {
+    fillers: "remove",
+    stammers: "remove",
+    pauses: "natural",
+    smooth_joins: true,
+    fade: true,
+    normalize: true,
+    caption: true,
+    resolution: "1080x1920",
+    quality: "high",
+    ...overrides,
+  };
+}
+
+/** An export of cut 34 as ``GET /api/cuts/34/renders`` gives it, docs/cli.md §9. */
+export function cutRender(overrides: Partial<Render> = {}): Render {
+  return {
+    id: 7,
+    cut_id: 34,
+    duration: 58.4,
+    created_at: "2026-10-20T00:23:00-03:00",
+    options: defaultRenderOptions(),
     ...overrides,
   };
 }

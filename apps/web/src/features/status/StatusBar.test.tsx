@@ -2,7 +2,7 @@ import { act, render, screen } from "@testing-library/react";
 import { afterEach } from "vitest";
 
 import { fakeApi } from "../../test/fakeApi";
-import { busyMachine, idleMachine, runningTask } from "../../test/fixtures";
+import { busyMachine, idleMachine, renderTask, runningTask } from "../../test/fixtures";
 import { MachineStatusProvider } from "./MachineStatus";
 import { StatusBar } from "./StatusBar";
 
@@ -34,6 +34,16 @@ test("says what holds the machine, for how long and how far it got", async () =>
 
   expect(await screen.findByRole("contentinfo")).toHaveTextContent(
     "Ocupada: processando a pregação 12 · há 3 min35%",
+  );
+});
+
+test("says which cut the machine exports and how far it got", async () => {
+  fakeApi({ "GET /api/status": { body: busyMachine(renderTask({ progress: 0.6 })) } });
+
+  renderBar();
+
+  expect(await screen.findByRole("contentinfo")).toHaveTextContent(
+    "Ocupada: exportando o corte 34 · há 3 min60%",
   );
 });
 

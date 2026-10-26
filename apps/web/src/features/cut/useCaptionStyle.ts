@@ -15,8 +15,12 @@ export interface CaptionStyleState {
   errors: Partial<Record<CaptionField, string>>;
   /** Why restoring the church's style failed. */
   resetError?: string;
+  /** A change is waiting to be saved or being saved. */
+  saving: boolean;
   change<F extends CaptionField>(field: F, value: CaptionStyle[F]): void;
   reset(): void;
+  /** Takes ``fields`` as saved: another call of the API already saved them. */
+  adopt(fields: Partial<CaptionStyle>): void;
 }
 
 /** The cut's caption style, saved field by field ``AUTOSAVE_MS`` after its last change with
@@ -30,6 +34,7 @@ export function useCaptionStyle(
   const [drafts, setDrafts] = useState<Partial<CaptionStyle>>({});
   const [errors, setErrors] = useState<CaptionStyleState["errors"]>({});
   const [resetError, setResetError] = useState<string>();
+  const [resetting, setResetting] = useState(false);
   const timers = useRef(new Map<CaptionField, ReturnType<typeof setTimeout>>());
   const generation = useRef(0);
   const tellSaved = useRef(onSaved);
@@ -84,16 +89,31 @@ export function useCaptionStyle(
     setDrafts({});
     setErrors({});
     setResetError(undefined);
-    resetCaption(cutId).then(
-      (style) => {
-        setSaved(style);
-        tellSaved.current();
-      },
-      (error: ApiError) => setResetError(error.message),
-    );
+    setResetting(true);
+    resetCaption(cutId)
+      .then(
+        (style) => {
+          setSaved(style);
+          tellSaved.current();
+        },
+        (error: ApiError) => setResetError(error.message),
+      )
+      .finally(() => setResetting(false));
   }
 
-  return { style: { ...saved, ...drafts }, errors, resetError, change, reset };
+  function adopt(fields: Partial<CaptionStyle>) {
+    setSaved((current) => ({ ...current, ...fields }));
+  }
+
+  return {
+    style: { ...saved, ...drafts },
+    errors,
+    resetError,
+    saving: resetting || Object.keys(drafts).length > 0,
+    change,
+    reset,
+    adopt,
+  };
 }
 
 function without<T extends object>(record: T, key: keyof T): T {

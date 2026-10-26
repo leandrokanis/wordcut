@@ -7,6 +7,9 @@ import type {
   ListedCut,
   MachineStatus,
   Me,
+  Render,
+  RenderEstimate,
+  RenderOptions,
   Sermon,
   SermonCreated,
   SermonListItem,
@@ -138,6 +141,48 @@ export function resetCaption(id: number): Promise<CaptionStyle> {
 /** Fixes the spelling of one word of the cut; the original text removes the fix. */
 export function fixWord(id: number, wordId: number, text: string): Promise<FixedWord> {
   return send("PUT", `/api/cuts/${id}/words/${wordId}`, { text });
+}
+
+// docs/cli.md §8.7: the nine export options, in its order, so the query is always the same.
+const RENDER_OPTION_NAMES: (keyof RenderOptions)[] = [
+  "fillers",
+  "stammers",
+  "pauses",
+  "smooth_joins",
+  "fade",
+  "normalize",
+  "caption",
+  "resolution",
+  "quality",
+];
+
+/** How long the export with ``options`` would last; saves nothing and takes no lock. The
+ * switches go in the query as ``true``/``false`` (docs/api.md §2). */
+export function estimateRender(
+  id: number,
+  options: RenderOptions,
+  signal?: AbortSignal,
+): Promise<RenderEstimate> {
+  const query = new URLSearchParams(
+    RENDER_OPTION_NAMES.map((name) => [name, String(options[name])]),
+  );
+  return request(`/api/cuts/${id}/renders/estimate?${query}`, { signal });
+}
+
+/** Launches the ``render`` task; the API saves ``options`` on the cut once it accepts it. */
+export function startRender(id: number, options: RenderOptions): Promise<TaskLaunched> {
+  const body = Object.fromEntries(RENDER_OPTION_NAMES.map((name) => [name, options[name]]));
+  return post(`/api/cuts/${id}/renders`, body);
+}
+
+/** The exports of the cut, newest first. */
+export async function listRenders(cutId: number): Promise<Render[]> {
+  return (await request<{ items: Render[] }>(`/api/cuts/${cutId}/renders`)).items;
+}
+
+/** Where the browser downloads the export's video, named by the API. */
+export function renderFileUrl(renderId: number): string {
+  return `/api/renders/${renderId}/file`;
 }
 
 export function createSermon(url: string): Promise<SermonCreated> {

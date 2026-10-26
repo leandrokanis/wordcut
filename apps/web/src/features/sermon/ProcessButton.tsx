@@ -1,9 +1,9 @@
 import { useState } from "react";
 
 import { processSermon, type ApiError } from "../../api/client";
-import type { Lock, SermonShown, Task } from "../../api/types";
+import type { SermonShown, Task } from "../../api/types";
 import { useMachineStatus } from "../status/MachineStatus";
-import { lockedWork } from "../status/StatusBar";
+import { otherWork } from "../status/StatusBar";
 import { isTrimmed } from "./bounds";
 import { useTaskEvents } from "./useTaskEvents";
 
@@ -28,7 +28,7 @@ export function ProcessButton({ sermon, bordersChanged, onEnd }: ProcessButtonPr
     setEndedError(task.error);
     onEnd();
   });
-  const busy = otherWork(useMachineStatus().status?.lock, sermon.id);
+  const busy = otherWork(useMachineStatus().status?.lock, `sermon ${sermon.id}`);
   const failure = endedError ?? (sermon.status === "failed" ? sermon.last_task?.error : null);
   const following = taskId !== undefined;
   const progress = events.task?.progress ?? running?.progress ?? 0;
@@ -99,12 +99,4 @@ export function ProcessButton({ sermon, bordersChanged, onEnd }: ProcessButtonPr
 function runningTaskOf(sermon: SermonShown): Task | undefined {
   const task = sermon.last_task;
   return sermon.status === "processing" && task?.status === "running" ? task : undefined;
-}
-
-/** What the machine does for another resource, while it holds the lock. */
-function otherWork(lock: Lock | undefined, sermonId: number): string | undefined {
-  if (!lock?.held || lock.resource === `sermon ${sermonId}`) {
-    return undefined;
-  }
-  return lockedWork(lock) || "outra tarefa";
 }
