@@ -13,16 +13,23 @@ JOIN_FADE_S = 0.015
 which would shorten each join and drift lips out of sync."""
 
 
-def assemble(source: Path, clips: Sequence[Clip], output: Path, fps: float) -> Path:
-    subprocess.run(montage_command(source, clips, output, fps), check=True)
+def assemble(
+    source: Path, clips: Sequence[Clip], output: Path, fps: float, *, smooth_joins: bool = True
+) -> Path:
+    subprocess.run(
+        montage_command(source, clips, output, fps, smooth_joins=smooth_joins), check=True
+    )
     return output
 
 
-def montage_command(source: Path, clips: Sequence[Clip], output: Path, fps: float) -> list[str]:
+def montage_command(
+    source: Path, clips: Sequence[Clip], output: Path, fps: float, *, smooth_joins: bool = True
+) -> list[str]:
     """ffmpeg arguments; ``output`` is a near-lossless intermediate (``.mov``).
 
     Each clip is its own seeked input, so ffmpeg decodes only what is used. The
-    frame rate is set explicitly: concat otherwise falls back to 25 fps.
+    frame rate is set explicitly: concat otherwise falls back to 25 fps. With
+    ``smooth_joins``, the audio fades out and in at every join.
     """
     if not clips:
         raise ValueError("timeline sem clipes")
@@ -30,11 +37,9 @@ def montage_command(source: Path, clips: Sequence[Clip], output: Path, fps: floa
     chains: list[str] = []
     for index, clip in enumerate(clips):
         inputs += ["-ss", f"{clip.start:.6f}", "-t", f"{clip.duration:.6f}", "-i", str(source)]
-        fade_out = max(0.0, clip.duration - JOIN_FADE_S)
         chains.append(
             f"[{index}:v]setpts=PTS-STARTPTS[v{index}];"
-            f"[{index}:a]asetpts=PTS-STARTPTS,"
-            f"afade=t=in:d={JOIN_FADE_S},afade=t=out:st={fade_out:.6f}:d={JOIN_FADE_S}[a{index}]"
+            f"[{index}:a]asetpts=PTS-STARTPTS{_join_fades(clip) if smooth_joins else ''}[a{index}]"
         )
     pairs = "".join(f"[v{i}][a{i}]" for i in range(len(clips)))
     graph = ";".join([*chains, f"{pairs}concat=n={len(clips)}:v=1:a=1[v][a]"])
@@ -45,3 +50,8 @@ def montage_command(source: Path, clips: Sequence[Clip], output: Path, fps: floa
         "-c:v", "libx264", "-crf", "12", "-preset", "fast", "-c:a", "pcm_s16le",
         str(output),
     ]  # fmt: skip
+
+
+def _join_fades(clip: Clip) -> str:
+    fade_out = max(0.0, clip.duration - JOIN_FADE_S)
+    return f",afade=t=in:d={JOIN_FADE_S},afade=t=out:st={fade_out:.6f}:d={JOIN_FADE_S}"

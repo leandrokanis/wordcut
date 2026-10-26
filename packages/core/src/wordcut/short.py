@@ -7,10 +7,11 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+from wordcut.edit import screen
 from wordcut.edit.assemble import assemble
 from wordcut.edit.edit_list import EditList
 from wordcut.edit.energy import EnergyProfile
-from wordcut.edit.text import apply_corrections, capitalize, tidy_joins
+from wordcut.edit.text import apply_corrections
 from wordcut.edit.timeline import Timeline, plan_timeline
 from wordcut.media import video_geometry
 from wordcut.sermon_folder import SermonFolder
@@ -74,17 +75,8 @@ def preview(plan: ShortPlan) -> str:
 
 def caption_words(plan: ShortPlan) -> list[Word]:
     """Output-timed words as shown on screen: corrected, tidied at joins, segments capitalized."""
-    words: list[Word] = []
-    starts: list[bool] = []
-    offset, previous_segment = 0.0, None
-    for clip in plan.timeline.clips:
-        for index, word in enumerate(clip.words):
-            words.append(word.shifted(offset - clip.start))
-            starts.append(index == 0 and clip.segment != previous_segment)
-        offset += clip.duration
-        previous_segment = clip.segment
-    words = tidy_joins(apply_corrections(words, plan.edit_list.corrections), starts)
-    return [capitalize(w) if start else w for w, start in zip(words, starts, strict=True)]
+    corrections = plan.edit_list.corrections
+    return screen.caption_words(plan.timeline, lambda words: apply_corrections(words, corrections))
 
 
 def _segment_words(plan: ShortPlan, index: int) -> list[Word]:

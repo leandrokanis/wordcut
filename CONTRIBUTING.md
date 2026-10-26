@@ -43,6 +43,10 @@ nenhuma app; apps não dependem umas das outras. Regra de negócio vive só no `
   `suggestion.default_model` e `processing.default_gateways` recusam com `network_error`
   ([ADR-0017](docs/adr/0017-testes-sem-rede-real.md)). Um teste que precise da tarefa
   `running` usa `harmless_tasks`.
+- A suíte não renderiza vídeo real. A fixture `no_real_rendering` faz
+  `rendering.default_gateways` falhar, e nenhum teste lança um `render` destacado de verdade
+  ([ADR-0018](docs/adr/0018-exportacao-por-portas-sem-arquivo-parcial.md)). O único `ffmpeg`
+  real é o de clipes sintéticos curtos.
 
 ### 3.1. Decisões de arquitetura
 

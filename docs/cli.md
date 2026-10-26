@@ -463,8 +463,10 @@ Devolve o corte completo:
   correção de grafia do corte, §8.5, ou `null`);
 - `caption`: estilo efetivo da legenda, no formato de `cut caption` (§8.6); o padrão completo
   quando o corte não tem estilo gravado;
-- `render_options`: últimas opções de exportação;
-- `renders`: histórico de exportações.
+- `render_options`: as opções efetivas da próxima exportação (§8.7), com as nove escolhas: os
+  padrões mais as últimas salvas, com `caption` igual ao `enabled` da legenda; uma opção salva
+  que deixou de valer volta ao padrão;
+- `renders`: histórico de exportações, da mais antiga para a mais nova, no formato de §9.
 
 ### 8.3. `cut preview <id>`
 
@@ -581,12 +583,25 @@ Tarefa com trava: cria uma exportação 9:16 do estado atual do corte (1.1.h).
 | | `--quality high\|small` | `high` |
 
 - As opções MUST ficar salvas no corte, como na interface; opção omitida usa a última salva.
-  `wordcut cut render 34` repete a exportação anterior.
-- `--caption`/`--no-caption` alteram o mesmo estado de `cut caption --on/--off`.
-- `--estimate` devolve a duração estimada e o resumo das opções, sem renderizar, sem salvar as
-  opções e sem pegar a trava.
+  `wordcut cut render 34` repete a exportação anterior. Elas são gravadas quando a tarefa é
+  aceita, sob a trava; uma recusa (`busy`, `not_found`, `sermon_not_processed`,
+  `invalid_argument`) não grava nada.
+- `--caption`/`--no-caption` alteram o mesmo estado de `cut caption --on/--off` (e marcam o
+  corte como editado).
+- Pausas: `original` não encurta as pausas entre palavras do mesmo trecho; `natural` deixa
+  até 0,15 s no meio da frase e 0,40 s depois de ponto; `short`, até 0,08 s e 0,20 s.
+  Qualidade: `high` é CRF 18, `small` é CRF 26. O fade dura 0,5 s, ou metade do corte se ele
+  for mais curto que 1 s. Sem normalização, o áudio só é reamostrado a 48 kHz. Em 720×1280,
+  a legenda escala na mesma proporção.
+- `--estimate` devolve `{duration, options}`: a duração estimada e o resumo das opções, sem
+  renderizar, sem salvar as opções, sem pegar a trava e sem abrir o vídeo (a timeline é
+  calculada sem a energia do áudio, a 30 quadros/s). Com `--wait`, é `invalid_argument`.
 - Com `--wait`, devolve a exportação (§9). Sem `--wait`, devolve a tarefa; ao terminar,
-  `task show` traz `render_id`.
+  `task show` traz `render_id` em `result` (§10).
+- Pregação não processada dá `sermon_not_processed`; pregação processada sem o arquivo do
+  vídeo dá `internal_error`, como `sermon download`.
+- Uma falha da renderização deixa a tarefa `failed` (`internal_error`) e um Ctrl+C a deixa
+  `interrupted`; nos dois casos nenhuma exportação é registrada e nenhum arquivo fica.
 
 ### 8.8. `cut create --sermon <id> --start T --end T` — administrador
 
@@ -635,7 +650,8 @@ opções (1.1.i).
 
 - `task list [--status S] [--kind K]`: tarefas, da mais recente para a mais antiga.
 - `task show <id>`: tipo, estado, recurso (`<recurso>_id`, como em §6.2), início, fim,
-  progresso, erro e resultado (`sermon_id`, `render_id`).
+  progresso, erro e resultado. O `result` de um `process` é a pregação processada; o de um
+  `render` é `{"render_id": …}`, o `id` da exportação (§9).
 - `task wait <id>`: espera o fim, como `--wait` (§6.3).
 - `status`: estado da máquina (3.1.a.3): se a trava está livre ou quem a segura (tarefa, tipo,
   recurso, há quanto tempo) e as tarefas em andamento.
@@ -734,6 +750,7 @@ A CLI também roda no contêiner: `docker compose run --rm cli <comando>`.
 |---|---|---|
 | Banco (SQLite) e mídias | `~/.local/share/wordcut/` | sobrescrito por `WORDCUT_HOME`; nos contêineres, o volume de dados |
 | Mídias de uma pregação | `media/sermons/<id>/` na pasta de dados | `sermon.mp4`; intermediários em `work/`, apagados no sucesso |
+| Exportações de um corte | `media/cuts/<id>/` na pasta de dados | `<render_id>.mp4`; intermediários em `work/`, apagados no fim |
 | Saída dos processos de tarefa | `tasks/<id>.log` na pasta de dados | traz o rastreio de um erro interno; permissão 600 |
 | Segredos (chave do LLM, cookies) | `~/.config/wordcut/` | permissão 600 |
 | Demais configurações, presets e equipe | no SQLite | — |

@@ -10,6 +10,7 @@ through dozens of joins — and, among nearby frames, on the quietest one.
 from __future__ import annotations
 
 import bisect
+import math
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
@@ -19,12 +20,47 @@ from wordcut.transcript import Word
 
 PAUSE_S = 0.15
 RHETORICAL_PAUSE_S = 0.40
+SHORT_PAUSE_S = 0.08
+SHORT_RHETORICAL_PAUSE_S = 0.20
 EDGE_PAD_S = 0.08
 SNAP_FRAMES = 2
 SENTENCE_END = (".", "?", "!")
 
 Energy = Callable[[float], float]
 """Audio loudness around a source time; lower is quieter."""
+
+
+@dataclass(frozen=True)
+class PauseLimits:
+    """The longest pause kept between two words of a segment, in seconds: after a sentence
+    end, and anywhere else."""
+
+    after_sentence: float
+    within_sentence: float
+
+
+# docs/cli.md §8.7: "original" never shortens a pause between words of the same segment.
+PAUSES: dict[str, PauseLimits] = {
+    "original": PauseLimits(math.inf, math.inf),
+    "natural": PauseLimits(RHETORICAL_PAUSE_S, PAUSE_S),
+    "short": PauseLimits(SHORT_RHETORICAL_PAUSE_S, SHORT_PAUSE_S),
+}
+
+
+@dataclass(frozen=True)
+class Cleanup:
+    """What the timeline removes: fillers, stammers and how much of each pause."""
+
+    fillers: bool = True
+    stammers: bool = True
+    pauses: str = "natural"
+
+    @property
+    def limits(self) -> PauseLimits:
+        return PAUSES[self.pauses]
+
+
+DEFAULT_CLEANUP = Cleanup()
 
 
 @dataclass(frozen=True)
@@ -69,41 +105,64 @@ class Timeline:
 
 
 def plan_timeline(
-    edit_list: EditList, words: Sequence[Word], fps: float, energy: Energy | None = None
+    edit_list: EditList,
+    words: Sequence[Word],
+    fps: float,
+    energy: Energy | None = None,
+    cleanup: Cleanup = DEFAULT_CLEANUP,
 ) -> Timeline:
+    """The clips of ``edit_list``, each segment made of the ``words`` inside its times."""
+    segments = [
+        [w for w in words if segment.start <= w.start and w.end <= segment.end]
+        for segment in edit_list.segments
+    ]
+    return plan_segments(segments, words, fps, energy, cleanup)
+
+
+def plan_segments(
+    segments: Sequence[Sequence[Word]],
+    words: Sequence[Word],
+    fps: float,
+    energy: Energy | None = None,
+    cleanup: Cleanup = DEFAULT_CLEANUP,
+) -> Timeline:
+    """The clips of ``segments``, each given by its words in spoken order, in the order they
+    play; ``words`` are all the words of the source, which the cuts must not reach into."""
     starts = [word.start for word in words]
     clips: list[Clip] = []
     removed: list[Word] = []
-    for index, segment in enumerate(edit_list.segments):
-        inside = [w for w in words if segment.start <= w.start and w.end <= segment.end]
-        cleaned = remove_hesitations(inside)
+    limits = cleanup.limits
+    for index, inside in enumerate(segments):
+        cleaned = remove_hesitations(inside, fillers=cleanup.fillers, stammers=cleanup.stammers)
         removed.extend(cleaned.removed)
-        for run in _runs(cleaned.kept, set(cleaned.removed)):
-            clips.append(_clip(run, index, words, starts, fps, energy))
+        for run in _runs(cleaned.kept, set(cleaned.removed), limits):
+            clips.append(_clip(run, index, words, starts, fps, energy, limits))
     return Timeline(tuple(clips), tuple(removed))
 
 
-def _runs(kept: Sequence[Word], removed: set[Word]) -> list[list[Word]]:
+def _runs(kept: Sequence[Word], removed: set[Word], limits: PauseLimits) -> list[list[Word]]:
     """Split kept words wherever audio must be cut: a removed word or a long pause."""
     runs: list[list[Word]] = []
     removed_starts = sorted(word.start for word in removed)
     for word in kept:
-        if runs and not _must_cut(runs[-1][-1], word, removed_starts):
+        if runs and not _must_cut(runs[-1][-1], word, removed_starts, limits):
             runs[-1].append(word)
         else:
             runs.append([word])
     return runs
 
 
-def _must_cut(before: Word, after: Word, removed_starts: list[float]) -> bool:
+def _must_cut(before: Word, after: Word, removed_starts: list[float], limits: PauseLimits) -> bool:
     between = bisect.bisect_left(removed_starts, before.end) < bisect.bisect_left(
         removed_starts, after.start
     )
-    return between or after.start - before.end > _allowed_pause(before)
+    return between or after.start - before.end > _allowed_pause(before, limits)
 
 
-def _allowed_pause(word: Word) -> float:
-    return RHETORICAL_PAUSE_S if word.text.endswith(SENTENCE_END) else PAUSE_S
+def _allowed_pause(word: Word, limits: PauseLimits) -> float:
+    if word.text.endswith(SENTENCE_END):
+        return limits.after_sentence
+    return limits.within_sentence
 
 
 def _clip(
@@ -113,6 +172,7 @@ def _clip(
     starts: list[float],
     fps: float,
     energy: Energy | None,
+    limits: PauseLimits,
 ) -> Clip:
     first, last = run[0], run[-1]
     position = bisect.bisect_left(starts, first.start)
@@ -124,9 +184,10 @@ def _clip(
     space_after = max(0.0, next_start - last.end)
     # Half of the allowed pause on each side of a cut, never reaching into a neighbour.
     lead = min(
-        _allowed_pause(words[position - 1]) / 2 if position else EDGE_PAD_S, space_before / 2
+        _allowed_pause(words[position - 1], limits) / 2 if position else EDGE_PAD_S,
+        space_before / 2,
     )
-    tail = min(_allowed_pause(last) / 2, space_after / 2)
+    tail = min(_allowed_pause(last, limits) / 2, space_after / 2)
 
     start = _snap(first.start - lead, first.start - space_before / 2, first.start, fps, energy)
     end = _snap(last.end + tail, last.end, last.end + space_after / 2, fps, energy)

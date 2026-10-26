@@ -9,12 +9,14 @@ from dataclasses import asdict, dataclass, fields, replace
 from typing import Any
 
 from wordcut.errors import WordcutError
-from wordcut.vertical.captions import CaptionStyle
+from wordcut.vertical.captions import DEFAULT_STYLE, CaptionStyle
 from wordcut.vertical.fonts import available_fonts
 
 # Inclusive ranges: sizes in px of the 1080x1920 frame, offset in % of the frame height (the
 # prototype's "Altura" slider, docs/prototype/wordcut.html).
 RANGES: dict[str, tuple[int, int]] = {"size": (24, 160), "offset": (10, 90), "border": (0, 12)}
+# The frame the sizes are chosen on (docs/cli.md §8.6).
+REFERENCE_FRAME_HEIGHT = 1920
 # The height of each position, in % of the frame height, as in the prototype (Topo, Centro,
 # Base).
 POSITIONS: dict[str, int] = {"top": 20, "center": 50, "bottom": 78}
@@ -56,16 +58,19 @@ def stored_caption(stored: Mapping[str, Any] | None) -> CaptionSettings:
 
 
 def to_style(settings: CaptionSettings, frame_height: int) -> CaptionStyle:
-    """The style ``CaptionRenderer`` draws ``settings`` with, on a frame ``frame_height`` px
-    tall (the frame width is the renderer's)."""
+    """The style ``CaptionRenderer`` draws ``settings`` with, on a 9:16 frame ``frame_height``
+    px tall (the frame width is the renderer's). Sizes in px of the 1080x1920 frame scale with
+    the frame, so a caption covers the same share of a smaller one."""
+    scale = frame_height / REFERENCE_FRAME_HEIGHT
     shadow_alpha, shadow_offset = SHADOW_LOOKS[settings.shadow]
     return CaptionStyle(
-        size=settings.size,
+        size=round(settings.size * scale),
         color=_rgb(settings.color),
-        outline=settings.border,
+        outline=round(settings.border * scale),
         outline_color=_rgb(settings.border_color),
-        shadow_offset=shadow_offset,
+        shadow_offset=round(shadow_offset * scale),
         shadow_alpha=shadow_alpha,
+        max_width=round(DEFAULT_STYLE.max_width * scale),
         centre_y=round(frame_height * settings.offset / 100),
         frame_height=frame_height,
         font=available_fonts()[settings.font],

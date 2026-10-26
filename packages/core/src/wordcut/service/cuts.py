@@ -12,10 +12,13 @@ from typing import Any
 from wordcut.cuts.assembly import AssembledCut, AssembledSegment, assemble
 from wordcut.cuts.caption import DEFAULT_CAPTION, stored_caption, validated
 from wordcut.cuts.spelling import check_spelling
-from wordcut.db import cuts, transcripts, word_fixes
+from wordcut.db import cuts, renders, transcripts, word_fixes
 from wordcut.db.cuts import CutRow
+from wordcut.db.renders import RenderRow
 from wordcut.db.transcripts import WordRow
 from wordcut.errors import WordcutError
+from wordcut.home import Home
+from wordcut.rendering.options import merged
 from wordcut.service.sermons import existing_sermon, shown_cut
 
 
@@ -37,22 +40,24 @@ def list_cuts(
     }
 
 
-def show_cut(connection: sqlite3.Connection, cut_id: int) -> dict[str, Any]:
+def show_cut(
+    connection: sqlite3.Connection, cut_id: int, *, home: Home | None = None
+) -> dict[str, Any]:
     """The cut as ``list_cuts`` gives it, plus the time and text of each segment, its words,
-    its effective caption style, its last export options and its exports (docs/cli.md §8.2)."""
-    row = _existing(connection, cut_id)
+    its effective caption style, the options its next export uses and its exports, each with
+    its file in ``home`` (by default the one of the environment) (docs/cli.md §8.2)."""
+    row = existing_cut(connection, cut_id)
     assembled = _assembled(connection, row)
+    caption = stored_caption(row.caption)
     return {
         **_listed(row, assembled),
         "segments": [_segment(segment) for segment in assembled.segments],
         "words": [
             _word(word, segment.fixes) for segment in assembled.segments for word in segment.words
         ],
-        "caption": stored_caption(row.caption).as_dict(),
-        # Null in the database means the defaults (item 1.1.h.1 defines them).
-        "render_options": row.render_options or {},
-        # Exports arrive with item 1.1.h.1.
-        "renders": [],
+        "caption": caption.as_dict(),
+        "render_options": merged(row.render_options, {}).summary(caption=caption.enabled),
+        "renders": _renders(connection, row.id, home),
     }
 
 
@@ -61,7 +66,7 @@ def preview_cut(connection: sqlite3.Connection, cut_id: int) -> dict[str, Any]:
     start and end in sermon time, its text and whether it goes back in the sermon, plus the
     duration ``show_cut`` gives (docs/cli.md §8.3). It reads only the database, so the
     processing lock never blocks it (constitution §IV)."""
-    row = _existing(connection, cut_id)
+    row = existing_cut(connection, cut_id)
     assembled = _assembled(connection, row)
     return {
         "cut_id": row.id,
@@ -86,14 +91,14 @@ def choose_cut(
     """Mark the cut ``chosen`` and give it as ``show_cut`` does; ``now`` defaults to the
     clock. Its content is left as it is (constitution §I), and a cut already chosen is not
     written again."""
-    return _with_status(connection, _existing(connection, cut_id), "chosen", now)
+    return _with_status(connection, existing_cut(connection, cut_id), "chosen", now)
 
 
 def discard_cut(
     connection: sqlite3.Connection, cut_id: int, now: datetime | None = None
 ) -> dict[str, Any]:
     """Mark the cut ``discarded``, as ``choose_cut`` marks it ``chosen``."""
-    return _with_status(connection, _existing(connection, cut_id), "discarded", now)
+    return _with_status(connection, existing_cut(connection, cut_id), "discarded", now)
 
 
 def restore_cut(
@@ -104,7 +109,7 @@ def restore_cut(
     A cut that is not discarded is left as it is: restoring undoes a discard only
     (docs/cli.md §8.4).
     """
-    row = _existing(connection, cut_id)
+    row = existing_cut(connection, cut_id)
     return _with_status(
         connection, row, "suggested" if row.status == "discarded" else row.status, now
     )
@@ -119,7 +124,7 @@ def fix_word(
 ) -> dict[str, Any]:
     """Fix the spelling of one word of the cut, in this cut only, and give the word as
     ``show_cut`` does, with the cut; ``now`` defaults to the clock (docs/cli.md §8.5)."""
-    row = _existing(connection, cut_id)
+    row = existing_cut(connection, cut_id)
     word = _played_word(connection, row, word_id)
     proposed = _one_word(text)
     undo = proposed == unicodedata.normalize("NFC", word.text)
@@ -137,7 +142,7 @@ def fix_word(
 
 def caption_of(connection: sqlite3.Connection, cut_id: int) -> dict[str, Any]:
     """The caption style of the cut, the default when it has none (docs/cli.md §8.6)."""
-    return stored_caption(_existing(connection, cut_id).caption).as_dict()
+    return stored_caption(existing_cut(connection, cut_id).caption).as_dict()
 
 
 def update_caption(
@@ -149,7 +154,7 @@ def update_caption(
     """Change only the given fields of the cut's caption style and give the whole style;
     ``now`` defaults to the clock. The cut becomes edited; a refused change stores nothing
     (docs/cli.md §8.6)."""
-    row = _existing(connection, cut_id)
+    row = existing_cut(connection, cut_id)
     style = validated(stored_caption(row.caption), changes).as_dict()
     _store_caption(connection, row.id, style, now)
     return style
@@ -160,7 +165,7 @@ def reset_caption(
 ) -> dict[str, Any]:
     """Bring the cut's caption back to the default, turned on, as ``update_caption`` changes
     it; nothing is stored, so the cut follows the default even if it changes."""
-    row = _existing(connection, cut_id)
+    row = existing_cut(connection, cut_id)
     _store_caption(connection, row.id, None, now)
     return DEFAULT_CAPTION.as_dict()
 
@@ -254,8 +259,31 @@ def _word(word: WordRow, fixes: Mapping[int, str]) -> dict[str, Any]:
     }
 
 
-def _existing(connection: sqlite3.Connection, cut_id: int) -> CutRow:
+def existing_cut(connection: sqlite3.Connection, cut_id: int) -> CutRow:
+    """The cut, or ``not_found`` when there is none with ``cut_id``."""
     row = cuts.by_id(connection, cut_id)
     if row is None:
         raise WordcutError("not_found", f"Corte {cut_id} não existe.", {"cut_id": cut_id})
     return row
+
+
+def _renders(
+    connection: sqlite3.Connection, cut_id: int, home: Home | None
+) -> list[dict[str, Any]]:
+    found = renders.of_cut(connection, cut_id)
+    if not found:
+        return []
+    where = home or Home.from_environment()
+    return [shown_render(row, where) for row in found]
+
+
+def shown_render(row: RenderRow, home: Home) -> dict[str, Any]:
+    """The export as ``render show`` gives it, its ``path`` the local file (docs/cli.md §9)."""
+    return {
+        "id": row.id,
+        "cut_id": row.cut_id,
+        "path": str(home.root / row.path),
+        "duration": row.duration,
+        "created_at": row.created_at.isoformat(),
+        "options": row.options,
+    }

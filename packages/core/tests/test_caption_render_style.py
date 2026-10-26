@@ -112,3 +112,18 @@ def test_the_default_caption_draws_exactly_like_the_legacy_default_style() -> No
         legacy.bgr.tobytes(),
         legacy.alpha.tobytes(),
     )
+
+
+def test_on_a_720_by_1280_frame_the_style_shrinks_by_two_thirds() -> None:
+    settings = replace(DEFAULT_CAPTION, size=72, border=6, shadow="strong", offset=50)
+
+    style = to_style(settings, 1280)
+
+    assert (
+        style.size,
+        style.outline,
+        style.shadow_offset,
+        style.max_width,
+        style.centre_y,
+        style.frame_height,
+    ) == (48, 4, 3, 640, 640, 1280)

@@ -55,6 +55,21 @@ def no_real_processing(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture(autouse=True)
+def no_real_rendering(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Fail a test that would export a cut with ffmpeg and OpenCV for real.
+
+    Only this process sees the double, so no test launches a detached ``render`` task: it
+    would build the real gateways (use ``harmless_tasks``).
+    """
+    from wordcut import rendering
+
+    def refuse() -> rendering.RenderGateways:
+        raise AssertionError("test reached real rendering; replace rendering.default_gateways")
+
+    monkeypatch.setattr(rendering, "default_gateways", refuse)
+
+
+@pytest.fixture(autouse=True)
 def no_real_llm(monkeypatch: pytest.MonkeyPatch) -> None:
     """Fail a test that would call the LLM on OpenRouter for real."""
     from wordcut import suggestion
