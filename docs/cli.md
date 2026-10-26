@@ -35,7 +35,7 @@ traduzem em comandos.
 10. [Tarefas (`task`) e estado (`status`)](#10-tarefas-task-e-estado-status)
 11. [Configurações, critérios e presets](#11-configurações-critérios-e-presets)
 12. [Equipe (`member`)](#12-equipe-member)
-13. [Servidor (`serve`)](#13-servidor-serve)
+13. [Servidor](#13-servidor)
 14. [Armazenamento](#14-armazenamento)
 15. [Migração da CLI anterior](#15-migração-da-cli-anterior)
 16. [Considerações de segurança](#16-considerações-de-segurança)
@@ -137,7 +137,6 @@ interativa permitida é a digitação sem eco de segredo em `settings set-key` e
 | `status` | 3.1.a | assistente | — |
 | `settings` · `criteria` · `preset` | 2.1.a | admin | — |
 | `member` | 1.2.a | admin | — |
-| `serve` | — | admin | — |
 
 A coluna "Papel" segue a tabela de permissões da feature 1.2.a. Na máquina do servidor, a CLI
 age como administrador e pode executar todos os comandos. O `--help` dos comandos de
@@ -533,17 +532,20 @@ Comandos do administrador (1.2.a). Membros são identificados pelo e-mail.
 
 Remover ou rebaixar o último administrador falha com `last_admin`.
 
-## 13. Servidor (`serve`)
+## 13. Servidor
 
-`wordcut serve [--host 127.0.0.1] [--port 8000]` sobe o servidor FastAPI com a interface
-compilada. O padrão MUST ser escutar só em `127.0.0.1`; o acesso externo é pelo Cloudflare
-Tunnel (constituição §VI).
+A CLI não sobe o servidor. A API (`apps/api`) e a interface (`apps/web`) são aplicações
+próprias, iniciadas pelo Docker Compose (ADR-0002, ADR-0003, ADR-0008). Elas compartilham com
+a CLI o mesmo `WORDCUT_HOME` e a mesma trava. As portas publicadas MUST escutar só em
+`127.0.0.1`; o acesso externo é pelo Cloudflare Tunnel (constituição §VI).
+
+A CLI também roda no contêiner: `docker compose run --rm cli <comando>`.
 
 ## 14. Armazenamento
 
 | O quê | Onde | Observação |
 |---|---|---|
-| Banco (SQLite) e mídias | `~/.local/share/wordcut/` | sobrescrito por `WORDCUT_HOME` |
+| Banco (SQLite) e mídias | `~/.local/share/wordcut/` | sobrescrito por `WORDCUT_HOME`; nos contêineres, o volume de dados |
 | Segredos (chave do LLM, cookies) | `~/.config/wordcut/` | permissão 600 |
 | Demais configurações, presets e equipe | no SQLite | — |
 
@@ -577,7 +579,7 @@ critério teológico vai para o pacote (2.1.a).
 - Segredos MUST NOT aparecer em saída, log, progresso ou mensagem de erro; a chave aparece só
   pelos últimos 4 caracteres (constituição §VI).
 - Os arquivos de segredo MUST ter permissão 600.
-- `serve` MUST escutar só em localhost por padrão.
+- As portas publicadas pelo Compose MUST escutar só em localhost.
 - A CLI age como administrador porque roda na máquina do servidor; o acesso a essa máquina é,
   portanto, acesso de administrador.
 - Comandos destrutivos não pedem confirmação (§3.2); agentes SHOULD ser autorizados com isso
