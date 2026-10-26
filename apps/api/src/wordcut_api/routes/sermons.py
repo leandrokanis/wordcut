@@ -21,9 +21,9 @@ from wordcut.service.sermons import (
 from wordcut.service.suggestion import start_suggestion
 from wordcut.service.tasks import launched_task
 from wordcut_api import deps
-from wordcut_api.auth import current_member, require
+from wordcut_api.auth import require
 
-router = APIRouter(prefix="/api/sermons", dependencies=[Depends(current_member)])
+router = APIRouter(prefix="/api/sermons")
 
 
 # docs/cli.md §7: the choices of ``sermon list --status`` (SERMON_STATES).

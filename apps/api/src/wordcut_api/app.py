@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 
 from wordcut_api import errors
-from wordcut_api.auth import CurrentMember, DevIdentification, identification
+from wordcut_api.auth import CurrentMember, DevIdentification, current_member, identification
 from wordcut_api.identity import KeySource
-from wordcut_api.routes import sermons, status, tasks
+from wordcut_api.routes import ROUTERS
 from wordcut_api.settings import ApiSettings
 
 
@@ -32,7 +32,7 @@ def create_app(settings: ApiSettings | None = None, keys: KeySource | None = Non
     def me(member: CurrentMember) -> dict[str, str]:
         return {"email": member.email, "role": member.role}
 
-    app.include_router(sermons.router)
-    app.include_router(tasks.router)
-    app.include_router(status.router)
+    # ADR-0021: the identity is required here, in one place, for every business router.
+    for router in ROUTERS:
+        app.include_router(router, dependencies=[Depends(current_member)])
     return app

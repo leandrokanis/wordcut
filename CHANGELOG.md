@@ -209,6 +209,14 @@ Formato de [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões
   15 s), lendo o banco a cada 0,5 s. Requisição malformada dá 400 `invalid_argument` sem
   repetir o valor enviado, com `details.choices` nos filtros; rota inexistente, 404
   `not_found`. O esquema OpenAPI fica em `/api/docs` só em desenvolvimento.
+- Rotas da API para cortes, exportações, configurações, critérios, presets e equipe (item 20b,
+  ADR-0021; `docs/api.md`): listar, detalhar, prever, escolher, descartar e restaurar cortes,
+  corrigir a grafia de uma palavra, ver, alterar e restaurar o estilo da legenda, exportar
+  (202) e estimar a exportação, listar, detalhar e baixar exportações com nome legível; ver e
+  trocar os modelos, gravar a chave do LLM e os cookies pelo corpo, sem nunca devolvê-los;
+  critérios, presets e equipe, só para o administrador, com o e-mail só no corpo. Toda rota de
+  negócio passa pela identidade num só lugar (`routes.ROUTERS`), as exportações saem sem o
+  caminho local, os corpos são estritos e um campo desconhecido dá 400 sem repetir o nome.
 
 ### Alterado
 

@@ -33,6 +33,10 @@ Definidas pelo administrador em 2026-10-26:
   `packages/core/src/wordcut/criteria/texts/` (item 8) antes de usar as sugestões em produção
   (constituição §I).
 
+- Decidir se os segredos (chave do LLM, cookies) podem ser gravados pela web em produção: hoje
+  `/config` é montado só leitura no contêiner da API (ADR-0003), e a gravação é pela CLI no
+  host (item 20b, L5).
+
 ## Ordem
 
 CLI primeiro (constituição §II): ela cobre o fluxo inteiro e é a base que a web reaproveita.
@@ -75,7 +79,7 @@ Depois o servidor e, por fim, a interface, seguindo o protótipo
 |:-:|---|---|---|---|
 | 19 | 1.2.a.2 | App `api`: FastAPI no Compose, identidade pelo Cloudflare Access e papéis | — | ☑ |
 | 20a | web-api-sermons | Rotas de pregações, tarefas e estado, com SSE | — | ☑ |
-| 20b | web-api-cuts | Rotas de cortes, exportações, configurações, presets e equipe | — | ☐ |
+| 20b | web-api-cuts | Rotas de cortes, exportações, configurações, presets e equipe | — | ☑ |
 
 ### Fase 3 — Interface web (React + Vite + TypeScript)
 
@@ -113,3 +117,4 @@ Depois o servidor e, por fim, a interface, seguindo o protótipo
 | 18 cli-migration | PASS na rodada 2 | (ver git log) | CLI antiga, `asr/remote.py`, `short`, `overview`, `edit_list` e símbolos mortos removidos; skills reescritas sobre a CLI nova. Fora da barra: `sermon list --help` chega a 83 colunas e o exemplo de `preset update` a 107; mutação `stammers=False` sobrevive (lacuna anterior). |
 | 19 1.2.a.2 | PASS na rodada 2 | (ver git log) | ADR-0019. JWT do Access com `exp`/`aud`/`iss` obrigatórios; modo dev só sem Access. Não testado contra o Cloudflare real (domínio pendente). |
 | 20a web-api-sermons | PASS na rodada 1 | (ver git log) | ADR-0020. Risco: rota futura oculta do OpenAPI e sem identidade passaria na varredura — tratado no 20b com dependência de identidade no nível do router. |
+| 20b web-api-cuts | PASS na rodada 2 | (ver git log) | ADR-0021. Identidade estrutural em `ROUTERS`; API sem `path` nem caminho do servidor; e-mail só no corpo. Segredos pela web dão 409 no Compose (pendência do administrador). |

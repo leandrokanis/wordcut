@@ -1,1 +1,1 @@
-active_plan: specs/web-api-sermons/plan.md
+active_plan: specs/web-api-cuts/plan.md

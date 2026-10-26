@@ -4,15 +4,14 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from starlette.concurrency import run_in_threadpool
 
 from wordcut.service.tasks import list_tasks, show_task
 from wordcut_api import deps, sse
-from wordcut_api.auth import current_member
 
-router = APIRouter(prefix="/api/tasks", dependencies=[Depends(current_member)])
+router = APIRouter(prefix="/api/tasks")
 
 # docs/cli.md §6.1: the choices of ``task list`` (TASK_STATES, TASK_KINDS); the internal
 # ``diagnostic`` kind is not one of them.

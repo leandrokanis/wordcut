@@ -24,6 +24,8 @@ STATUS_BY_CODE = {"unauthenticated": 401, "forbidden": 403}
 # The text of an unexpected exception may carry a token or an e-mail (docs/constitution.md §VI).
 UNEXPECTED = WordcutError("internal_error", "Erro interno na API.")
 NO_ROUTE = WordcutError("not_found", "Rota não encontrada.")
+# ADR-0021: the name of a field the route does not declare is typed text too (ADR-0015).
+UNKNOWN_ARGUMENT = WordcutError("invalid_argument", "Argumento não reconhecido; veja docs/api.md.")
 
 
 def http_status(error: WordcutError) -> int:
@@ -65,9 +67,12 @@ def invalid_argument(request: Request, error: RequestValidationError) -> Wordcut
     """The first problem of the request as ``invalid_argument``, worded as the CLI words it.
 
     Pydantic's message and ``input`` repeat the value sent, which may be a secret; only the
-    name of the argument and its choices come out.
+    name of the argument and its choices come out, and not even the name of an argument the
+    route does not declare.
     """
     problem = error.errors()[0]
+    if problem["type"] == "extra_forbidden":
+        return UNKNOWN_ARGUMENT
     location, *path = problem["loc"]
     argument = next((part for part in reversed(path) if isinstance(part, str)), location)
     if problem["type"] == "missing":

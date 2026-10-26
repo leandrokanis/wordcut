@@ -4,13 +4,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 
 from wordcut.service.status import machine_status
 from wordcut_api import deps
-from wordcut_api.auth import current_member
 
-router = APIRouter(prefix="/api/status", dependencies=[Depends(current_member)])
+router = APIRouter(prefix="/api/status")
 
 
 @router.get("")
