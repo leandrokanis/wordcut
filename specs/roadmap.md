@@ -93,7 +93,7 @@ Depois o servidor e, por fim, a interface, seguindo o protótipo
 | 23 | 1.1.e-web | Nível 2: painel de cortes | 1.1.e.1, 1.1.e.2 (web) | ☑ |
 | 24 | 1.1.g-web | Nível 3: prévia 9:16 sem renderizar, abas Texto e Legenda, grafia na prévia | 1.1.g.1, 1.1.f (web) | ☑ |
 | 25 | 1.1.h-web | Caixa de exportação e downloads | 1.1.h.1, 1.1.h.3, 1.1.i.1 (web) | ☑ |
-| 26 | 2.1.a-web | Configurações e equipe | 2.1.a, 1.2.a.1 (web) | ☐ |
+| 26 | 2.1.a-web | Configurações e equipe | 2.1.a, 1.2.a.1 (web) | ☑ |
 
 ## Registro
 
@@ -126,3 +126,4 @@ Depois o servidor e, por fim, a interface, seguindo o protótipo
 | 23 1.1.e (web) | PASS na rodada 1 | (ver git log) | `cut list` ganhou `start`/`end` (core, CLI e API). Um clique abre o corte (spec), diferente do protótipo. |
 | 24 1.1.g (web) | PASS na rodada 1 | (ver git log) | Legenda na prévia é aproximação (blocos como `captions.py`); recorte central, sem seguir o pregador. Fora: olho da camada e 9:16/16:9. |
 | 25 1.1.h (web) | PASS na rodada 1 | (ver git log) | Exportar fica "Salvando…" com gravação pendente. Fora: "Exportado"/"Baixar" no card do nível 2 e cor da estimativa fora da meta. |
+| 26 2.1.a (web) | PASS na rodada 2 | (ver git log) | Seções do protótipo sem "Processamentos" (sai do menu; teste do item 21 ajustado). Fora, sem rota na API: gancho, autônomo, fechamento, limpo, ideias por pregação, descrição por critério e busca do menu. Último admin protegido pelo 409 `last_admin` (nada escondido por e-mail); quem se rebaixa relê `/api/me` e vê a recusa. Segredos pela web dão 409 no Compose: a tela mostra o comando da CLI no host. |

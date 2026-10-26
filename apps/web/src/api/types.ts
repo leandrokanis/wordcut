@@ -220,3 +220,68 @@ export interface ErrorBody {
     details?: Record<string, unknown>;
   };
 }
+
+/** service/settings.py show_settings: the key comes masked and the cookies only as presence. */
+export interface Settings {
+  llm_model: string | null;
+  whisper_model: string;
+  /** ``"••••"`` and the key's last characters; null without a key. */
+  llm_key: string | null;
+  youtube_cookies: boolean;
+  default_preset_id: number;
+}
+
+export type SettingsModels = Partial<Pick<Settings, "llm_model" | "whisper_model">>;
+
+export type Level = "lenient" | "moderate" | "strict";
+
+/** docs/cli.md §11.2: a filter or value of the code, never with its prompt text. */
+export interface Criterion {
+  id: string;
+  name: string;
+  type: "filter" | "value";
+  default_level: Level;
+}
+
+/** Seconds, both ends included. */
+export interface SecondsRange {
+  min: number;
+  max: number;
+}
+
+/** docs/cli.md §11.3: ``levels`` has every criterion of the code. */
+export interface Preset {
+  id: number;
+  name: string;
+  is_default: boolean;
+  levels: Record<string, Level>;
+  duration_allowed: SecondsRange;
+  duration_ideal: SecondsRange;
+  reorder: boolean;
+  protected_words: string[];
+  instructions: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** What ``PATCH /api/presets/{id}`` takes; ``levels`` changes only the criteria it names. */
+export type PresetChange = Partial<
+  Pick<
+    Preset,
+    | "name"
+    | "levels"
+    | "duration_allowed"
+    | "duration_ideal"
+    | "reorder"
+    | "protected_words"
+    | "instructions"
+  >
+>;
+
+/** docs/cli.md §12: a member is only an e-mail and a role. */
+export interface Member {
+  email: string;
+  role: Role;
+  created_at: string;
+  updated_at: string;
+}

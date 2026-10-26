@@ -268,6 +268,19 @@ Formato de [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões
   legenda ou a grafia gravam. A recusa e a falha aparecem com o motivo. No fim, o corte e a
   lista são lidos de novo: cada exportação aparece com data, duração e resumo das opções, e
   Baixar entrega o arquivo pela API, com o nome legível dado pelo servidor.
+- Configurações e equipe na web (item 26): as seções do protótipo (Modelo, Presets, Filtros,
+  Valor, Formato e Pessoas) numa só rolagem, com o menu que pula para a seção e acompanha a
+  leitura. Modelo do LLM e do WhisperX salvos com Enter ou ao sair do campo; chave da API
+  enviada com Enter e mostrada só mascarada; cookies do YouTube enviados por arquivo e
+  mostrados só como presentes ou ausentes; quando a API não pode gravar o segredo, a tela
+  mostra o comando da CLI no host. Presets escolhidos no topo do grupo, com nome, padrão,
+  Duplicar ("Cópia de <nome>"), Apagar (nunca o padrão), instruções adicionais, rigidez
+  Brando/Moderado/Rigoroso de cada filtro e valor (só o nome do critério aparece), durações,
+  reordenar e palavras protegidas, cada campo salvo sozinho 400 ms depois da mudança e a
+  mudança pendente gravada no seu preset antes de trocar de preset. Pessoas lista a equipe por
+  e-mail com o papel e Remover, libera acesso por e-mail e papel, protege o último
+  administrador (o papel volta ao anterior) e manda quem se rebaixa para a tela de recusa. Um
+  só "Salvo" para a tela, nunca depois de erro; o motivo da recusa aparece junto ao campo.
 
 ### Alterado
 
@@ -276,6 +289,7 @@ Formato de [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões
 
 - A web deixa de ser o esqueleto que mostrava só o estado da API (`fetchHealth`) e passa a
   ser a interface do item 21.
+- O menu das configurações perde "Processamentos", que fica para um item próprio (item 26).
 - `cut show` traz em `render_options` as opções efetivas da próxima exportação (padrões mais
   as salvas, com `caption` igual ao estado da legenda), não mais o JSON gravado ou `{}`, e em
   `renders` as exportações do corte, da mais antiga para a mais nova, com `path` absoluto.
