@@ -52,6 +52,17 @@ class AssembledCut:
         spans = sum(segment.end - segment.start for segment in self.segments)
         return round(spans, MILLISECOND_DIGITS)
 
+    @property
+    def out_of_order(self) -> tuple[bool, ...]:
+        """For each segment, whether it starts before the one played just before it ends:
+        the jump back in the sermon the preview marks (docs/cli.md §8.3). The first segment
+        never is."""
+        jumps = (
+            current.start < previous.end
+            for previous, current in zip(self.segments, self.segments[1:], strict=False)
+        )
+        return (False, *jumps) if self.segments else ()
+
 
 def assemble(segments: Sequence[Segment], words: Sequence[WordRow]) -> AssembledCut:
     """The cut made of ``segments``, out of the sermon's ``words`` in spoken order."""
