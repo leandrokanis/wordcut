@@ -1,24 +1,11 @@
-import { useEffect, useState } from "react";
+import { BrowserRouter } from "react-router-dom";
 
-import { fetchHealth } from "./api";
-
-const CHECKING = "verificando…";
-const UNAVAILABLE = "indisponível";
+import { AppRoutes } from "./app/routes";
 
 export function App() {
-  const [status, setStatus] = useState(CHECKING);
-
-  useEffect(() => {
-    fetchHealth().then(
-      (health) => setStatus(health.status),
-      () => setStatus(UNAVAILABLE),
-    );
-  }, []);
-
   return (
-    <main>
-      <h1>Wordcut</h1>
-      <p>API: {status}</p>
-    </main>
+    <BrowserRouter>
+      <AppRoutes />
+    </BrowserRouter>
   );
 }

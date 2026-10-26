@@ -1,0 +1,88 @@
+// Response bodies of the API, as docs/api.md §2 and the core service layer give them.
+
+export type Role = "assistant" | "admin";
+
+export interface Me {
+  email: string;
+  role: Role;
+}
+
+export type SermonStatus = "created" | "trimmed" | "processing" | "processed" | "failed";
+
+export type CutStatus = "suggested" | "chosen" | "discarded";
+
+/** The sermon as service/sermons.py ``_sermon`` gives it. */
+export interface Sermon {
+  id: number;
+  youtube_id: string;
+  url: string;
+  title: string;
+  service_date: string;
+  live_duration: number;
+  live_finished: boolean;
+  status: SermonStatus;
+  created_at: string;
+}
+
+/** An item of ``GET /api/sermons``: ``duration`` is null until the sermon has borders. */
+export interface SermonListItem extends Sermon {
+  duration: number | null;
+  cut_counts: Record<CutStatus, number>;
+}
+
+/** ``POST /api/sermons``: ``created`` is false when the video already had a sermon. */
+export interface SermonCreated extends Sermon {
+  created: boolean;
+}
+
+/** The fields of ``GET /api/cuts/{id}`` the web reads so far. */
+export interface Cut {
+  id: number;
+  sermon_id: number;
+  title: string;
+  status: CutStatus;
+}
+
+export type TaskKind = "process" | "render" | "suggest";
+
+/** A task as service/tasks.py ``shown_task`` gives it. */
+export interface Task {
+  id: number;
+  kind: TaskKind;
+  status: "running" | "succeeded" | "failed";
+  sermon_id?: number;
+  cut_id?: number;
+  progress: number | null;
+  progress_message: string | null;
+  pid: number | null;
+  started_at: string;
+  finished_at: string | null;
+  error: ErrorBody["error"] | null;
+  result: unknown;
+}
+
+/** service/status.py: the lock fields are null while the holder has not written them. */
+export type Lock =
+  | { held: false }
+  | {
+      held: true;
+      kind: string | null;
+      resource: string | null;
+      pid: number | null;
+      started_at: string | null;
+      task_id: number | null;
+      elapsed_seconds: number | null;
+    };
+
+export interface MachineStatus {
+  lock: Lock;
+  running_tasks: Task[];
+}
+
+export interface ErrorBody {
+  error: {
+    code: string;
+    message: string;
+    details?: Record<string, unknown>;
+  };
+}
