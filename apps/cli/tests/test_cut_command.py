@@ -279,13 +279,18 @@ def test_error_without_json_goes_to_stderr_in_portuguese_and_stdout_stays_empty(
 def test_cut_help_lists_its_actions(capsys: pytest.CaptureFixture[str]) -> None:
     exit_code = main(["cut", "--help"])
 
-    assert (exit_code, "{list,show,preview,choose,discard,restore}" in capsys.readouterr().out) == (
+    assert (
+        exit_code,
+        "{list,show,preview,choose,discard,restore,fix-word}" in capsys.readouterr().out,
+    ) == (
         0,
         True,
     )
 
 
-@pytest.mark.parametrize("action", ["list", "show", "preview", "choose", "discard", "restore"])
+@pytest.mark.parametrize(
+    "action", ["list", "show", "preview", "choose", "discard", "restore", "fix-word"]
+)
 def test_each_cut_action_help_shows_an_example_ready_to_copy(
     action: str, capsys: pytest.CaptureFixture[str]
 ) -> None:

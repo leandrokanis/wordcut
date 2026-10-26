@@ -459,7 +459,8 @@ Devolve o corte completo:
 
 - texto montado, duração, estado e faixa na pregação;
 - `segments`: trechos em ordem, no formato de `cut segments` (§8.10), com tempos e texto;
-- `words`: palavras do corte com `word_id`, texto, tempos e correção aplicada, se houver;
+- `words`: palavras do corte com `word_id`, `text` (o original), tempos e `corrected` (a
+  correção de grafia do corte, §8.5, ou `null`);
 - `caption`: estilo da legenda;
 - `render_options`: últimas opções de exportação;
 - `renders`: histórico de exportações.
@@ -471,7 +472,7 @@ texto. Não toca vídeo nem renderiza; nunca é bloqueado pela trava.
 
 - `segments`: os trechos na ordem em que o corte toca, cada um com `start` e `end` (início da
   primeira palavra e fim da última, em tempo da pregação), `text` (as palavras do trecho
-  unidas por espaço, sem correção de grafia até 1.1.f.2) e `out_of_order`.
+  unidas por espaço, com as correções de grafia do corte, §8.5) e `out_of_order`.
 - `out_of_order` é `true` no trecho que começa antes do fim do trecho tocado logo antes dele,
   e só esse anterior conta; o primeiro trecho é sempre `false`. Um trecho que começa
   exatamente no fim do anterior não está fora de ordem. Exemplo: um corte que toca
@@ -496,11 +497,30 @@ altera o conteúdo (constituição §I).
 
 ### 8.5. `cut fix-word <id> <word_id> <texto>`
 
-Corrige a grafia de uma palavra da legenda, só neste corte (1.1.f.2).
+Corrige a grafia de uma palavra da legenda, só neste corte (1.1.f.2). `<word_id>` é o de
+`cut show` (§8.2). A correção aparece no texto de `cut list`, `cut show` e `cut preview`; em
+`words`, `text` continua o original e `corrected` traz a correção.
 
-- A correção MUST passar pela trava de grafia por distância de edição (1.1.f.3); se não
-  passar, `spelling_too_different`, com `details.distance` e `details.limit`.
-- `<texto>` igual ao original remove a correção.
+- A correção MUST passar pela trava de grafia por distância de edição (1.1.f.3): a distância
+  de Levenshtein entre o núcleo da palavra original e o da correção (minúsculas, só letras,
+  números e hífen) não pode passar de `max(1, floor(0,34 × tamanho do núcleo original))`. A
+  comparação é sempre com a palavra original, nunca com a correção atual. Se não passar,
+  `spelling_too_different`, com `details.distance`, `details.limit` e `details.original`, e
+  nada muda.
+- `<texto>` igual ao original remove a correção; sem correção gravada, não é erro.
+- `<texto>` vazio ou com mais de uma palavra: `invalid_argument` com
+  `details.argument = "text"`. Palavra fora dos trechos do corte (não basta estar na faixa):
+  `invalid_argument` com `details.argument = "word_id"`. Nenhuma mensagem repete o texto
+  digitado (ADR-0015). Corte inexistente: `not_found`.
+- Os espaços das pontas são ignorados, e o texto é comparado e gravado em NFC.
+- Corrigir marca o corte como editado (`edited`), e `sermon suggest` o mantém (§7.6). Não é
+  tarefa nem toma a trava.
+- Sem `--json`, uma linha com a palavra, o original e a correção.
+
+```json
+{ "cut_id": 34, "word_id": 1204, "text": "Jesús", "start": 512.31, "end": 512.7,
+  "corrected": "Jesus" }
+```
 
 ### 8.6. `cut caption <id> [opções]`
 

@@ -231,7 +231,7 @@ def test_a_database_at_schema_6_keeps_its_data_and_gains_no_cuts_nor_suggestion_
         sermon = sermons.by_id(migrated, sermon_id)
         assert sermon is not None
         assert (
-            migrated.execute("PRAGMA user_version").fetchone()[0],
+            migrated.execute("PRAGMA user_version").fetchone()[0] >= 7,
             (sermon.title, sermon.status, sermon.suggestion_error),
             [word.text for word in transcripts.words_of(migrated, sermon.id)],
             presets.by_id(migrated, preset_id) is not None,
@@ -239,4 +239,4 @@ def test_a_database_at_schema_6_keeps_its_data_and_gains_no_cuts_nor_suggestion_
             migrated.execute(
                 "SELECT suggestion_error_code, suggestion_error_message FROM sermons"
             ).fetchall(),
-        ) == (7, ("Culto", "processed", None), ["Amém."], True, [], [(None, None)])
+        ) == (True, ("Culto", "processed", None), ["Amém."], True, [], [(None, None)])

@@ -1,12 +1,15 @@
 """The words a cut plays, segment by segment, with its assembled text and duration.
 
+The text carries the cut's spelling fixes (item 1.1.f.2); times and duration are those of
+the words as spoken.
+
 The duration is raw: the sum of each segment's span, pauses included; the cleanup the
 export applies is not estimated here (spec 1.1.e.1, FR-004).
 """
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 from wordcut.db.cuts import Segment
@@ -18,11 +21,13 @@ MILLISECOND_DIGITS = 3
 
 @dataclass(frozen=True)
 class AssembledSegment:
-    """The words of one segment, ``from_word`` to ``to_word`` inclusive, in sermon order."""
+    """The words of one segment, ``from_word`` to ``to_word`` inclusive, in sermon order,
+    with the fixed spelling of those of them that have one, by word ID."""
 
     from_word: int
     to_word: int
     words: tuple[WordRow, ...]
+    fixes: Mapping[int, str]
 
     @property
     def start(self) -> float:
@@ -34,7 +39,7 @@ class AssembledSegment:
 
     @property
     def text(self) -> str:
-        return " ".join(word.text for word in self.words)
+        return " ".join(self.fixes.get(word.id, word.text) for word in self.words)
 
 
 @dataclass(frozen=True)
@@ -64,17 +69,27 @@ class AssembledCut:
         return (False, *jumps) if self.segments else ()
 
 
-def assemble(segments: Sequence[Segment], words: Sequence[WordRow]) -> AssembledCut:
-    """The cut made of ``segments``, out of the sermon's ``words`` in spoken order."""
+def assemble(
+    segments: Sequence[Segment], words: Sequence[WordRow], fixes: Mapping[int, str]
+) -> AssembledCut:
+    """The cut made of ``segments``, out of the sermon's ``words`` in spoken order, spelled
+    with the cut's ``fixes`` (word ID to fixed spelling)."""
     # Word IDs are stable but not contiguous; the spoken order is the position (spec 1.1.e.1).
     place = {word.id: index for index, word in enumerate(words)}
     return AssembledCut(
         tuple(
-            AssembledSegment(
-                segment.from_word,
-                segment.to_word,
-                tuple(words[place[segment.from_word] : place[segment.to_word] + 1]),
-            )
+            _segment(segment, words[place[segment.from_word] : place[segment.to_word] + 1], fixes)
             for segment in segments
         )
+    )
+
+
+def _segment(
+    segment: Segment, played: Sequence[WordRow], fixes: Mapping[int, str]
+) -> AssembledSegment:
+    return AssembledSegment(
+        segment.from_word,
+        segment.to_word,
+        tuple(played),
+        {word.id: fixes[word.id] for word in played if word.id in fixes},
     )
