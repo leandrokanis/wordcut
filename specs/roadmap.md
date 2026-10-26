@@ -63,7 +63,7 @@ Depois o servidor e, por fim, a interface, seguindo o protótipo
 | 11 | 1.1.e.1 | `cut list/show/choose/discard/restore` | 1.1.e.2 | ☑ |
 | 12 | 1.1.g.1 | `cut preview` (sequência da prévia) | — | ☑ |
 | 13 | 1.1.f.2 | `cut fix-word` com a trava de grafia | 1.1.f.3 | ☑ |
-| 14 | 1.1.f.4 | `cut caption` | 1.1.f.5 | ☐ |
+| 14 | 1.1.f.4 | `cut caption` | 1.1.f.5 | ☑ |
 | 15 | 1.1.h.1 | `cut render` com opções e `--estimate` | 1.1.h.2, 1.1.h.3 | ☐ |
 | 16 | 1.1.i.1 | `render list/show/download` | — | ☐ |
 | 17 | 1.2.a.1 | `member` | — | ☐ |
@@ -105,3 +105,4 @@ Depois o servidor e, por fim, a interface, seguindo o protótipo
 | 11 1.1.e.1 | PASS na rodada 1 | (ver git log) | Comando antigo `cut` renomeado para `cut-sermon` (sai no item 18). |
 | 12 1.1.g.1 | PASS na rodada 1 | (ver git log) | Texto sem correção de grafia até o item 13. |
 | 13 1.1.f.2 | PASS na rodada 3 | (ver git log) | Correção por corte; corrigir marca o corte como editado (protege do `sermon suggest`). |
+| 14 1.1.f.4 | PASS na rodada 1 | (ver git log) | Posições alinhadas ao protótipo (20/50/78 %, altura 10–90 %). Só Open Sans Bold incluída. |

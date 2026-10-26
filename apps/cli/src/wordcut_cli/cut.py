@@ -1,5 +1,6 @@
 """``wordcut cut <action>``: see and preview the suggested cuts of a sermon, choose, discard
-or restore them and fix the spelling of their caption words (docs/cli.md §8.1–§8.5)."""
+or restore them, fix the spelling of their caption words and set their caption style
+(docs/cli.md §8.1–§8.6)."""
 
 from __future__ import annotations
 
@@ -7,17 +8,23 @@ import argparse
 import sqlite3
 from collections.abc import Callable
 from contextlib import closing
+from dataclasses import fields
 from functools import partial
 from typing import TYPE_CHECKING, Any
 
+from wordcut.cuts.caption import POSITIONS, RANGES, SHADOWS, CaptionSettings
+from wordcut.errors import WordcutError
 from wordcut.service.cuts import (
+    caption_of,
     choose_cut,
     discard_cut,
     fix_word,
     list_cuts,
     preview_cut,
+    reset_caption,
     restore_cut,
     show_cut,
+    update_caption,
 )
 from wordcut.service.sermons import CUT_STATES
 from wordcut.timefmt import format_timestamp
@@ -27,6 +34,9 @@ from wordcut_cli.contract import Context, add_command, add_group
 if TYPE_CHECKING:
     from wordcut_cli.contract import Commands
 
+CAPTION_FIELDS = tuple(field.name for field in fields(CaptionSettings))
+POSITION_NAMES = {"top": "topo", "center": "centro", "bottom": "base"}
+SHADOW_NAMES = {"none": "nenhuma", "soft": "suave", "strong": "forte"}
 STATE_NAMES = {"suggested": "sugerido", "chosen": "escolhido", "discarded": "descartado"}
 
 
@@ -34,7 +44,8 @@ def register(commands: Commands) -> None:
     actions = add_group(
         commands,
         "cut",
-        help="cortes: ver, escolher, descartar, restaurar e corrigir a grafia da legenda",
+        help="cortes: ver, escolher, descartar, restaurar, corrigir a grafia e ajustar o estilo"
+        " da legenda",
     )
     listing = add_command(
         actions,
@@ -97,6 +108,84 @@ def register(commands: Commands) -> None:
     fix.add_argument("id", type=int, help="ID do corte")
     fix.add_argument("word_id", type=int, help="ID da palavra, como no cut show")
     fix.add_argument("text", help="a palavra com a grafia corrigida")
+    caption = add_command(
+        actions,
+        "caption",
+        help="mostra ou altera o estilo da legenda do corte, que vale para todas as legendas"
+        " dele; sem opções, só mostra",
+        run=_caption,
+        render=_render_caption,
+        example='wordcut cut caption 34 --size 72 --color "#FFFFFF" --position bottom --json',
+    )
+    caption.add_argument("id", type=int, help="ID do corte")
+    _add_caption_options(caption)
+
+
+def _add_caption_options(caption: argparse.ArgumentParser) -> None:
+    shown = caption.add_mutually_exclusive_group()
+    shown.add_argument(
+        "--on", dest="enabled", action="store_const", const=True, help="liga a legenda"
+    )
+    shown.add_argument(
+        "--off", dest="enabled", action="store_const", const=False, help="desliga a legenda"
+    )
+    caption.add_argument("--font", help="fonte, uma das incluídas no pacote")
+    caption.add_argument(
+        "--size", type=int, help=f"tamanho em px no quadro de 1080 por 1920 ({_range('size')})"
+    )
+    caption.add_argument("--color", help="cor do texto, #RRGGBB")
+    caption.add_argument(
+        "--position", choices=tuple(POSITIONS), help="posição; leva a altura à da posição"
+    )
+    caption.add_argument(
+        "--offset",
+        type=int,
+        help=f"altura do centro da legenda, em %% do quadro ({_range('offset')}); vence --position",
+    )
+    caption.add_argument(
+        "--border", type=int, help=f"espessura do contorno em px ({_range('border')})"
+    )
+    caption.add_argument("--border-color", help="cor do contorno, #RRGGBB")
+    caption.add_argument("--shadow", choices=SHADOWS, help="sombra")
+    caption.add_argument(
+        "--reset", action="store_true", help="volta ao estilo da igreja; não aceita outra opção"
+    )
+
+
+def _range(field: str) -> str:
+    low, high = RANGES[field]
+    return f"{low} a {high}"
+
+
+def _caption(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:
+    changes = {
+        field: getattr(args, field) for field in CAPTION_FIELDS if getattr(args, field) is not None
+    }
+    if args.reset and changes:
+        raise WordcutError(
+            "invalid_argument",
+            "Use --reset sozinho, sem outras opções de estilo.",
+            {"argument": "--reset"},
+        )
+    with closing(deps.connection()) as connection:
+        if args.reset:
+            return reset_caption(connection, args.id)
+        if changes:
+            return update_caption(connection, args.id, changes)
+        return caption_of(connection, args.id)
+
+
+def _render_caption(style: dict[str, Any]) -> str:
+    return "\n".join(
+        [
+            f"Legenda: {'ligada' if style['enabled'] else 'desligada'}",
+            f"Fonte: {style['font']}, {style['size']} px",
+            f"Cor: {style['color']}",
+            f"Posição: {POSITION_NAMES[style['position']]}, altura {style['offset']}%",
+            f"Contorno: {style['border']} px, {style['border_color']}",
+            f"Sombra: {SHADOW_NAMES[style['shadow']]}",
+        ]
+    )
 
 
 def _list(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:

@@ -1,5 +1,5 @@
-"""Cuts of a sermon: list, show, preview, choose them and fix the spelling of their words
-(docs/cli.md §8.1–§8.5)."""
+"""Cuts of a sermon: list, show, preview, choose them, fix the spelling of their words and
+set their caption style (docs/cli.md §8.1–§8.6)."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from datetime import datetime
 from typing import Any
 
 from wordcut.cuts.assembly import AssembledCut, AssembledSegment, assemble
+from wordcut.cuts.caption import DEFAULT_CAPTION, stored_caption, validated
 from wordcut.cuts.spelling import check_spelling
 from wordcut.db import cuts, transcripts, word_fixes
 from wordcut.db.cuts import CutRow
@@ -38,7 +39,7 @@ def list_cuts(
 
 def show_cut(connection: sqlite3.Connection, cut_id: int) -> dict[str, Any]:
     """The cut as ``list_cuts`` gives it, plus the time and text of each segment, its words,
-    its caption style, its last export options and its exports (docs/cli.md §8.2)."""
+    its effective caption style, its last export options and its exports (docs/cli.md §8.2)."""
     row = _existing(connection, cut_id)
     assembled = _assembled(connection, row)
     return {
@@ -47,8 +48,8 @@ def show_cut(connection: sqlite3.Connection, cut_id: int) -> dict[str, Any]:
         "words": [
             _word(word, segment.fixes) for segment in assembled.segments for word in segment.words
         ],
-        # Null in the database means the defaults (items 1.1.f.4 and 1.1.h.1 define them).
-        "caption": row.caption or {},
+        "caption": stored_caption(row.caption).as_dict(),
+        # Null in the database means the defaults (item 1.1.h.1 defines them).
         "render_options": row.render_options or {},
         # Exports arrive with item 1.1.h.1.
         "renders": [],
@@ -132,6 +133,46 @@ def fix_word(
             word_fixes.put(connection, row.id, word.id, proposed, moment)
         cuts.mark_edited(connection, row.id, moment)
     return {"cut_id": row.id, **_word(word, word_fixes.of_cut(connection, row.id))}
+
+
+def caption_of(connection: sqlite3.Connection, cut_id: int) -> dict[str, Any]:
+    """The caption style of the cut, the default when it has none (docs/cli.md §8.6)."""
+    return stored_caption(_existing(connection, cut_id).caption).as_dict()
+
+
+def update_caption(
+    connection: sqlite3.Connection,
+    cut_id: int,
+    changes: Mapping[str, Any],
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """Change only the given fields of the cut's caption style and give the whole style;
+    ``now`` defaults to the clock. The cut becomes edited; a refused change stores nothing
+    (docs/cli.md §8.6)."""
+    row = _existing(connection, cut_id)
+    style = validated(stored_caption(row.caption), changes).as_dict()
+    _store_caption(connection, row.id, style, now)
+    return style
+
+
+def reset_caption(
+    connection: sqlite3.Connection, cut_id: int, now: datetime | None = None
+) -> dict[str, Any]:
+    """Bring the cut's caption back to the default, turned on, as ``update_caption`` changes
+    it; nothing is stored, so the cut follows the default even if it changes."""
+    row = _existing(connection, cut_id)
+    _store_caption(connection, row.id, None, now)
+    return DEFAULT_CAPTION.as_dict()
+
+
+def _store_caption(
+    connection: sqlite3.Connection, cut_id: int, style: dict[str, Any] | None, now: datetime | None
+) -> None:
+    """Store the style and mark the cut edited, so ``sermon suggest`` keeps it (§7.6)."""
+    moment = now or datetime.now().astimezone()
+    with connection:
+        cuts.set_caption(connection, cut_id, style, moment)
+        cuts.mark_edited(connection, cut_id, moment)
 
 
 def _played_word(connection: sqlite3.Connection, row: CutRow, word_id: int) -> WordRow:

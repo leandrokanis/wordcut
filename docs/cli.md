@@ -461,7 +461,8 @@ Devolve o corte completo:
 - `segments`: trechos em ordem, no formato de `cut segments` (§8.10), com tempos e texto;
 - `words`: palavras do corte com `word_id`, `text` (o original), tempos e `corrected` (a
   correção de grafia do corte, §8.5, ou `null`);
-- `caption`: estilo da legenda;
+- `caption`: estilo efetivo da legenda, no formato de `cut caption` (§8.6); o padrão completo
+  quando o corte não tem estilo gravado;
 - `render_options`: últimas opções de exportação;
 - `renders`: histórico de exportações.
 
@@ -524,20 +525,44 @@ Corrige a grafia de uma palavra da legenda, só neste corte (1.1.f.2). `<word_id
 
 ### 8.6. `cut caption <id> [opções]`
 
-Sem opções, mostra o estilo atual. Com opções, altera o estilo, que vale para todas as legendas
-do corte (1.1.f.4, 1.1.f.5).
+Sem opções, mostra o estilo atual e não grava nada. Com opções, altera só o informado, e o
+estilo vale para todas as legendas do corte (1.1.f.4, 1.1.f.5).
 
 | Opção | Valores |
 |---|---|
 | `--on` · `--off` | liga ou desliga a legenda |
-| `--font <nome>` | fontes oferecidas pela interface |
-| `--size <px>` | tamanho em pixels, no quadro 1080×1920 |
+| `--font <nome>` | fontes incluídas no pacote, pelo nome dos metadados do arquivo (`Open Sans Bold`) |
+| `--size <px>` | tamanho em pixels, no quadro 1080×1920, de 24 a 160 |
 | `--color <#RRGGBB>` | cor do texto |
-| `--position top\|center\|bottom` | posição |
-| `--offset <%>` | ajuste fino da altura |
-| `--border <px>` · `--border-color <#RRGGBB>` | contorno |
+| `--position top\|center\|bottom` | posição: 20, 50 e 78 % da altura do quadro, como no protótipo |
+| `--offset <%>` | altura do centro da legenda, de 10 a 90 % do quadro |
+| `--border <px>` · `--border-color <#RRGGBB>` | contorno, de 0 a 12 px |
 | `--shadow none\|soft\|strong` | sombra |
-| `--reset` | volta ao estilo da igreja (Open Sans Bold, #FFD600, contorno preto, centro) |
+| `--reset` | volta ao estilo da igreja |
+
+- O estilo da igreja é o padrão: Open Sans Bold, 60 px, `#FFD600`, centro (altura 50 %),
+  contorno preto de 3 px e sombra suave.
+- `--position` leva a altura (`offset`) à da posição. `--offset` junto com `--position`
+  vence; `--offset` sozinho mantém o `position`.
+- As cores são aceitas em maiúsculas ou minúsculas e gravadas em maiúsculas.
+- O estilo fica gravado no corte; `--reset` apaga o gravado, e o corte volta a seguir o
+  padrão, ligado. Um estilo gravado incompleto é completado pelo padrão, e campos
+  desconhecidos são ignorados.
+- Alterar, ligar, desligar ou restaurar marca o corte como editado (`edited`), e
+  `sermon suggest` o mantém (§7.6). Não é tarefa nem toma a trava.
+- `invalid_argument`, sem mudar nada: valor fora da faixa (`details.min` e `details.max`),
+  cor fora de `#RRGGBB`, posição ou sombra fora dos valores, fonte que não está no pacote
+  (`details.choices` com as fontes), `--on` com `--off` e `--reset` com outra opção. Corte
+  inexistente: `not_found`.
+- No desenho, a legenda nunca sai do quadro: perto da borda, encosta nela.
+- Saída: o estilo inteiro, o mesmo `caption` de `cut show`. Sem `--json`, uma linha por
+  campo.
+
+```json
+{ "enabled": true, "font": "Open Sans Bold", "size": 60, "color": "#FFD600",
+  "position": "center", "offset": 50, "border": 3, "border_color": "#000000",
+  "shadow": "soft" }
+```
 
 ### 8.7. `cut render <id> [opções] [--estimate] [--wait]`
 

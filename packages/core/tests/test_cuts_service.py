@@ -8,6 +8,7 @@ from typing import Any
 
 import pytest
 
+from wordcut.cuts.caption import DEFAULT_CAPTION
 from wordcut.db import connect, cuts, sermons, transcripts
 from wordcut.db.cuts import NewCut, Segment
 from wordcut.db.sermons import NewSermon
@@ -144,7 +145,7 @@ def test_shown_cut_has_the_sermon_cut_fields_plus_assembly_and_default_style_and
             {"word_id": word[4], "text": "Deus", "start": 2.5, "end": 2.8, "corrected": None},
             {"word_id": word[0], "text": "Irmãos,", "start": 0.3, "end": 0.8, "corrected": None},
         ],
-        "caption": {},
+        "caption": DEFAULT_CAPTION.as_dict(),
         "render_options": {},
         "renders": [],
     }  # fmt: skip
@@ -163,7 +164,10 @@ def test_shown_cut_keeps_the_caption_style_and_export_options_stored_with_it(
 
     shown = show_cut(connection, cut_id)
 
-    assert (shown["caption"], shown["render_options"]) == ({"font_size": 72}, {"quality": "high"})
+    assert (shown["caption"], shown["render_options"]) == (
+        DEFAULT_CAPTION.as_dict(),
+        {"quality": "high"},
+    )
 
 
 def test_showing_a_cut_that_does_not_exist_is_not_found(connection: sqlite3.Connection) -> None:

@@ -107,6 +107,20 @@ def set_status(
     )
 
 
+def set_caption(
+    connection: sqlite3.Connection,
+    cut_id: int,
+    caption: dict[str, Any] | None,
+    updated_at: datetime,
+) -> None:
+    """Store the caption style of the cut, ``None`` meaning the default, in the caller's
+    transaction."""
+    connection.execute(
+        "UPDATE cuts SET caption = ?, updated_at = ? WHERE id = ?",
+        (None if caption is None else json.dumps(caption), updated_at.isoformat(), cut_id),
+    )
+
+
 def mark_edited(connection: sqlite3.Connection, cut_id: int, updated_at: datetime) -> None:
     """Record that someone changed the cut, which ``delete_unedited_suggestions`` then
     keeps, in the caller's transaction."""
