@@ -7,14 +7,16 @@ Ferramentas para transformar a transmissão de um culto em:
    sem hesitações nem pausas mortas, com a janela 9:16 acompanhando o pregador e legenda
    sincronizada por palavra.
 
-> Estado: em uso pela CLI `wordcut`, da live às exportações. A API e a web estão em
-> construção (roadmap, fases 2 e 3).
+> Estado: em uso pela CLI `wordcut`, da live às exportações. A API já tem as rotas de
+> pregações, tarefas e estado; o restante da API e a web estão em construção (roadmap, fases
+> 2 e 3).
 
 ## Documentação
 
 - [Constituição](docs/constitution.md): princípios e restrições de arquitetura.
 - [Requisitos](docs/requirements/features.md) e [protótipo](docs/prototype/wordcut.html).
 - [CLI](docs/cli.md): especificação dos comandos `wordcut`.
+- [API](docs/api.md): rotas HTTP, corpos, status e eventos de progresso.
 - [Arquitetura](docs/architecture/README.md) (C4 e fluxos) e [ADRs](docs/adr/README.md).
 - [Como contribuir](CONTRIBUTING.md), [segurança](SECURITY.md) e [changelog](CHANGELOG.md).
 - [Roadmap do MVP](specs/roadmap.md).
@@ -197,7 +199,8 @@ WORDCUT_DEV_EMAIL=admin@exemplo.org uv run uvicorn wordcut_api.app:create_app --
 A API identifica quem chama pelo token do Cloudflare Access (`WORDCUT_ACCESS_TEAM_DOMAIN` e
 `WORDCUT_ACCESS_AUD`). Sem o Access, `WORDCUT_DEV_EMAIL` fixa o e-mail de um membro da equipe,
 só em desenvolvimento; sem nenhum dos dois, toda rota menos `/api/health` dá 401
-([ADR-0019](docs/adr/0019-identidade-e-erros-na-api.md)).
+([ADR-0019](docs/adr/0019-identidade-e-erros-na-api.md)). As rotas estão em
+[docs/api.md](docs/api.md); em desenvolvimento, o esquema OpenAPI fica em `/api/docs`.
 
 ## Docker Compose
 

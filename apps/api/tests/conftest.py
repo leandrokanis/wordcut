@@ -7,18 +7,31 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable
+from contextlib import closing
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 import jwt
 import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
+from fastapi.testclient import TestClient
+
+from wordcut.db import connect
+from wordcut.home import Home
+from wordcut.service.members import add_member
+from wordcut.youtube import LiveInfo
+from wordcut_api import deps
+from wordcut_api.app import create_app
+from wordcut_api.settings import ApiSettings
 
 # The .invalid top-level domain never resolves (RFC 2606).
 TEAM_DOMAIN = "equipe.exemplo.invalid"
 AUDIENCE = "aud-de-teste"
 KEY_ID = "chave-1"
 TOKEN_LIFETIME_SECONDS = 300
+ASSISTANT_EMAIL = "assistente@exemplo.org"
+ADMIN_EMAIL = "admin@exemplo.org"
 
 Sign = Callable[..., str]
 
@@ -39,6 +52,34 @@ class StaticKeys:
 
     def public_key(self, kid: str) -> rsa.RSAPublicKey | None:
         return self.by_kid.get(kid)
+
+
+class NoYouTube:
+    def info(self, url: str) -> LiveInfo:
+        raise AssertionError("test reached YouTube; replace wordcut_api.deps.live_source")
+
+
+@pytest.fixture(autouse=True)
+def no_real_youtube(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A route reaches YouTube through ``deps.live_source``; no test may reach the real one."""
+    monkeypatch.setattr(deps, "live_source", NoYouTube)
+
+
+def member_client(home: Path, email: str, role: str) -> TestClient:
+    """A client of the API identified as ``email``, a member of the team with ``role``."""
+    with closing(connect(Home(home))) as connection:
+        add_member(connection, email, role)
+    return TestClient(create_app(settings=ApiSettings(dev_email=email)))
+
+
+@pytest.fixture
+def assistant(wordcut_home: Path) -> TestClient:
+    return member_client(wordcut_home, ASSISTANT_EMAIL, "assistant")
+
+
+@pytest.fixture
+def admin(wordcut_home: Path) -> TestClient:
+    return member_client(wordcut_home, ADMIN_EMAIL, "admin")
 
 
 @pytest.fixture(autouse=True)

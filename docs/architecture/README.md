@@ -109,7 +109,7 @@ flowchart LR
 | Sugestão de cortes | `wordcut.suggestion`: entrada (`request`: prompt do preset + formato da resposta; frases numeradas de 1 em diante, sem tempos), validação estrita do esquema (`response`), porta `SuggestionModel` com `OpenRouterModel` (`httpx`, toda falha vira `llm_error`) e `default_model(llm_model, key)`, que os testes substituem e que, como `processing.default_gateways`, recusa com `network_error` enquanto `WORDCUT_FORBID_NETWORK` estiver definida (`wordcut.network`; o `conftest.py` da raiz a define e a tarefa destacada a herda; ADR-0017); `suggest` confere modelo e chave (`llm_not_configured`), pede uma vez e mais uma em resposta fora do esquema, monta trechos e faixa contínua, descarta por duração estimada (×0,82) com aviso e grava os cortes `suggested`; tabela `cuts` (migração 0007, repositório `db.cuts`; `preset_id` com `ON DELETE SET NULL`) e `suggestion_error_code`/`suggestion_error_message` em `sermons`; `sermon show` e `list` trazem cortes e contagens reais (item 2.1.b.1; ADR-0010, ADR-0016); `service.suggestion.start_suggestion` lança a tarefa `suggest` (`wordcut.tasks.suggest`) depois de conferir pregação processada, preset, modelo e chave e a ausência de outra sugestão da pregação em andamento, e `suggest(..., replace_suggested=True)` troca, só no sucesso e numa transação, os `suggested` não editados pelos novos, recusando a gravação se a pregação foi reprocessada no meio (item 2.1.b.2) |
 | Exportação do corte | `wordcut.rendering`: `options` (as escolhas de docs/cli.md §8.7, os padrões, a validação e a mescla informado > salvo > padrão), `timeline` (os trechos pela posição das palavras, de `cuts.assembly`, limpos com `edit.timeline.Cleanup`: hesitações, gaguejos e pausas `original`, `natural` ou `short`), `estimate` (a duração sem abrir mídia, à taxa nominal de 30 quadros/s), `pipeline.render_cut` (montagem com ou sem emendas suavizadas, câmera, legendas com as correções por `word_id` e o estilo do corte escalado para 720×1280, codificação com resolução, CRF, normalização e fade, num temporário movido só no sucesso) e a porta `RenderGateways` com `LocalGateways`/`default_gateways()`, que os testes substituem (fixture `no_real_rendering`); tabela `renders` (migração 0009, repositório `db.renders`; `cut_id` com `ON DELETE CASCADE`) e `db.cuts.set_render_options`; arquivos em `media/cuts/<cut_id>/<render_id>.mp4` na pasta de dados (item 1.1.h.1; ADR-0018) |
 | CLI | contrato de saída e erros (ADR-0012), erro de uso sem repetir valor digitado (ADR-0015), `wordcut status`, `wordcut sermon create` (com `--process`), `list`, `show` (com `--transcript`), `trim` e `process`, `wordcut task list`, `show` e `wait`, `wordcut settings show`, `set`, `set-key` e `set-cookies` (segredo só pelo stdin; argumento sobrando recusado sem eco), `wordcut criteria list`, `wordcut preset list`, `show`, `create`, `update`, `set-default` e `delete`, `wordcut cut list`, `show`, `preview`, `choose`, `discard`, `restore`, `fix-word`, `caption` e `render` (com `--estimate` e `--wait`), `wordcut member list`, `add`, `set-role` e `remove`, `wordcut render list`, `show` e `download`, `wordcut sermon download` e `suggest` e o auxiliar de `--wait` dos comandos que lançam tarefa existem; todo comando segue o contrato; a CLI anterior saiu com o código que só ela usava (item `cli-migration`) |
-| API | `apps/api` (`wordcut_api`): `GET /api/health`, sem identificação e sem banco; identidade pelo Cloudflare Access (`identity`: JWT RS256 de `Cf-Access-Jwt-Assertion` com `aud`, `iss`, `exp` e `email`, chaves do time pela porta `KeySource` com `AccessKeys` em cache de 10 min e nova busca em `kid` desconhecido, atrás da guarda de rede); configuração por ambiente (`settings`: `WORDCUT_ACCESS_TEAM_DOMAIN`, `WORDCUT_ACCESS_AUD` e `WORDCUT_DEV_EMAIL`, só sem Access; Access pela metade recusa subir); papéis (`auth`: `CurrentMember` e `require(papel)`, papel por `service.members.role_of` numa conexão por requisição); erros (`errors`: `WordcutError` como `{"error": …}` com o status da saída, `unauthenticated` 401, `forbidden` 403, exceção inesperada 500 `internal_error`); `GET /api/me` devolve e-mail e papel (item 1.2.a.2; ADR-0009, ADR-0019); rotas de negócio planejadas (roadmap, fase 2) |
+| API | `apps/api` (`wordcut_api`): `GET /api/health`, sem identificação e sem banco; identidade pelo Cloudflare Access (`identity`: JWT RS256 de `Cf-Access-Jwt-Assertion` com `aud`, `iss`, `exp` e `email`, chaves do time pela porta `KeySource` com `AccessKeys` em cache de 10 min e nova busca em `kid` desconhecido, atrás da guarda de rede); configuração por ambiente (`settings`: `WORDCUT_ACCESS_TEAM_DOMAIN`, `WORDCUT_ACCESS_AUD` e `WORDCUT_DEV_EMAIL`, só sem Access; Access pela metade recusa subir); papéis (`auth`: `CurrentMember` e `require(papel)`, papel por `service.members.role_of` numa conexão por requisição); erros (`errors`: `WordcutError` como `{"error": …}` com o status da saída, `unauthenticated` 401, `forbidden` 403, exceção inesperada 500 `internal_error`); `GET /api/me` devolve e-mail e papel (item 1.2.a.2; ADR-0009, ADR-0019); rotas de pregações, tarefas e estado (`routes.sermons`, `routes.tasks`, `routes.status`; item 20a, ADR-0020): `POST/GET /api/sermons`, `GET/PATCH /api/sermons/{id}`, `POST /api/sermons/{id}/process`, `POST /api/sermons/{id}/suggest` (administrador), `GET /api/sermons/{id}/video`, `GET /api/tasks`, `GET /api/tasks/{id}`, `GET /api/tasks/{id}/events` (SSE por polling do banco, `sse`), `GET /api/status`, com conexão aberta e fechada no corpo da rota e o YouTube em `deps.live_source()`; requisição malformada dá 400 `invalid_argument` sem eco e rota inexistente 404 `not_found`; OpenAPI em `/api/docs` só em desenvolvimento ([docs/api.md](../api.md)); rotas de cortes, exportações, configurações, presets e equipe planejadas (roadmap, item 20b) |
 | Web | esqueleto em `apps/web` que mostra o estado da API; protótipo em `docs/prototype/wordcut.html`; interface planejada (roadmap, fase 3) |
 
 ## 5. Fluxos
@@ -282,3 +282,48 @@ sequenceDiagram
 Sem o Access configurado, `WORDCUT_DEV_EMAIL` faz o papel do token, só em desenvolvimento, e
 também passa por `role_of`
 ([ADR-0019](../adr/0019-identidade-e-erros-na-api.md)).
+
+### 5.5. Processar uma pregação pela web
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor A as Assistente
+  participant Web as web
+  participant API as api
+  participant SVC as core.service
+  participant Lock as processing.lock
+  participant DB as SQLite
+  participant Task as tarefa process
+
+  A->>Web: Processar
+  Web->>API: POST /api/sermons/{id}/process {"force": false}
+  API->>SVC: start_processing(home, id, live, force, detach=True)
+  SVC->>DB: pregação delimitada; live terminada
+  SVC->>Lock: flock exclusivo (não bloqueante)
+  alt ocupada
+    API-->>Web: 409 {"error": {"code": "busy"}}
+  else livre
+    SVC->>DB: pregação processing; tarefa running
+    SVC->>Task: processo destacado, herda a trava
+    API-->>Web: 202 {"task_id", "kind", "status", "sermon_id"}
+    Web->>API: GET /api/tasks/{task_id}/events (SSE)
+    API->>DB: 404 antes do fluxo se a tarefa não existe
+    loop a cada 0,5 s até o fim
+      API->>DB: show_task (reconcilia tarefa órfã)
+      opt progresso mudou
+        API-->>Web: event: progress (a tarefa)
+      end
+      opt 15 s sem evento
+        API-->>Web: : ping
+      end
+    end
+    Task->>DB: pregação processed; tarefa succeeded
+    API-->>Web: event: done (a tarefa, com result) e fecha o fluxo
+    Web->>Web: fecha o EventSource
+  end
+```
+
+Fechar a página só fecha o fluxo: a tarefa continua no processo dela. Uma falha termina em
+`event: failed`, com o objeto de erro em `error`
+([ADR-0020](../adr/0020-rotas-e-progresso-por-sse-na-api.md)).

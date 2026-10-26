@@ -23,3 +23,4 @@ Uma decisão por arquivo, no formato de Michael Nygard ([ADR-0001](0001-registra
 | [ADR-0017](0017-testes-sem-rede-real.md) | Testes sem rede real (complementa a ADR-0014 e a ADR-0016) | Aceita |
 | [ADR-0018](0018-exportacao-por-portas-sem-arquivo-parcial.md) | Exportação do corte por portas, sem arquivo parcial (complementa a ADR-0014 e a ADR-0017) | Aceita |
 | [ADR-0019](0019-identidade-e-erros-na-api.md) | Identidade e erros na API (complementa a ADR-0009 e a ADR-0012) | Aceita |
+| [ADR-0020](0020-rotas-e-progresso-por-sse-na-api.md) | Rotas e progresso por SSE na API (complementa a ADR-0019 e a ADR-0015) | Aceita |
