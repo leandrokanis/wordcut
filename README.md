@@ -10,7 +10,19 @@ Ferramentas para transformar a transmissão de um culto em:
 > Estado: em uso. As duas etapas funcionam de ponta a ponta; a primeira pregação processada
 > foi a de 2026-10-18.
 
-## Arquitetura
+## Documentação
+
+- [Constituição](docs/constitution.md): princípios e restrições de arquitetura.
+- [Requisitos](docs/requirements/features.md) e [protótipo](docs/prototype/wordcut.html).
+- [CLI](docs/cli.md): especificação dos comandos `wordcut`.
+- [Arquitetura](docs/architecture/README.md) (C4 e fluxos) e [ADRs](docs/adr/README.md).
+- [Como contribuir](CONTRIBUTING.md), [segurança](SECURITY.md) e [changelog](CHANGELOG.md).
+- [Roadmap do MVP](specs/roadmap.md).
+
+A aplicação web está em construção como monorepo orquestrado por Docker Compose
+(ADR-0002, ADR-0003). As seções abaixo descrevem o fluxo atual, pela CLI anterior.
+
+## Arquitetura atual
 
 O fluxo roda no host com GPU (ex.: "leitao"), conduzido por duas skills do Claude Code em
 `skills/`. O Mac só traz os vídeos prontos por `scp`.

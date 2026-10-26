@@ -1,5 +1,11 @@
 <!--
 Sync Impact Report
+- Versão: 2.0.2 → 3.0.0 — MAJOR (2026-10-26): monorepo com um projeto por aplicação,
+  orquestrado por Docker Compose; a web passa a ter contêiner próprio (o FastAPI não serve
+  mais a interface); decisões de arquitetura passam a ser ADRs (docs/adr/). Princípio V
+  redefinido (sai "um único processo servidor"). Fluxo de desenvolvimento ampliado (ADRs,
+  documentos de arquitetura, CONTRIBUTING.md). Decidida pelo administrador do projeto em
+  2026-10-26.
 - Versão: 2.0.1 → 2.0.2 — PATCH (2026-10-26): o projeto passa a se chamar Wordcut (título).
   Aprovada pelo administrador do projeto em 2026-10-26.
 - Versão: 2.0.0 → 2.0.1 — PATCH (2026-10-25): "roteiros sugeridos" passa a "cortes sugeridos" no
@@ -89,10 +95,10 @@ Razão: uma GPU, uma máquina pessoal, e resposta imediata onde a pessoa está e
 
 ### V. Simplicidade
 
-- Sem infraestrutura além do que a máquina já roda: nada de Redis, broker de filas ou banco
-  servidor enquanto o uso real não exigir. Se surgir a necessidade, ela é registrada como
-  emenda.
-- Um único processo servidor serve a API e a interface compilada.
+- Sem infraestrutura além do que a máquina já roda (Docker incluído): nada de Redis, broker
+  de filas ou banco servidor enquanto o uso real não exigir. Se surgir a necessidade, ela é
+  registrada como ADR e emenda.
+- Os serviços rodam em contêineres orquestrados por um único `compose.yaml`.
 - O projeto não tem compromisso de retrocompatibilidade com o formato antigo (pastas, `.json`
   e skills do Claude Code).
 
@@ -111,10 +117,13 @@ infraestrutura.
 
 ## Restrições técnicas
 
-- **Servidor:** Python ≥ 3.10 com FastAPI, reaproveitando os módulos de domínio existentes
-  (limpeza, câmera, legenda, renderização).
-- **Interface:** React com TypeScript, compilada com Vite e servida como arquivos estáticos
-  pelo FastAPI. O progresso das tarefas chega por SSE.
+- **Repositório:** monorepo com um projeto por aplicação (`packages/core`, `apps/cli`,
+  `apps/api`, `apps/web`), orquestrado por Docker Compose. A regra de negócio vive só no
+  `core` (ADR-0002, ADR-0003, ADR-0004).
+- **API:** Python ≥ 3.10 com FastAPI, sobre a camada de serviço do `core`, que reaproveita os
+  módulos de domínio existentes (limpeza, câmera, legenda, renderização).
+- **Interface:** React com TypeScript, compilada com Vite e servida por contêiner próprio na
+  mesma origem da API (ADR-0008). O progresso das tarefas chega por SSE.
 - **Dados:** SQLite para tudo o que não é mídia, inclusive as palavras transcritas. As mídias
   ficam no disco.
 - **Tarefas:** em segundo plano no próprio processo que as dispara (servidor ou CLI), sob a
@@ -124,10 +133,16 @@ infraestrutura.
 
 ## Fluxo de desenvolvimento
 
+- Regras de contribuição, código e comentários em `CONTRIBUTING.md`; boas práticas de clean
+  code e XP.
+- Toda decisão de arquitetura MUST virar ADR em `docs/adr/`, e os documentos de arquitetura
+  (`docs/architecture/`, C4 e diagramas de sequência) e o README MUST ser atualizados no
+  mesmo commit.
 - Testes de comportamento pela interface pública da camada de serviço. Toda funcionalidade
   nova chega com o comando de CLI e o teste correspondente.
 - Quality gates antes de integrar: `uv run pytest`, `uv run ruff check .`,
-  `uv run ruff format --check .` e `uv run mypy src` (strict), todos limpos. A interface tem o
+  `uv run ruff format --check .` e `uv run mypy` (strict) sobre os projetos Python, todos
+  limpos. A interface tem o
   equivalente em TypeScript (typecheck e lint).
 - Mensagens de commit em inglês, no imperativo. Texto voltado ao usuário em português.
 
@@ -142,4 +157,4 @@ infraestrutura.
   - PATCH: redação e esclarecimentos.
 - Uma emenda MUST ser revisada por uma pessoa diferente de quem a redigiu antes de valer.
 
-**Version**: 2.0.2 | **Ratified**: 2026-10-24 | **Last Amended**: 2026-10-26
+**Version**: 3.0.0 | **Ratified**: 2026-10-24 | **Last Amended**: 2026-10-26

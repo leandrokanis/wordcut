@@ -20,6 +20,14 @@ Definidas pelo administrador em 2026-10-26:
 - Testes nunca chamam serviço externo de verdade: YouTube, WhisperX, OpenRouter e
   renderização longa são dublês. Nenhum vídeo real é renderizado sem pedido explícito.
 - Segredos (chave do LLM, cookies) nunca são lidos, exibidos ou registrados.
+- Convenções de [CONTRIBUTING.md](../CONTRIBUTING.md): monorepo, clean code, XP, política de
+  comentários. Decisão de arquitetura nova vira ADR e atualiza `docs/architecture/` e o README
+  no mesmo commit.
+
+## Pendências do administrador
+
+- Instalar o NVIDIA Container Toolkit no host, para a GPU aparecer nos contêineres
+  (ADR-0003, ADR-0011). Sem ele, a transcrição só roda pela CLI no host.
 
 ## Ordem
 
@@ -27,6 +35,12 @@ CLI primeiro (constituição §II): ela cobre o fluxo inteiro e é a base que a 
 Depois o servidor e, por fim, a interface, seguindo o protótipo
 ([docs/prototype/wordcut.html](../docs/prototype/wordcut.html)) e a especificação da CLI
 ([docs/cli.md](../docs/cli.md)).
+
+### Fase 0 — Estrutura
+
+| # | ID | Item | Cobre | Estado |
+|:-:|---|---|---|---|
+| 0 | monorepo | Monorepo (`packages/core`, `apps/cli`, `apps/api`, `apps/web`), workspace `uv`, Docker Compose | ADR-0002, ADR-0003 | ☐ |
 
 ### Fase 1 — Camada de serviço e CLI
 
@@ -55,8 +69,8 @@ Depois o servidor e, por fim, a interface, seguindo o protótipo
 
 | # | ID | Item | Cobre | Estado |
 |:-:|---|---|---|---|
-| 19 | 1.2.a.2 | `wordcut serve`, identidade pelo Cloudflare Access e papéis | — | ☐ |
-| 20 | web-api | API HTTP sobre a camada de serviço e progresso das tarefas por SSE | — | ☐ |
+| 19 | 1.2.a.2 | App `api`: FastAPI no Compose, identidade pelo Cloudflare Access e papéis | — | ☐ |
+| 20 | web-api | Rotas da API sobre a camada de serviço e progresso das tarefas por SSE | — | ☐ |
 
 ### Fase 3 — Interface web (React + Vite + TypeScript)
 
