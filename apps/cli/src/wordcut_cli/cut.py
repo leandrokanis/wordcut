@@ -1,5 +1,5 @@
-"""``wordcut cut <action>``: see and preview the suggested cuts of a sermon and choose,
-discard or restore them (docs/cli.md §8.1–§8.4)."""
+"""``wordcut cut <action>``: see and preview the suggested cuts of a sermon, choose, discard
+or restore them and fix the spelling of their caption words (docs/cli.md §8.1–§8.5)."""
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any
 from wordcut.service.cuts import (
     choose_cut,
     discard_cut,
+    fix_word,
     list_cuts,
     preview_cut,
     restore_cut,
@@ -30,7 +31,11 @@ STATE_NAMES = {"suggested": "sugerido", "chosen": "escolhido", "discarded": "des
 
 
 def register(commands: Commands) -> None:
-    actions = add_group(commands, "cut", help="cortes: ver, escolher, descartar e restaurar")
+    actions = add_group(
+        commands,
+        "cut",
+        help="cortes: ver, escolher, descartar, restaurar e corrigir a grafia da legenda",
+    )
     listing = add_command(
         actions,
         "list",
@@ -80,6 +85,18 @@ def register(commands: Commands) -> None:
             example=f"wordcut cut {name} 34 --json",
         )
         transition.add_argument("id", type=int, help="ID do corte")
+    fix = add_command(
+        actions,
+        "fix-word",
+        help="corrige a grafia de uma palavra da legenda, só neste corte; só aceita uma"
+        " palavra parecida com a original, e o texto original remove a correção",
+        run=_fix_word,
+        render=_render_fixed_word,
+        example="wordcut cut fix-word 34 1204 Jesus --json",
+    )
+    fix.add_argument("id", type=int, help="ID do corte")
+    fix.add_argument("word_id", type=int, help="ID da palavra, como no cut show")
+    fix.add_argument("text", help="a palavra com a grafia corrigida")
 
 
 def _list(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:
@@ -95,6 +112,16 @@ def _show(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:
 def _preview(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:
     with closing(deps.connection()) as connection:
         return preview_cut(connection, args.id)
+
+
+def _fix_word(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:
+    with closing(deps.connection()) as connection:
+        return fix_word(connection, args.id, args.word_id, args.text)
+
+
+def _render_fixed_word(word: dict[str, Any]) -> str:
+    fix = "sem correção" if word["corrected"] is None else f"corrigida para {word['corrected']}"
+    return f"Palavra {word['word_id']} do corte {word['cut_id']} ({word['text']}): {fix}."
 
 
 def _change(

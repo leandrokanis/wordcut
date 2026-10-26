@@ -120,6 +120,19 @@ Formato de [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões
   `out_of_order`, verdadeiro no trecho que começa antes do fim do trecho anterior; mais
   `cut_id` e a duração do `cut show`. Sem `--json`, uma linha por trecho com `↑` no que
   volta no tempo. Corte inexistente dá `not_found`.
+- `wordcut cut fix-word <id> <word_id> <texto>` (item 1.1.f.2): corrige a grafia de uma
+  palavra da legenda, só naquele corte (tabela `word_fixes`, migração 0008, com as duas
+  chaves estrangeiras em `ON DELETE CASCADE`). A trava de grafia (`wordcut.cuts.spelling`,
+  item 1.1.f.3) compara sempre com a palavra original o núcleo das duas (minúsculas, só
+  letras, números e hífen) e aceita distância de Levenshtein até
+  `max(1, floor(0,34 × tamanho do núcleo original))`; acima disso, `spelling_too_different`
+  (saída 5) com `details.distance`, `details.limit` e `details.original`, e nada muda. O
+  texto original remove a correção. Texto vazio ou com mais de uma palavra e palavra fora
+  dos trechos do corte dão `invalid_argument` (`details.argument` `text` ou `word_id`), sem
+  repetir o texto digitado. Devolve a palavra como o `cut show` a dá, mais `cut_id`; a
+  correção marca o corte como editado, e o `sermon suggest` o mantém. `cut list`, `cut show`
+  (`text`, `segments[].text` e `words[].corrected`) e `cut preview` passam a trazer as
+  correções; `words[].text` segue com o original.
 
 ### Alterado
 

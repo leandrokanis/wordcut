@@ -107,6 +107,15 @@ def set_status(
     )
 
 
+def mark_edited(connection: sqlite3.Connection, cut_id: int, updated_at: datetime) -> None:
+    """Record that someone changed the cut, which ``delete_unedited_suggestions`` then
+    keeps, in the caller's transaction."""
+    connection.execute(
+        "UPDATE cuts SET edited = 1, updated_at = ? WHERE id = ?",
+        (updated_at.isoformat(), cut_id),
+    )
+
+
 def counts_of(connection: sqlite3.Connection, sermon_id: int) -> dict[str, int]:
     """How many cuts of the sermon are in each state; a state without cuts is left out."""
     found = connection.execute(
