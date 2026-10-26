@@ -17,3 +17,4 @@ Uma decisão por arquivo, no formato de Michael Nygard ([ADR-0001](0001-registra
 | [ADR-0011](0011-transcricao-whisperx-local.md) | Transcrição com WhisperX na GPU local | Aceita |
 | [ADR-0012](0012-contrato-da-cli.md) | Contrato de saída e erros da CLI | Aceita |
 | [ADR-0013](0013-trava-herdada-pelo-processo-da-tarefa.md) | Trava herdada pelo processo da tarefa (complementa a ADR-0007) | Aceita |
+| [ADR-0014](0014-processamento-por-portas-e-estado-na-leitura.md) | Processamento da pregação por portas, com o estado conferido na leitura | Aceita |

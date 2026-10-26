@@ -50,7 +50,7 @@ Depois o servidor e, por fim, a interface, seguindo o protótipo
 | 2 | 1.1.a.1 | `sermon create`, `list`, `show` | 1.1.a.2 | ☑ |
 | 3 | 1.1.b.2 | `sermon trim` | — | ☑ |
 | 4 | 3.1.a.2 | Tarefas: processo destacado, `--wait`, `task list/show/wait` | — | ☑ |
-| 5 | 1.1.c.1 | `sermon process`: baixar a faixa, transcrever, cortar em 16:9, palavras no SQLite | 1.1.c.2, 1.1.c.3, 1.1.b.3 | ☐ |
+| 5 | 1.1.c.1 | `sermon process`: baixar a faixa, transcrever, cortar em 16:9, palavras no SQLite | 1.1.c.2, 1.1.c.3, 1.1.b.3 | ☑ |
 | 6 | 1.1.d.1 | `sermon download` | — | ☐ |
 | 7 | 2.1.a.1 | `settings`: modelo, chave e cookies pelo stdin, modelo do WhisperX | — | ☐ |
 | 8 | 2.1.a.2 | Critérios no pacote, `criteria list` e `preset` | 2.1.a.3 | ☐ |
@@ -92,3 +92,4 @@ Depois o servidor e, por fim, a interface, seguindo o protótipo
 | 2 1.1.a.1 | PASS na rodada 1 | (ver git log) | Erro de cookies ausentes passou a `youtube_error` sem caminho (decisão 2). |
 | 3 1.1.b.2 | PASS na rodada 1 | (ver git log) | `parse_timestamp` ficou estrito (vale também para os comandos antigos). Criação com bordas valida antes do insert; falha entre os dois commits deixaria pregação `created` sem bordas (aceito). |
 | 4 3.1.a.2 | PASS na rodada 1 | (ver git log) | ADR-0013 (trava herdada). Ordem "solta a trava antes do estado final" está no código, mas sem teste que pegue a inversão (janela de microssegundos). |
+| 5 1.1.c.1 | PASS na rodada 3 | (ver git log) | ADR-0014. Rodadas 1–2 PARCIAL: revalidação no `admit` e `failed` gravado no erro (inclusive exceção inesperada). Processamento real (YouTube + WhisperX) ainda não exercitado fora dos dublês. |

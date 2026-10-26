@@ -189,12 +189,12 @@ Comandos longos escrevem o progresso no stderr, uma linha por etapa ou atualiza�
 | Saída | Nome | Significado |
 |:-:|---|---|
 | 0 | — | sucesso |
-| 1 | `internal_error`, `interrupted` | erro interno inesperado; tarefa interrompida |
+| 1 | `internal_error`, `interrupted`, `processing_error` | erro interno inesperado; tarefa interrompida; processamento sem resultado (§5.3) |
 | 2 | `invalid_argument` | uso inválido: argumento faltando, mal formado ou fora da faixa |
 | 3 | `not_found` | recurso inexistente |
 | 4 | `busy` | máquina ocupada pela trava de processamento |
 | 5 | regra violada | a operação contraria uma regra de negócio (§5.3) |
-| 6 | falha externa | YouTube, OpenRouter ou rede falharam (§5.3) |
+| 6 | falha externa | YouTube, OpenRouter, rede ou transcrição falharam (§5.3) |
 | 130 | — | interrompido pelo usuário (Ctrl+C) |
 
 ### 5.2. Objeto de erro
@@ -224,6 +224,7 @@ Sem `--json`, o `message` vai para o stderr.
 |---|:-:|---|
 | `internal_error` | 1 | falha não prevista |
 | `interrupted` | 1 | a tarefa parou antes do fim: Ctrl+C durante `--wait` ou processo da tarefa morto (§6.5) |
+| `processing_error` | 1 | o processamento não achou palavra dentro das bordas, ou o vídeo baixado não cobre a pregação; nada é gravado |
 | `invalid_argument` | 2 | argumento inválido; `details.argument` diz qual |
 | `not_found` | 3 | ID ou e-mail inexistente |
 | `busy` | 4 | outra tarefa segura a trava; `details` traz a tarefa |
@@ -238,6 +239,7 @@ Sem `--json`, o `message` vai para o stderr.
 | `youtube_error` | 6 | falha ao consultar ou baixar do YouTube |
 | `llm_error` | 6 | falha do LLM depois da nova tentativa (constituição §III) |
 | `network_error` | 6 | falha de rede genérica |
+| `transcription_error` | 6 | falha da transcrição: ambiente do WhisperX ausente, GPU ou processo de transcrição |
 
 Códigos novos MAY ser acrescentados; os existentes MUST NOT mudar de saída.
 
@@ -305,7 +307,10 @@ Cria a pregação a partir do link da live e devolve título, data do culto e du
 - `--start`/`--end`: delimita na criação, como `sermon trim`; os dois juntos ou nenhum. Bordas
   recusadas MUST NOT deixar pregação criada. Para um vídeo que já tem pregação, delimita a
   existente, com as mesmas regras e aviso de `sermon trim`, e devolve `"created": false`.
-- `--process`: em seguida processa, como `sermon process`; exige `--start` e `--end`.
+- `--process`: em seguida processa, como `sermon process`; exige `--start` e `--end`
+  (`invalid_argument` sem criar nada). Sem `--wait`, devolve a tarefa (§6.2); com ele, a
+  pregação processada. Se o processamento for recusado (live no ar, pregação já processada),
+  a pregação criada e delimitada permanece. `--wait` sem `--process` é `invalid_argument`.
 
 ```
 wordcut sermon create https://youtube.com/live/… --start 1:02:10 --end 1:48:30 --process --wait
@@ -314,9 +319,20 @@ wordcut sermon create https://youtube.com/live/… --start 1:02:10 --end 1:48:30
 ### 7.2. `sermon list [--status S]` · `sermon show <id> [--transcript]`
 
 - `list`: ID, título, data, duração da pregação, estado e quantidade de cortes por estado.
-- `show`: os mesmos dados, mais as bordas na live, a última tarefa e os cortes.
+- `show`: os mesmos dados, mais as bordas na live (`live_start`, `live_end`), as bordas
+  ajustadas às palavras pelo processamento (`sermon_start`, `sermon_end`, em tempo da live;
+  `null` antes de processar), `processed_at`, a última tarefa da pregação (`last_task`, no
+  formato de `task show`, ou `null`) e os cortes.
 - `--transcript`: acrescenta a transcrição, uma frase por linha, com ID da frase, tempo e IDs
-  da primeira e da última palavra.
+  da primeira e da última palavra. No JSON, `sentences`, em ordem e em tempo da pregação:
+
+```json
+{ "sentences": [ { "id": 41, "start": 0.3, "end": 1.3, "text": "Irmãos, graça e paz.",
+                   "first_word_id": 803, "last_word_id": 806 } ] }
+```
+
+- `list` e `show` conferem o estado: uma pregação `processing` cuja tarefa morreu (§6.5) é
+  mostrada e gravada `failed`.
 
 ### 7.3. `sermon trim <id> --start T --end T`
 
@@ -330,12 +346,18 @@ Define as bordas da pregação, em tempo da live (1.1.b.2).
 ### 7.4. `sermon process <id> [--force] [--wait]`
 
 Tarefa com trava (1.1.c): baixa só a faixa delimitada, transcreve na GPU local, corta em 16:9 e
-pede as sugestões ao LLM com o preset padrão (2.1.b.1).
+pede as sugestões ao LLM com o preset padrão (2.1.b.1). A sugestão pelo LLM chega no item 9
+do roadmap; até lá, o processamento termina ao gravar palavras e frases.
 
-- Exige bordas (`sermon_not_trimmed`) e live terminada (`live_not_finished`).
+- Exige bordas (`sermon_not_trimmed`) e live terminada (`live_not_finished`). Uma pregação
+  criada com a live no ar é consultada de novo no YouTube antes da recusa.
 - Numa pregação já processada, MUST exigir `--force`, porque os cortes e suas edições são
   refeitos (1.1.b.3); sem ele, `would_discard_edits`.
 - Uma pregação `failed` é refeita pelo mesmo comando (1.1.c.3).
+- A pregação fica `processing` desde o lançamento e termina `processed` ou `failed`.
+- Etapas no progresso: `baixando`, `sincronizando`, `transcrevendo`, `cortando`, `gravando`.
+- Com `--wait`, devolve a pregação como `sermon show`. O resultado gravado na tarefa, que
+  `task wait` devolve, é o mesmo objeto sem `last_task`.
 
 ### 7.5. `sermon download <id> [-o caminho]`
 
@@ -551,6 +573,7 @@ A CLI também roda no contêiner: `docker compose run --rm cli <comando>`.
 | O quê | Onde | Observação |
 |---|---|---|
 | Banco (SQLite) e mídias | `~/.local/share/wordcut/` | sobrescrito por `WORDCUT_HOME`; nos contêineres, o volume de dados |
+| Mídias de uma pregação | `media/sermons/<id>/` na pasta de dados | `sermon.mp4`; intermediários em `work/`, apagados no sucesso |
 | Saída dos processos de tarefa | `tasks/<id>.log` na pasta de dados | traz o rastreio de um erro interno; permissão 600 |
 | Segredos (chave do LLM, cookies) | `~/.config/wordcut/` | permissão 600 |
 | Demais configurações, presets e equipe | no SQLite | — |

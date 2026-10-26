@@ -35,7 +35,7 @@ def test_migration_creates_the_tasks_table_with_every_task_field(tmp_path: Path)
         columns = {row[1] for row in connection.execute("PRAGMA table_info(tasks)")}
         version = connection.execute("PRAGMA user_version").fetchone()[0]
 
-    assert (columns, version) == (TASK_COLUMNS, 3)
+    assert (columns, version >= 3) == (TASK_COLUMNS, True)
 
 
 def test_database_in_schema_2_keeps_its_sermons_when_migrated(tmp_path: Path) -> None:

@@ -8,7 +8,7 @@ import sys
 import threading
 import time
 import traceback
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import closing, contextmanager
 from dataclasses import dataclass
 from datetime import datetime
@@ -46,10 +46,12 @@ def start(
     *,
     detach: bool,
     on_progress: ProgressListener | None = None,
+    admit: Callable[[], None] | None = None,
 ) -> TaskRow:
     """Start a task of ``kind_name`` on ``resource``.
 
-    A kind that needs the lock raises ``busy`` before any task is recorded. With ``detach``,
+    A kind that needs the lock raises ``busy`` before any task is recorded. ``admit`` runs
+    next, under the lock: what it raises refuses the task before it is recorded. With ``detach``,
     a process in a session of its own runs the task and the running task returns at once.
     Otherwise the task runs here, ``on_progress`` hears its progress, and the succeeded task
     returns; a failure raises its ``WordcutError``, and Ctrl+C raises ``KeyboardInterrupt``
@@ -57,6 +59,8 @@ def start(
     """
     task_kind = kind(kind_name)
     with _lock_for(home, task_kind, resource) as held:
+        if admit is not None:
+            admit()
         task = _create(home, task_kind, resource, params)
         if held is not None:
             held.assign(task.id)

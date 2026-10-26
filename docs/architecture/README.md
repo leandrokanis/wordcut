@@ -71,6 +71,7 @@ flowchart LR
     DB["db<br/>SQLite + migrações"]
     LOCK["lock<br/>trava global"]
     TASK["tasks<br/>processo destacado"]
+    PROC["processing<br/>pipeline + ProcessingGateways"]
     DOM["domínio<br/>youtube, asr, edit, vertical"]
   end
   CLI --> SVC
@@ -80,6 +81,8 @@ flowchart LR
   SVC --> TASK
   SVC --> DOM
   SVC --> ERR
+  TASK --> PROC
+  PROC --> DOM
 ```
 
 ## 4. Estado da implementação
@@ -91,9 +94,10 @@ flowchart LR
 | Domínio (`youtube`, `asr`, `edit`, `vertical`) | existe em `packages/core`, herdado da CLI anterior |
 | Erros (`errors`), raiz de dados (`home`), banco com migrações (`db`), trava global (`lock`) | existe em `packages/core` (item 3.1.a.3; ADR-0005, ADR-0006) |
 | Tabela `sermons` (migração 0002, repositório `db.sermons`) e pasta de segredos (`config`, `WORDCUT_CONFIG`) | existe em `packages/core` (item 1.1.a.1) |
-| Camada de serviço | `service.status` (trava e tarefas em andamento), `service.sermons` (criar a pregação pelo link, listar e detalhar; item 1.1.a.1) e `service.tasks` (listar, detalhar e esperar tarefas; item 3.1.a.2) existem; as demais operações em construção (roadmap, fase 1) |
-| Tarefas | tabela `tasks` (migração 0003) e `wordcut.tasks`: registro de tipos, execução em primeiro plano ou em processo destacado que herda a trava (`wordcut.tasks.runner`, saída em `tasks/<id>.log`), progresso no banco e tarefa órfã marcada `interrupted` na leitura; o tipo interno `diagnostic` exercita o mecanismo; os tipos `process`, `render` e `suggest` chegam com as operações (item 3.1.a.2; ADR-0007, ADR-0013) |
-| CLI | contrato de saída e erros (ADR-0012), `wordcut status`, `wordcut sermon create`, `list` e `show`, `wordcut task list`, `show` e `wait` e o auxiliar de `--wait` dos comandos que lançam tarefa existem; os comandos da CLI anterior seguem no mesmo executável, com saída e erros de execução fora do contrato (o erro de uso segue o contrato), até o item `cli-migration`; os demais comandos de `docs/cli.md` em construção (roadmap, fase 1) |
+| Camada de serviço | `service.status` (trava e tarefas em andamento), `service.sermons` (criar a pregação pelo link, listar, detalhar com a última tarefa e a transcrição, delimitar e reconciliar a pregação `processing` órfã; itens 1.1.a.1, 1.1.b, 1.1.c.1), `service.processing` (lançar o processamento; item 1.1.c.1) e `service.tasks` (listar, detalhar e esperar tarefas; item 3.1.a.2) existem; as demais operações em construção (roadmap, fase 1) |
+| Tarefas | tabela `tasks` (migração 0003) e `wordcut.tasks`: registro de tipos, execução em primeiro plano ou em processo destacado que herda a trava (`wordcut.tasks.runner`, saída em `tasks/<id>.log`), gancho `admit` sob a trava antes de gravar a tarefa, progresso no banco e tarefa órfã marcada `interrupted` na leitura; o tipo interno `diagnostic` exercita o mecanismo; o tipo `process` existe (item 1.1.c.1); `render` e `suggest` chegam com as operações (item 3.1.a.2; ADR-0007, ADR-0013, ADR-0014) |
+| Processamento da pregação | `wordcut.processing`: `pipeline.process` (baixa só a faixa e uma janela de áudio, sincroniza, transcreve, ajusta as bordas às palavras e corta com fades), frases (`processing.sentences`, reaproveitadas por `overview`) e a porta `ProcessingGateways` com `LocalGateways`/`default_gateways`; tabelas `words` e `sentences` e colunas `sermon_start`, `sermon_end`, `video_path`, `processed_at` em `sermons` (migração 0004, repositório `db.transcripts`); mídias em `media/sermons/<id>/` na pasta de dados; a sugestão de cortes pelo LLM ao fim chega no item 9 (item 1.1.c.1; ADR-0014) |
+| CLI | contrato de saída e erros (ADR-0012), `wordcut status`, `wordcut sermon create` (com `--process`), `list`, `show` (com `--transcript`), `trim` e `process`, `wordcut task list`, `show` e `wait` e o auxiliar de `--wait` dos comandos que lançam tarefa existem; os comandos da CLI anterior seguem no mesmo executável, com saída e erros de execução fora do contrato (o erro de uso segue o contrato), até o item `cli-migration`; os demais comandos de `docs/cli.md` em construção (roadmap, fase 1) |
 | API | esqueleto em `apps/api` com `GET /api/health`; rotas planejadas (roadmap, fase 2) |
 | Web | esqueleto em `apps/web` que mostra o estado da API; protótipo em `docs/prototype/wordcut.html`; interface planejada (roadmap, fase 3) |
 
@@ -111,19 +115,22 @@ sequenceDiagram
   participant Child as processo destacado
   participant Lock as processing.lock
   participant YT as YouTube
+  participant ASR as WhisperX + ffmpeg
 
   Op->>CLI: sermon create <link> --start T --end T
   CLI->>SVC: create_sermon(link, start, end)
   SVC->>YT: dados da live
-  SVC->>DB: grava a pregação
+  SVC->>DB: grava a pregação delimitada
   SVC-->>CLI: pregação (id, título, duração)
   Op->>CLI: sermon process <id>
-  CLI->>SVC: start_process(id)
+  CLI->>SVC: start_processing(id)
+  SVC->>DB: pré-condições (bordas, live terminada, --force)
   SVC->>Lock: flock exclusivo (não bloqueante)
   alt trava ocupada
     SVC-->>CLI: WordcutError busy
     CLI-->>Op: saída 4
   else livre
+    SVC->>DB: revalida e grava a pregação processing (gancho admit)
     SVC->>DB: tarefa running (PID do lançador)
     SVC->>Lock: dono = task_id
     SVC->>Child: lança em sessão própria (herda o descritor da trava)
@@ -132,9 +139,11 @@ sequenceDiagram
     SVC-->>CLI: task_id
     CLI-->>Op: {"task_id": …}
     Child->>Lock: dono = PID do filho
-    Child->>YT: baixa só a faixa
-    Child->>Child: transcreve, corta 16:9, pede sugestões
-    Child->>DB: palavras e cortes
+    Child->>DB: confirma processing; com --force, apaga palavras e frases
+    Child->>YT: baixa só a faixa e a janela de áudio
+    Child->>ASR: sincroniza, transcreve a faixa, corta 16:9 com fades
+    Child->>DB: palavras, frases e processed (uma transação)
+    Note over Child: a sugestão de cortes pelo LLM chega no item 9
     Child->>Lock: libera
     Child->>DB: tarefa succeeded
   end
@@ -142,7 +151,9 @@ sequenceDiagram
 
 O lançador trava antes de criar a tarefa e o filho herda a trava; o filho a solta antes de
 gravar o fim, para que `task wait` termine com a máquina livre
-([ADR-0013](../adr/0013-trava-herdada-pelo-processo-da-tarefa.md)).
+([ADR-0013](../adr/0013-trava-herdada-pelo-processo-da-tarefa.md)). A pregação fica
+`processing` desde o lançamento; se o processo morrer, a próxima leitura a deixa `failed`
+([ADR-0014](../adr/0014-processamento-por-portas-e-estado-na-leitura.md)).
 
 ### 5.2. Exportar um corte pela web
 

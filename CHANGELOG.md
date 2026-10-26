@@ -33,9 +33,26 @@ Formato de [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões
   trava e as tarefas em andamento, e o `busy` traz o `task_id` nos `details`.
 - Código de erro `interrupted` (saída 1): tarefa interrompida por Ctrl+C ou cujo processo
   morreu; uma tarefa `running` sem processo vivo vira `failed` na próxima leitura.
+- `wordcut sermon process <id> [--force] [--wait]` (tarefa `process`, com trava; ADR-0014):
+  baixa só a faixa delimitada (com 30 s de margem) e uma janela curta de áudio para a
+  sincronia, transcreve, ajusta as bordas à primeira e à última palavra, corta em 16:9 com
+  fades em `media/sermons/<id>/sermon.mp4` e grava palavras e frases em tempo da pregação
+  (migração 0004: tabelas `words` e `sentences`; `sermon_start`, `sermon_end`, `video_path` e
+  `processed_at` na pregação). A pregação fica `processing` desde o lançamento e termina
+  `processed` ou `failed`; `failed` é refeita pelo mesmo comando, e uma pregação processada
+  exige `--force` (`would_discard_edits`). Progresso no stderr por etapa.
+- `sermon create … --start T --end T --process [--wait]`: cria, delimita e processa num
+  comando.
+- `sermon show <id> --transcript`: as frases da pregação, com ID, tempo e IDs da primeira e
+  da última palavra. `sermon show` passa a trazer `sermon_start`, `sermon_end`,
+  `processed_at` e a última tarefa (`last_task`); `show` e `list` deixam `failed` a pregação
+  `processing` cujo processo morreu.
+- Códigos de erro `transcription_error` (saída 6) e `processing_error` (saída 1).
 
 ### Alterado
 
+- `overview` passa a quebrar as frases com o mesmo módulo do processamento
+  (`wordcut.processing.sentences`), sem mudar a saída.
 - Tempos (`T`) aceitam só dígitos: minutos e segundos depois do primeiro componente ficam
   abaixo de 60, e valores como `inf`, `nan`, `1e3` ou negativos são recusados.
 - O projeto passa a se chamar Wordcut; executável `wordcut`, pacote `wordcut`.

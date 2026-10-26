@@ -14,7 +14,7 @@ from typing import Any
 
 from wordcut.home import Home
 
-BUILTIN_KIND_MODULES = ("wordcut.tasks.diagnostic",)
+BUILTIN_KIND_MODULES = ("wordcut.tasks.diagnostic", "wordcut.tasks.process")
 
 Result = dict[str, Any]
 

@@ -18,7 +18,9 @@ EXIT_CODE_BY_ERROR_CODE = {
     "youtube_error": 6,
     "llm_error": 6,
     "network_error": 6,
+    "transcription_error": 6,
     "interrupted": 1,
+    "processing_error": 1,
 }
 
 

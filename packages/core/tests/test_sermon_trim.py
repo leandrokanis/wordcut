@@ -1,6 +1,6 @@
 import sqlite3
 from collections.abc import Iterator
-from contextlib import closing
+from contextlib import closing, contextmanager
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -10,6 +10,7 @@ import pytest
 from wordcut.db import connect
 from wordcut.errors import WordcutError
 from wordcut.home import Home
+from wordcut.lock import ProcessingLock
 from wordcut.service.sermons import create_sermon, list_sermons, show_sermon, trim_sermon
 from wordcut.youtube import LiveInfo
 
@@ -37,6 +38,12 @@ class FakeLive:
         return self.answer
 
 
+def home_of(connection: sqlite3.Connection) -> Home:
+    """The data folder of the database ``connection`` is open on."""
+    [(_, _, database)] = connection.execute("PRAGMA database_list").fetchall()
+    return Home(Path(database).parent)
+
+
 @pytest.fixture
 def connection(tmp_path: Path) -> Iterator[sqlite3.Connection]:
     with closing(connect(Home(tmp_path))) as opened:
@@ -49,11 +56,19 @@ def put_in_state(connection: sqlite3.Connection, sermon_id: int, status: str) ->
         connection.execute("UPDATE sermons SET status = ? WHERE id = ?", (status, sermon_id))
 
 
+@contextmanager
+def being_processed(connection: sqlite3.Connection, sermon_id: int) -> Iterator[None]:
+    """The sermon ``processing`` with the lock held for it, as while its task runs."""
+    with ProcessingLock(home_of(connection)).acquire("process", f"sermon {sermon_id}"):
+        put_in_state(connection, sermon_id, "processing")
+        yield
+
+
 def failure_of(connection: sqlite3.Connection, sermon_id: int, start: float, end: float) -> Any:
     """The error of a trim that must fail, and the sermon as shown after it."""
     with pytest.raises(WordcutError) as raised:
         trim_sermon(connection, sermon_id, start, end, now=TRIMMED_AT)
-    return raised.value, show_sermon(connection, sermon_id)
+    return raised.value, show_sermon(connection, sermon_id, home=home_of(connection))
 
 
 @pytest.fixture
@@ -66,7 +81,7 @@ def test_trimming_a_created_sermon_records_the_borders_and_makes_it_trimmed(
 ) -> None:
     trim_sermon(connection, sermon["id"], 3730.0, 6510.0, now=TRIMMED_AT)
 
-    shown = show_sermon(connection, sermon["id"])
+    shown = show_sermon(connection, sermon["id"], home=home_of(connection))
     assert (shown["status"], shown["live_start"], shown["live_end"]) == (
         "trimmed",
         3730.0,
@@ -88,10 +103,10 @@ def test_trimming_an_unknown_sermon_is_not_found(connection: sqlite3.Connection)
 def test_trimming_a_sermon_being_processed_is_busy_and_changes_nothing(
     connection: sqlite3.Connection, sermon: dict[str, Any]
 ) -> None:
-    put_in_state(connection, sermon["id"], "processing")
-    before = show_sermon(connection, sermon["id"])
+    with being_processed(connection, sermon["id"]):
+        before = show_sermon(connection, sermon["id"], home=home_of(connection))
 
-    error, after = failure_of(connection, sermon["id"], 3730.0, 6510.0)
+        error, after = failure_of(connection, sermon["id"], 3730.0, 6510.0)
 
     assert (error.code, error.exit_code, after) == ("busy", 4, before)
 
@@ -100,7 +115,7 @@ def test_trimming_a_sermon_being_processed_is_busy_and_changes_nothing(
 def test_range_shorter_than_a_minute_is_too_short_and_changes_nothing(
     connection: sqlite3.Connection, sermon: dict[str, Any], start: float, end: float
 ) -> None:
-    before = show_sermon(connection, sermon["id"])
+    before = show_sermon(connection, sermon["id"], home=home_of(connection))
 
     error, after = failure_of(connection, sermon["id"], start, end)
 
@@ -127,7 +142,7 @@ def test_range_of_exactly_one_minute_is_accepted(
 def test_borders_outside_the_live_or_out_of_order_are_invalid_and_change_nothing(
     connection: sqlite3.Connection, sermon: dict[str, Any], start: float, end: float
 ) -> None:
-    before = show_sermon(connection, sermon["id"])
+    before = show_sermon(connection, sermon["id"], home=home_of(connection))
 
     error, after = failure_of(connection, sermon["id"], start, end)
 
@@ -185,7 +200,7 @@ def test_trimming_a_processed_sermon_keeps_it_processed_and_asks_for_a_reprocess
 
     trimmed = trim_sermon(connection, sermon["id"], 3730.0, 6510.0, now=TRIMMED_AT)
 
-    shown = show_sermon(connection, sermon["id"])
+    shown = show_sermon(connection, sermon["id"], home=home_of(connection))
     assert (
         shown["status"],
         shown["live_start"],
@@ -204,7 +219,7 @@ def test_trimmed_sermon_is_answered_as_shown_with_the_duration_between_its_borde
 ) -> None:
     trimmed = trim_sermon(connection, sermon["id"], 3730.0, 6510.0, now=TRIMMED_AT)
 
-    shown = show_sermon(connection, sermon["id"])
+    shown = show_sermon(connection, sermon["id"], home=home_of(connection))
     assert (trimmed, shown["duration"]) == ({**shown, "needs_reprocess": False}, 2780.0)
 
 
@@ -213,7 +228,9 @@ def test_listed_sermon_shows_the_duration_between_its_borders(
 ) -> None:
     trim_sermon(connection, sermon["id"], 3730.0, 6510.0, now=TRIMMED_AT)
 
-    assert [item["duration"] for item in list_sermons(connection)["items"]] == [2780.0]
+    assert [
+        item["duration"] for item in list_sermons(connection, home=home_of(connection))["items"]
+    ] == [2780.0]
 
 
 def test_live_of_unknown_duration_accepts_any_ordered_range_of_at_least_a_minute(
@@ -254,7 +271,7 @@ def test_sermon_created_with_borders_is_already_trimmed(
 ) -> None:
     created = create_sermon(connection, FakeLive(), LINK, now=CREATED_AT, start=3730.0, end=6510.0)
 
-    shown = show_sermon(connection, created["id"])
+    shown = show_sermon(connection, created["id"], home=home_of(connection))
     assert (created["created"], shown["status"], shown["live_start"], shown["live_end"]) == (
         True,
         "trimmed",
@@ -285,7 +302,10 @@ def test_create_with_refused_borders_fails_and_creates_no_sermon(
     with pytest.raises(WordcutError) as raised:
         create_sermon(connection, FakeLive(), LINK, now=CREATED_AT, start=start, end=end)
 
-    assert (raised.value.code, list_sermons(connection)) == (code, {"items": []})
+    assert (raised.value.code, list_sermons(connection, home=home_of(connection))) == (
+        code,
+        {"items": []},
+    )
 
 
 def test_create_with_borders_of_a_known_video_trims_the_existing_sermon(
@@ -293,7 +313,7 @@ def test_create_with_borders_of_a_known_video_trims_the_existing_sermon(
 ) -> None:
     again = create_sermon(connection, FakeLive(), LINK, now=TRIMMED_AT, start=3730.0, end=6510.0)
 
-    shown = show_sermon(connection, sermon["id"])
+    shown = show_sermon(connection, sermon["id"], home=home_of(connection))
     assert (again["id"], again["created"], again["status"], shown["live_start"]) == (
         sermon["id"],
         False,
@@ -325,7 +345,11 @@ def test_create_with_a_single_border_is_refused_before_anything_is_created(
     with pytest.raises(WordcutError) as raised:
         create_sermon(connection, FakeLive(), LINK, now=CREATED_AT, start=start, end=end)
 
-    assert (raised.value.code, raised.value.details, list_sermons(connection)) == (
+    assert (
+        raised.value.code,
+        raised.value.details,
+        list_sermons(connection, home=home_of(connection)),
+    ) == (
         "invalid_argument",
         {"argument": missing},
         {"items": []},
