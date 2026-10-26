@@ -62,6 +62,16 @@ def of_cut(connection: sqlite3.Connection, cut_id: int) -> list[RenderRow]:
     return [_row(values) for values in found]
 
 
+def newest_of_cut(connection: sqlite3.Connection, cut_id: int) -> list[RenderRow]:
+    """The exports of the cut, the most recent first; those of the same second, the last
+    recorded first."""
+    found = connection.execute(
+        f"SELECT {COLUMNS} FROM renders WHERE cut_id = ? ORDER BY created_at DESC, id DESC",
+        (cut_id,),
+    ).fetchall()
+    return [_row(values) for values in found]
+
+
 def _row(values: tuple[Any, ...]) -> RenderRow:
     render_id, cut_id, path, duration, options, created_at = values
     return RenderRow(

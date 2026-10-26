@@ -65,7 +65,7 @@ Depois o servidor e, por fim, a interface, seguindo o protótipo
 | 13 | 1.1.f.2 | `cut fix-word` com a trava de grafia | 1.1.f.3 | ☑ |
 | 14 | 1.1.f.4 | `cut caption` | 1.1.f.5 | ☑ |
 | 15 | 1.1.h.1 | `cut render` com opções e `--estimate` | 1.1.h.2, 1.1.h.3 | ☑ |
-| 16 | 1.1.i.1 | `render list/show/download` | — | ☐ |
+| 16 | 1.1.i.1 | `render list/show/download` | — | ☑ |
 | 17 | 1.2.a.1 | `member` | — | ☐ |
 | 18 | cli-migration | Remover a CLI antiga e reescrever README e skills sobre a nova | — | ☐ |
 
@@ -107,3 +107,4 @@ Depois o servidor e, por fim, a interface, seguindo o protótipo
 | 13 1.1.f.2 | PASS na rodada 3 | (ver git log) | Correção por corte; corrigir marca o corte como editado (protege do `sermon suggest`). |
 | 14 1.1.f.4 | PASS na rodada 1 | (ver git log) | Posições alinhadas ao protótipo (20/50/78 %, altura 10–90 %). Só Open Sans Bold incluída. |
 | 15 1.1.h.1 | PASS na rodada 2 | (ver git log) | ADR-0018. Limitação: `.mp4` órfão quando o corte é apagado por `sermon suggest`/reprocessamento (tratar em 1.2.b). Renderização real só testada em clipe sintético. |
+| 16 1.1.i.1 | PASS na rodada 1 | (ver git log) | `path` das exportações sempre absoluto. |

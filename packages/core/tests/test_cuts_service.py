@@ -2,15 +2,16 @@ import sqlite3
 from collections.abc import Callable, Iterator
 from contextlib import closing
 from dataclasses import replace
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
 import pytest
 
 from wordcut.cuts.caption import DEFAULT_CAPTION
-from wordcut.db import connect, cuts, sermons, transcripts
+from wordcut.db import connect, cuts, renders, sermons, transcripts
 from wordcut.db.cuts import NewCut, Segment
+from wordcut.db.renders import NewRender
 from wordcut.db.sermons import NewSermon
 from wordcut.errors import WordcutError
 from wordcut.home import Home
@@ -172,6 +173,22 @@ def test_shown_cut_keeps_the_caption_style_and_export_options_stored_with_it(
          "fade": True, "normalize": True, "caption": True, "resolution": "1080x1920",
          "quality": "high"},
     )  # fmt: skip
+
+
+def test_shown_cut_lists_its_exports_the_oldest_first(
+    connection: sqlite3.Connection, tmp_path: Path
+) -> None:
+    sermon_id, word = processed_sermon(connection)
+    cut_id = stored_cut(connection, sermon_id, (Segment(word[0], word[3]),))
+    with connection:
+        older = renders.insert(connection, NewRender(cut_id, "1.mp4", 30.0, {}, NOW))
+        newer = renders.insert(
+            connection, NewRender(cut_id, "2.mp4", 30.0, {}, NOW + timedelta(minutes=5))
+        )
+
+    shown = show_cut(connection, cut_id, home=Home(tmp_path))
+
+    assert [render["id"] for render in shown["renders"]] == [older, newer]
 
 
 def test_showing_a_cut_that_does_not_exist_is_not_found(connection: sqlite3.Connection) -> None:
