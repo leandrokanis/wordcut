@@ -1,0 +1,15 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "wordcut-api"
+version = "0.1.0"
+description = "API HTTP do Wordcut."
+license = "MIT"
+requires-python = ">=3.10"
+dependencies = [
+    "wordcut-core",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+]

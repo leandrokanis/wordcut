@@ -1,3 +1,9 @@
+import subprocess
+from pathlib import Path
+
+import pytest
+
+from wordcut.asr import remote
 from wordcut.asr.remote import RemoteHost, RemoteTranscriber, _last_progress_line
 
 
@@ -27,3 +33,23 @@ def test_last_progress_line_handles_carriage_returns() -> None:
 
 def test_last_progress_line_empty_when_no_progress() -> None:
     assert _last_progress_line("INFO loading model\n") == ""
+
+
+def test_submit_syncs_the_package_that_holds_the_worker(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    commands: list[list[str]] = []
+
+    def fake_run(command: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        commands.append(command)
+        return subprocess.CompletedProcess(command, 0, stdout="/opt/cp/jobs/abc123\n")
+
+    monkeypatch.setattr(remote.subprocess, "run", fake_run)
+    RemoteTranscriber(RemoteHost("leitao", home="/opt/cp")).submit(tmp_path / "audio.wav")
+
+    *_, source, destination = next(c for c in commands if c[0] == "rsync")
+    assert (Path(source).name, (Path(source) / "asr/worker.py").is_file(), destination) == (
+        "wordcut",
+        True,
+        "leitao:/opt/cp/src/",
+    )

@@ -101,10 +101,11 @@ por vez e o comando `wordcut status`.
 ## Escopo
 
 ### Componentes em escopo
-- `src/wordcut/cli.py` — novo ponto de entrada com o contrato global (opções, saída, erros).
-- `src/wordcut/` — novas áreas: configuração de caminhos (`WORDCUT_HOME`), banco e
-  migrações, trava global, erros de domínio com código e saída.
-- `tests/` — testes de comportamento do contrato, do banco, da trava e do `status`.
+- `apps/cli/src/wordcut_cli/` — novo ponto de entrada com o contrato global (opções, saída, erros).
+- `packages/core/src/wordcut/` — novas áreas: configuração de caminhos (`WORDCUT_HOME`),
+  banco e migrações, trava global, erros de domínio com código e saída, camada de serviço.
+- `packages/core/tests/`, `apps/cli/tests/` — testes de comportamento do contrato, do banco,
+  da trava e do `status`.
 
 ### Fora de escopo
 - Tarefas em segundo plano, `--wait` e `task` (item 4 do roadmap).

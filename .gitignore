@@ -5,6 +5,7 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 dist/
+node_modules/
 *.egg-info/
 *.wav
 *.mp4
