@@ -59,3 +59,7 @@ export function DotsIcon() {
     <Icon path="M5 10.7a1.3 1.3 0 1 0 0 2.6 1.3 1.3 0 0 0 0-2.6zM12 10.7a1.3 1.3 0 1 0 0 2.6 1.3 1.3 0 0 0 0-2.6zM19 10.7a1.3 1.3 0 1 0 0 2.6 1.3 1.3 0 0 0 0-2.6z" />
   );
 }
+
+export function CaptionIcon() {
+  return <Icon path="M5 5h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2zM10 10.5a2 2 0 1 0 0 3M17 10.5a2 2 0 1 0 0 3" />;
+}

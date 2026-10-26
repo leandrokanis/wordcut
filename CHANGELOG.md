@@ -244,6 +244,20 @@ Formato de [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões
   aparecem depois do processamento, e recarrega quando o processamento termina. Cada corte
   vira uma camada da timeline, acima de "Vídeo", em tempo da live e só para leitura, com a
   mesma cor do card. Em telas estreitas o painel fica abaixo da timeline.
+- Nível 3 da web (item 24): a tela do corte. A prévia 9:16 sem renderizar toca o vídeo
+  processado da pregação (nunca o YouTube; ADR-0023) de trecho em trecho, na ordem do corte e
+  pulando os intervalos, inclusive com trechos fora de ordem, recortada ao centro do quadro, e
+  não espera a trava de processamento. A legenda é desenhada pelo navegador por cima, em
+  blocos como os da exportação, com a palavra falada marcada e o estilo do corte (fonte Open
+  Sans 700 empacotada no build). A timeline mostra só o corte, em tempo do corte, com as
+  camadas Legenda e Vídeo. O painel tem as abas Texto (o texto montado, com as correções) e
+  Legenda (formulário em linhas: Legenda, Fonte, Tamanho, Cor, Posição, Altura, Borda, Cor da
+  borda e Sombra), que abre pela camada Legenda e volta a Texto ao fechar ou clicar fora;
+  cada campo salva sozinho 400 ms depois da mudança, só com o campo mudado, com "Salvo" e o
+  motivo junto ao campo, e "Restaurar padrão" volta ao estilo da igreja. Clique duplo numa
+  palavra da legenda pausa e abre a correção de grafia no lugar: Enter ou sair salva, Esc
+  cancela, e o bloqueio da trava aparece junto à legenda sem repetir o texto digitado. A aba
+  Legenda lista as correções de grafia, cada uma com Desfazer.
 
 ### Alterado
 

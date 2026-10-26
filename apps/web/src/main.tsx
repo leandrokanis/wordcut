@@ -3,6 +3,7 @@ import "@fontsource/geist/500.css";
 import "@fontsource/geist/600.css";
 import "@fontsource/geist-mono/400.css";
 import "@fontsource/geist-mono/500.css";
+import "@fontsource/open-sans/700.css";
 import "./ui/tokens.css";
 import "./ui/app.css";
 

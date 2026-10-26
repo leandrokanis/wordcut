@@ -4,7 +4,13 @@ import { afterEach } from "vitest";
 
 import type { ListedCut, SermonShown } from "../../api/types";
 import { apiError, type RecordedCall, type Reply } from "../../test/fakeApi";
-import { listedCut, processedSermon, shownSermon } from "../../test/fixtures";
+import {
+  cutPreview,
+  listedCut,
+  processedSermon,
+  shownCut,
+  shownSermon,
+} from "../../test/fixtures";
 import { renderRoute } from "../../test/renderRoute";
 import { fakeShellApi } from "../../test/shellApi";
 
@@ -23,9 +29,8 @@ async function panelOf(
   calls = fakeShellApi({
     "GET /api/sermons/12": { body: sermon },
     "GET /api/sermons/12/cuts": { body: { items: cuts } },
-    "GET /api/cuts/34": {
-      body: { id: 34, sermon_id: 12, title: "Fé no deserto", status: "chosen" },
-    },
+    "GET /api/cuts/34": { body: shownCut() },
+    "GET /api/cuts/34/preview": { body: cutPreview() },
     ...routes,
   });
   renderRoute("/sermons/12");
@@ -154,7 +159,8 @@ test("shows the API's message when the cuts cannot be loaded", async () => {
   expect(await within(panel).findByRole("alert")).toHaveTextContent("A API não respondeu.");
 });
 
-const CUT_LEVEL = "Esta tela está em construção.";
+/** The cut's level: its 9:16 preview. */
+const CUT_LEVEL = "Prévia do corte";
 
 function sent(): string[] {
   return calls
@@ -176,10 +182,10 @@ test("opens a suggested cut by choosing it, and goes to its level once the API a
   });
 
   await userEvent.click(await within(panel).findByRole("button", { name: /Fé no deserto/ }));
-  const before = { sent: sent(), cutLevel: screen.queryByText(CUT_LEVEL) !== null };
+  const before = { sent: sent(), cutLevel: screen.queryByLabelText(CUT_LEVEL) !== null };
   await act(async () => choose.release());
 
-  expect({ before, after: await screen.findByText(CUT_LEVEL) }).toEqual({
+  expect({ before, after: await screen.findByLabelText(CUT_LEVEL) }).toEqual({
     before: { sent: ["POST /api/cuts/34/choose"], cutLevel: false },
     after: expect.anything(),
   });
@@ -190,7 +196,7 @@ test("opens a chosen cut without choosing it again", async () => {
 
   await userEvent.click(await within(panel).findByRole("button", { name: /Fé no deserto/ }));
 
-  expect({ cutLevel: await screen.findByText(CUT_LEVEL), sent: sent() }).toEqual({
+  expect({ cutLevel: await screen.findByLabelText(CUT_LEVEL), sent: sent() }).toEqual({
     cutLevel: expect.anything(),
     sent: [],
   });
@@ -201,7 +207,7 @@ test("does not open a discarded cut", async () => {
 
   await userEvent.click(await within(panel).findByRole("button", { name: /Fé no deserto/ }));
 
-  expect({ cutLevel: screen.queryByText(CUT_LEVEL), sent: sent() }).toEqual({
+  expect({ cutLevel: screen.queryByLabelText(CUT_LEVEL), sent: sent() }).toEqual({
     cutLevel: null,
     sent: [],
   });
@@ -216,7 +222,7 @@ test("stays on the sermon with the API's message when choosing the cut fails", a
 
   expect({
     alert: (await within(panel).findByRole("alert")).textContent,
-    cutLevel: screen.queryByText(CUT_LEVEL),
+    cutLevel: screen.queryByLabelText(CUT_LEVEL),
   }).toEqual({ alert: "Corte 34 não existe.", cutLevel: null });
 });
 
@@ -294,7 +300,7 @@ test("never asks the API to change a cut's content", async () => {
   const other = await within(panel).findByRole("listitem", { name: "Graça" });
   await userEvent.click(within(await menuOf(other)).getByRole("menuitem", { name: "Descartar" }));
   await userEvent.click(within(panel).getByRole("button", { name: /Fé no deserto/ }));
-  await screen.findByText(CUT_LEVEL);
+  await screen.findByLabelText(CUT_LEVEL);
 
   expect(sent()).toEqual(["POST /api/cuts/35/discard", "POST /api/cuts/34/choose"]);
 });

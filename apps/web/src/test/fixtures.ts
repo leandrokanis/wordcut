@@ -1,4 +1,8 @@
 import type {
+  CaptionStyle,
+  Cut,
+  CutPreview,
+  CutWord,
   ListedCut,
   MachineStatus,
   Me,
@@ -142,6 +146,80 @@ export function listedCut(overrides: Partial<ListedCut> = {}): ListedCut {
     source: "llm",
     preset_id: 1,
     edited: false,
+    ...overrides,
+  };
+}
+
+/** The church's caption style, as docs/cli.md §8.6 gives the default. */
+export function churchCaption(overrides: Partial<CaptionStyle> = {}): CaptionStyle {
+  return {
+    enabled: true,
+    font: "Open Sans Bold",
+    size: 60,
+    color: "#FFD600",
+    position: "center",
+    offset: 50,
+    border: 3,
+    border_color: "#000000",
+    shadow: "soft",
+    ...overrides,
+  };
+}
+
+/** The words of ``shownCut``, in the order the cut plays them, in sermon time. */
+export function cutWords(): CutWord[] {
+  const word = (word_id: number, text: string, start: number, end: number): CutWord => ({
+    word_id,
+    text,
+    start,
+    end,
+    corrected: null,
+  });
+  return [
+    word(1105, "Deus", 2.5, 2.9),
+    word(1106, "governa.", 2.95, 3.4),
+    word(1101, "Irmãos,", 0.3, 0.7),
+    word(1102, "graça", 0.8, 1.2),
+    word(1103, "paz.", 1.35, 1.9),
+  ];
+}
+
+/** ``GET /api/cuts/34`` as service/cuts.py ``show_cut`` gives it: the out-of-order example of
+ * docs/cli.md §8.3, playing 2.5–3.4, then 0.3–1.2, then 1.35–1.9 of the sermon. */
+export function shownCut(overrides: Partial<Cut> = {}): Cut {
+  return {
+    id: 34,
+    sermon_id: 12,
+    status: "chosen",
+    title: "Fé no deserto",
+    text: "Deus governa. Irmãos, graça paz.",
+    duration: 2.35,
+    segments: [
+      { from_word: 1105, to_word: 1106, start: 2.5, end: 3.4, text: "Deus governa." },
+      { from_word: 1101, to_word: 1102, start: 0.3, end: 1.2, text: "Irmãos, graça" },
+      { from_word: 1103, to_word: 1103, start: 1.35, end: 1.9, text: "paz." },
+    ],
+    words: cutWords(),
+    caption: churchCaption(),
+    range_start_word: 1101,
+    range_end_word: 1106,
+    source: "llm",
+    preset_id: 1,
+    edited: false,
+    ...overrides,
+  };
+}
+
+/** ``GET /api/cuts/34/preview`` for ``shownCut``, docs/cli.md §8.3. */
+export function cutPreview(overrides: Partial<CutPreview> = {}): CutPreview {
+  return {
+    cut_id: 34,
+    duration: 2.35,
+    segments: [
+      { start: 2.5, end: 3.4, text: "Deus governa.", out_of_order: false },
+      { start: 0.3, end: 1.2, text: "Irmãos, graça", out_of_order: true },
+      { start: 1.35, end: 1.9, text: "paz.", out_of_order: false },
+    ],
     ...overrides,
   };
 }

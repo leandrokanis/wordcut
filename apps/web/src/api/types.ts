@@ -82,12 +82,67 @@ export interface TaskLaunched {
   cut_id?: number;
 }
 
-/** The fields of ``GET /api/cuts/{id}`` the web reads so far. */
-export interface Cut {
-  id: number;
-  sermon_id: number;
-  title: string;
-  status: CutStatus;
+/** A segment of ``GET /api/cuts/{id}``, docs/cli.md §8.2: times in sermon time. */
+export interface CutSegment {
+  from_word: number;
+  to_word: number;
+  start: number;
+  end: number;
+  text: string;
+}
+
+/** A word of the cut: ``text`` is the original, ``corrected`` the cut's spelling fix. */
+export interface CutWord {
+  word_id: number;
+  text: string;
+  start: number;
+  end: number;
+  corrected: string | null;
+}
+
+export type CaptionPosition = "top" | "center" | "bottom";
+
+export type CaptionShadow = "none" | "soft" | "strong";
+
+/** The caption style of ``cut caption``, docs/cli.md §8.6: ``size`` and ``border`` in px of
+ * the 1080×1920 frame, ``offset`` the height of the caption's centre in % of the frame. */
+export interface CaptionStyle {
+  enabled: boolean;
+  font: string;
+  size: number;
+  color: string;
+  position: CaptionPosition;
+  offset: number;
+  border: number;
+  border_color: string;
+  shadow: CaptionShadow;
+}
+
+/** ``GET /api/cuts/{id}``, service/cuts.py ``show_cut``. */
+export interface Cut extends Omit<ListedCut, "start" | "end" | "segments"> {
+  segments: CutSegment[];
+  words: CutWord[];
+  caption: CaptionStyle;
+}
+
+/** A segment of ``GET /api/cuts/{id}/preview``, in the order the cut plays it. */
+export interface PreviewSegment {
+  start: number;
+  end: number;
+  text: string;
+  out_of_order: boolean;
+}
+
+/** ``GET /api/cuts/{id}/preview``, docs/cli.md §8.3. */
+export interface CutPreview {
+  cut_id: number;
+  duration: number;
+  segments: PreviewSegment[];
+}
+
+/** ``PUT /api/cuts/{id}/words/{word_id}``, docs/cli.md §8.5. */
+export interface FixedWord extends CutWord {
+  cut_id: number;
 }
 
 export type TaskKind = "process" | "render" | "suggest";
