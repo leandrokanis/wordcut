@@ -57,6 +57,15 @@ export function lockedWork(lock: Extract<Lock, { held: true }>): string {
     .join(" ");
 }
 
+/** What the machine does for another resource than ``resource`` (as "sermon 12"), while it
+ * holds the lock. */
+export function otherWork(lock: Lock | undefined, resource: string): string | undefined {
+  if (!lock?.held || lock.resource === resource) {
+    return undefined;
+  }
+  return lockedWork(lock) || "outra tarefa";
+}
+
 function busyText(lock: Extract<Lock, { held: true }>): string {
   const what = lockedWork(lock);
   const since =

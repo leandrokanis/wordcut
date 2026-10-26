@@ -9,15 +9,19 @@ export interface WordFixes {
   /** Saves ``text`` as the word's spelling; the original text removes the fix. Answers the
    * API's refusal, or nothing once saved. */
   fix(wordId: number, text: string): Promise<ApiError | undefined>;
+  /** A fix is being saved. */
+  saving: boolean;
 }
 
 /** The spelling fixes of the cut's words, saved with ``PUT /api/cuts/{id}/words/{word_id}``. */
 export function useWordFixes(cutId: number, initial: CutWord[], onSaved: () => void): WordFixes {
   const [words, setWords] = useState(initial);
+  const [inFlight, setInFlight] = useState(0);
   const tellSaved = useRef(onSaved);
   tellSaved.current = onSaved;
 
   async function fix(wordId: number, text: string): Promise<ApiError | undefined> {
+    setInFlight((count) => count + 1);
     try {
       const { corrected } = await fixWord(cutId, wordId, text);
       setWords((current) =>
@@ -27,8 +31,10 @@ export function useWordFixes(cutId: number, initial: CutWord[], onSaved: () => v
       return undefined;
     } catch (error) {
       return error as ApiError;
+    } finally {
+      setInFlight((count) => count - 1);
     }
   }
 
-  return { words, fix };
+  return { words, fix, saving: inFlight > 0 };
 }

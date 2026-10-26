@@ -118,11 +118,43 @@ export interface CaptionStyle {
   shadow: CaptionShadow;
 }
 
-/** ``GET /api/cuts/{id}``, service/cuts.py ``show_cut``. */
+/** The nine choices of an export, docs/cli.md §8.7, in its order: ``caption`` is the
+ * ``enabled`` of the cut's caption style. */
+export interface RenderOptions {
+  fillers: "remove" | "keep";
+  stammers: "remove" | "keep";
+  pauses: "original" | "natural" | "short";
+  smooth_joins: boolean;
+  fade: boolean;
+  normalize: boolean;
+  caption: boolean;
+  resolution: "1080x1920" | "720x1280";
+  quality: "high" | "small";
+}
+
+/** An export as ``render show`` gives it, docs/cli.md §9, without ``path``: the web downloads
+ * it by ``GET /api/renders/{id}/file``. ``duration`` in seconds. */
+export interface Render {
+  id: number;
+  cut_id: number;
+  duration: number;
+  created_at: string;
+  options: RenderOptions;
+}
+
+/** ``GET /api/cuts/{id}/renders/estimate``: the estimated duration, in seconds. */
+export interface RenderEstimate {
+  duration: number;
+  options: RenderOptions;
+}
+
+/** ``GET /api/cuts/{id}``, service/cuts.py ``show_cut``: ``renders`` oldest first. */
 export interface Cut extends Omit<ListedCut, "start" | "end" | "segments"> {
   segments: CutSegment[];
   words: CutWord[];
   caption: CaptionStyle;
+  render_options: RenderOptions;
+  renders: Render[];
 }
 
 /** A segment of ``GET /api/cuts/{id}/preview``, in the order the cut plays it. */

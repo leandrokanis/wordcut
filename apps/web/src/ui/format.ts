@@ -12,3 +12,8 @@ export function formatDuration(seconds: number): string {
   const rest = String(whole % 60).padStart(2, "0");
   return hours ? `${hours}:${String(minutes).padStart(2, "0")}:${rest}` : `${minutes}:${rest}`;
 }
+
+/** An ISO moment as ``21/10/2026 19:05``, in the wall time it was written with. */
+export function formatDateTime(isoMoment: string): string {
+  return `${formatDate(isoMoment.slice(0, 10))} ${isoMoment.slice(11, 16)}`;
+}

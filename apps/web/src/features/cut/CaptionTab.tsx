@@ -3,6 +3,7 @@ import { useState, type CSSProperties, type ReactNode } from "react";
 import type { ApiError } from "../../api/client";
 
 import type { CaptionPosition, CaptionShadow, CutWord } from "../../api/types";
+import { Choice } from "../../ui/Choice";
 import { CAPTION_FONTS } from "./captions";
 import type { CaptionField, CaptionStyleState } from "./useCaptionStyle";
 
@@ -223,33 +224,6 @@ function Row({
           {error}
         </p>
       )}
-    </div>
-  );
-}
-
-function Choice<T extends string | boolean>({
-  name,
-  options,
-  value,
-  onPick,
-}: {
-  name: string;
-  options: [T, string][];
-  value: T;
-  onPick: (value: T) => void;
-}) {
-  return (
-    <div className="segctl" role="group" aria-label={name}>
-      {options.map(([option, label]) => (
-        <button
-          key={label}
-          type="button"
-          aria-pressed={option === value}
-          onClick={() => option !== value && onPick(option)}
-        >
-          {label}
-        </button>
-      ))}
     </div>
   );
 }

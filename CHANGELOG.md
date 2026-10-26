@@ -258,6 +258,16 @@ Formato de [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões
   palavra da legenda pausa e abre a correção de grafia no lugar: Enter ou sair salva, Esc
   cancela, e o bloqueio da trava aparece junto à legenda sem repetir o texto digitado. A aba
   Legenda lista as correções de grafia, cada uma com Desfazer.
+- Exportação na web (item 25): no nível 3, Exportar abre o menu do protótipo com "Exportar
+  9:16…" e as exportações do corte. A caixa "Exportar 9:16" traz as opções em Limpeza,
+  Edição, Áudio e Vídeo, abre com as últimas salvas no corte (a Legenda como a aba Legenda a
+  deixou) e mostra a duração estimada, pedida 300 ms depois da última mudança, com a
+  estimativa anterior cancelada. Exportar inicia a tarefa, com o progresso no botão por
+  eventos e na barra de status, e fica desligado com a máquina ocupada (inclusive pelo próprio
+  corte, cuja exportação em andamento é retomada ao reabrir) e com "Salvando…" enquanto a
+  legenda ou a grafia gravam. A recusa e a falha aparecem com o motivo. No fim, o corte e a
+  lista são lidos de novo: cada exportação aparece com data, duração e resumo das opções, e
+  Baixar entrega o arquivo pela API, com o nome legível dado pelo servidor.
 
 ### Alterado
 

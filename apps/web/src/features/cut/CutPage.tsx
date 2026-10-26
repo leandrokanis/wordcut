@@ -11,6 +11,7 @@ import { CutPreview, type CutPreviewHandle } from "./CutPreview";
 import { CutSide, type Tab } from "./CutSide";
 import { CutTimeline } from "./CutTimeline";
 import { CutTransport } from "./CutTransport";
+import { ExportButton } from "./ExportButton";
 import { TextTab } from "./TextTab";
 import { useCaptionStyle } from "./useCaptionStyle";
 import { useWordFixes } from "./useWordFixes";
@@ -133,6 +134,15 @@ function CutLevel({ cut, sequence, sermonStart }: CutLevelProps) {
         )}
       </CutSide>
       <main className="work">
+        <div className="l2-bar">
+          <span className="spacer" />
+          <ExportButton
+            cut={cut}
+            captionOn={caption.style.enabled}
+            saving={caption.saving || fixes.saving}
+            onCaptionSaved={(enabled) => caption.adopt({ enabled })}
+          />
+        </div>
         <CutPreview
           ref={preview}
           sermonId={cut.sermon_id}
