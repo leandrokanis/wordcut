@@ -1,4 +1,4 @@
-"""Cuts of a sermon: list, show and choose them (docs/cli.md §8.1, §8.2, §8.4)."""
+"""Cuts of a sermon: list, show, preview and choose them (docs/cli.md §8.1–§8.4)."""
 
 from __future__ import annotations
 
@@ -41,6 +41,30 @@ def show_cut(connection: sqlite3.Connection, cut_id: int) -> dict[str, Any]:
         "render_options": row.render_options or {},
         # Exports arrive with item 1.1.h.1.
         "renders": [],
+    }
+
+
+def preview_cut(connection: sqlite3.Connection, cut_id: int) -> dict[str, Any]:
+    """The sequence the preview plays: each segment in the order the cut plays it, with its
+    start and end in sermon time, its text and whether it goes back in the sermon, plus the
+    duration ``show_cut`` gives (docs/cli.md §8.3). It reads only the database, so the
+    processing lock never blocks it (constitution §IV)."""
+    row = _existing(connection, cut_id)
+    assembled = assemble(row.segments, transcripts.words_of(connection, row.sermon_id))
+    return {
+        "cut_id": row.id,
+        "duration": assembled.duration,
+        "segments": [
+            {
+                "start": segment.start,
+                "end": segment.end,
+                "text": segment.text,
+                "out_of_order": out_of_order,
+            }
+            for segment, out_of_order in zip(
+                assembled.segments, assembled.out_of_order, strict=True
+            )
+        ],
     }
 
 

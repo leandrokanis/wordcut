@@ -469,6 +469,26 @@ Devolve o corte completo:
 Devolve a sequência que a prévia toca (1.1.g): cada trecho com início e fim na pregação e o
 texto. Não toca vídeo nem renderiza; nunca é bloqueado pela trava.
 
+- `segments`: os trechos na ordem em que o corte toca, cada um com `start` e `end` (início da
+  primeira palavra e fim da última, em tempo da pregação), `text` (as palavras do trecho
+  unidas por espaço, sem correção de grafia até 1.1.f.2) e `out_of_order`.
+- `out_of_order` é `true` no trecho que começa antes do fim do trecho tocado logo antes dele,
+  e só esse anterior conta; o primeiro trecho é sempre `false`. Um trecho que começa
+  exatamente no fim do anterior não está fora de ordem. Exemplo: um corte que toca
+  `2.5–3.4`, depois `0.3–1.2` e depois `1.35–1.9` marca `false`, `true`, `false`; o terceiro
+  ainda vem antes do primeiro na pregação, mas segue o segundo.
+- `duration`: a mesma do `cut show` (§8.2), a soma das faixas dos trechos.
+- Sem `--json`, uma linha por trecho com os tempos e o texto, com `↑` nos fora de ordem:
+  `[00:00:00.300 → 00:00:01.200] ↑ Irmãos, graça`.
+- Corte inexistente: `not_found`.
+
+```json
+{ "cut_id": 34, "duration": 2.35,
+  "segments": [ { "start": 2.5, "end": 3.4, "text": "Deus governa.", "out_of_order": false },
+                { "start": 0.3, "end": 1.2, "text": "Irmãos, graça", "out_of_order": true },
+                { "start": 1.35, "end": 1.9, "text": "paz.", "out_of_order": false } ] }
+```
+
 ### 8.4. `cut choose <id>` · `cut discard <id>` · `cut restore <id>`
 
 Mudam o estado (1.1.e). `restore` devolve um corte descartado a `suggested`. Nenhum deles

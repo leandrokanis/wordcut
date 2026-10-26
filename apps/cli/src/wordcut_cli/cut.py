@@ -1,5 +1,5 @@
-"""``wordcut cut <action>``: see the suggested cuts of a sermon and choose, discard or
-restore them (docs/cli.md §8.1, §8.2, §8.4)."""
+"""``wordcut cut <action>``: see and preview the suggested cuts of a sermon and choose,
+discard or restore them (docs/cli.md §8.1–§8.4)."""
 
 from __future__ import annotations
 
@@ -10,7 +10,14 @@ from contextlib import closing
 from functools import partial
 from typing import TYPE_CHECKING, Any
 
-from wordcut.service.cuts import choose_cut, discard_cut, list_cuts, restore_cut, show_cut
+from wordcut.service.cuts import (
+    choose_cut,
+    discard_cut,
+    list_cuts,
+    preview_cut,
+    restore_cut,
+    show_cut,
+)
 from wordcut.service.sermons import CUT_STATES
 from wordcut.timefmt import format_timestamp
 from wordcut_cli import deps
@@ -45,6 +52,16 @@ def register(commands: Commands) -> None:
         example="wordcut cut show 34 --json",
     )
     show.add_argument("id", type=int, help="ID do corte")
+    preview = add_command(
+        actions,
+        "preview",
+        help="mostra a sequência que a prévia toca: cada trecho com início e fim na pregação"
+        " e o texto, marcando com ↑ o que volta no tempo; nunca espera a trava",
+        run=_preview,
+        render=_render_preview,
+        example="wordcut cut preview 34 --json",
+    )
+    preview.add_argument("id", type=int, help="ID do corte")
     for name, change, help_text in (
         ("choose", choose_cut, "marca o corte como escolhido; não muda o conteúdo"),
         ("discard", discard_cut, "descarta o corte; não muda o conteúdo"),
@@ -75,6 +92,11 @@ def _show(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:
         return show_cut(connection, args.id)
 
 
+def _preview(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:
+    with closing(deps.connection()) as connection:
+        return preview_cut(connection, args.id)
+
+
 def _change(
     change: Callable[[sqlite3.Connection, int], dict[str, Any]],
     args: argparse.Namespace,
@@ -100,6 +122,16 @@ def _render_cut(cut: dict[str, Any]) -> str:
             f"Texto: {cut['text']}",
         ]
     )
+
+
+def _render_preview(preview: dict[str, Any]) -> str:
+    return "\n".join(_preview_line(segment) for segment in preview["segments"])
+
+
+def _preview_line(segment: dict[str, Any]) -> str:
+    times = f"[{format_timestamp(segment['start'])} → {format_timestamp(segment['end'])}]"
+    jump = "↑ " if segment["out_of_order"] else ""
+    return f"{times} {jump}{segment['text']}"
 
 
 def _render_list(result: dict[str, Any]) -> str:

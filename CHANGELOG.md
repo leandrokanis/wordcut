@@ -114,6 +114,12 @@ Formato de [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões
   enquanto valem os padrões) e `renders: []`. `choose`, `discard` e `restore` mudam só o
   estado e devolvem o corte como o `show`; `restore` só tira um corte de `discarded`, e
   repetir uma transição não grava nada. Corte ou pregação inexistente dá `not_found`.
+- `wordcut cut preview <id>` (item 1.1.g.1): a sequência que a prévia toca, sem tocar vídeo,
+  sem renderizar e sem esperar a trava. Cada trecho na ordem em que o corte toca, com início
+  e fim em tempo da pregação, o texto (sem correção de grafia até o item 1.1.f.2) e
+  `out_of_order`, verdadeiro no trecho que começa antes do fim do trecho anterior; mais
+  `cut_id` e a duração do `cut show`. Sem `--json`, uma linha por trecho com `↑` no que
+  volta no tempo. Corte inexistente dá `not_found`.
 
 ### Alterado
 
