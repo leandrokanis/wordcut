@@ -6,6 +6,7 @@ import pytest
 
 from wordcut.config import (
     has_youtube_cookies,
+    llm_key,
     llm_key_file,
     masked_llm_key,
     write_secret,
@@ -129,3 +130,10 @@ def test_cookies_are_present_only_once_stored() -> None:
     write_secret(youtube_cookies(), ".example.com\tTRUE\t/\tTRUE\t0\tSID\tficticio\n")
 
     assert (before, has_youtube_cookies()) == (False, True)
+
+
+def test_the_llm_key_is_read_in_clear_only_once_stored() -> None:
+    before = llm_key()
+    write_secret(llm_key_file(), FAKE_KEY)
+
+    assert (before, llm_key()) == (None, FAKE_KEY)

@@ -7,7 +7,9 @@ from typing import Any
 
 import pytest
 
-from wordcut.db import connect
+from wordcut.db import connect, cuts, presets, sermons
+from wordcut.db.cuts import NewCut, Segment
+from wordcut.db.sermons import SuggestionError
 from wordcut.errors import WordcutError
 from wordcut.home import Home
 from wordcut.service.sermons import create_sermon, list_sermons, show_sermon
@@ -212,6 +214,7 @@ def test_shown_sermon_has_empty_borders_no_task_and_no_cuts(
         "processed_at": None,
         "last_task": None,
         "cuts": [],
+        "suggestion_error": None,
     }
 
 
@@ -224,3 +227,73 @@ def test_showing_an_unknown_sermon_is_not_found(connection: sqlite3.Connection) 
         3,
         {"sermon_id": 999},
     )
+
+
+def store_cuts(connection: sqlite3.Connection, sermon_id: int, *statuses: str) -> None:
+    preset = presets.default(connection)
+    assert preset is not None
+    new = [
+        NewCut(
+            status=status,
+            title=f"Corte {number}",
+            segments=(Segment(120, 135), Segment(90, 99)),
+            range_start_word=90,
+            range_end_word=135,
+            source="llm",
+            preset_id=preset.id,
+        )
+        for number, status in enumerate(statuses, start=1)
+    ]
+    with connection:
+        cuts.insert_many(connection, sermon_id, new, NOW)
+
+
+def test_shown_sermon_lists_its_cuts_with_their_segments_range_and_preset(
+    connection: sqlite3.Connection,
+) -> None:
+    created = create_sermon(connection, FakeLive(), LINK, now=NOW)
+    store_cuts(connection, created["id"], "suggested")
+    [stored] = cuts.of_sermon(connection, created["id"])
+    preset = presets.default(connection)
+    assert preset is not None
+
+    shown = show_sermon(connection, created["id"], home=home_of(connection))
+
+    assert shown["cuts"] == [
+        {
+            "id": stored.id,
+            "status": "suggested",
+            "title": "Corte 1",
+            "segments": [{"from_word": 120, "to_word": 135}, {"from_word": 90, "to_word": 99}],
+            "range_start_word": 90,
+            "range_end_word": 135,
+            "source": "llm",
+            "preset_id": preset.id,
+            "edited": False,
+        }
+    ]
+
+
+def test_listed_and_shown_sermons_count_their_cuts_by_state(
+    connection: sqlite3.Connection,
+) -> None:
+    created = create_sermon(connection, FakeLive(), LINK, now=NOW)
+    store_cuts(connection, created["id"], "suggested", "chosen", "chosen", "discarded")
+    counts = {"suggested": 1, "chosen": 2, "discarded": 1}
+
+    [listed_sermon] = list_sermons(connection, home=home_of(connection))["items"]
+    shown = show_sermon(connection, created["id"], home=home_of(connection))
+
+    assert (listed_sermon["cut_counts"], shown["cut_counts"]) == (counts, counts)
+
+
+def test_shown_sermon_tells_the_last_suggestions_failure(connection: sqlite3.Connection) -> None:
+    created = create_sermon(connection, FakeLive(), LINK, now=NOW)
+    with connection:
+        sermons.record_suggestion_error(
+            connection, created["id"], SuggestionError("llm_error", "O LLM falhou.")
+        )
+
+    shown = show_sermon(connection, created["id"], home=home_of(connection))
+
+    assert shown["suggestion_error"] == {"code": "llm_error", "message": "O LLM falhou."}

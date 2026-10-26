@@ -115,7 +115,10 @@ rodam em primeiro plano ([ADR-0013](docs/adr/0013-trava-herdada-pelo-processo-da
 O processamento (`sermon process`) usa o mundo externo por uma porta e deixa a pregação
 `failed` na leitura se o processo morrer
 ([ADR-0014](docs/adr/0014-processamento-por-portas-e-estado-na-leitura.md)); as mídias ficam
-em `media/sermons/<id>/` na pasta de dados.
+em `media/sermons/<id>/` na pasta de dados. Ao fim, ele pede os cortes ao LLM com o preset
+padrão; sem modelo ou chave configurados, ou com o OpenRouter falhando, a pregação fica
+processada sem cortes e o erro aparece no `sermon show`
+([ADR-0016](docs/adr/0016-sugestao-por-porta-com-falha-na-pregacao.md)).
 
 Os dados (banco SQLite, criado e migrado na primeira chamada, e a trava `processing.lock`)
 ficam em `~/.local/share/wordcut/`, ou em `WORDCUT_HOME` quando definida. Essa pasta deve

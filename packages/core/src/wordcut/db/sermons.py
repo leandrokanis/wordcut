@@ -1,4 +1,4 @@
-"""SQL access to the ``sermons`` table (migrations 0002 and 0004)."""
+"""SQL access to the ``sermons`` table (migrations 0002, 0004 and 0007)."""
 
 from __future__ import annotations
 
@@ -10,8 +10,16 @@ from typing import Any
 COLUMNS = (
     "id, youtube_id, url, title, service_date, live_duration, live_finished, status,"
     " live_start, live_end, created_at, updated_at, sermon_start, sermon_end, video_path,"
-    " processed_at"
+    " processed_at, suggestion_error_code, suggestion_error_message"
 )
+
+
+@dataclass(frozen=True)
+class SuggestionError:
+    """Why the last cut suggestion of the sermon failed."""
+
+    code: str
+    message: str
 
 
 @dataclass(frozen=True)
@@ -43,6 +51,7 @@ class SermonRow:
     sermon_end: float | None = None
     video_path: str | None = None
     processed_at: datetime | None = None
+    suggestion_error: SuggestionError | None = None
 
 
 def insert(connection: sqlite3.Connection, sermon: NewSermon) -> SermonRow:
@@ -132,6 +141,21 @@ def record_processed(
     )
 
 
+def record_suggestion_error(
+    connection: sqlite3.Connection, sermon_id: int, error: SuggestionError | None
+) -> None:
+    """Keep why the last suggestion failed, or ``None`` when it succeeded, in the caller's
+    transaction."""
+    connection.execute(
+        "UPDATE sermons SET suggestion_error_code = ?, suggestion_error_message = ? WHERE id = ?",
+        (
+            None if error is None else error.code,
+            None if error is None else error.message,
+            sermon_id,
+        ),
+    )
+
+
 def by_id(connection: sqlite3.Connection, sermon_id: int) -> SermonRow | None:
     return _one(connection, "id = ?", sermon_id)
 
@@ -179,6 +203,8 @@ def _row(values: tuple[Any, ...]) -> SermonRow:
         sermon_end,
         video_path,
         processed_at,
+        suggestion_error_code,
+        suggestion_error_message,
     ) = values
     return SermonRow(
         id=sermon_id,
@@ -197,4 +223,9 @@ def _row(values: tuple[Any, ...]) -> SermonRow:
         sermon_end=sermon_end,
         video_path=video_path,
         processed_at=None if processed_at is None else datetime.fromisoformat(processed_at),
+        suggestion_error=(
+            None
+            if suggestion_error_code is None
+            else SuggestionError(suggestion_error_code, suggestion_error_message)
+        ),
     )

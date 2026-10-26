@@ -44,6 +44,17 @@ def no_real_processing(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture(autouse=True)
+def no_real_llm(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Fail a test that would call the LLM on OpenRouter for real."""
+    from wordcut import suggestion
+
+    def refuse(llm_model: str, key: str) -> suggestion.SuggestionModel:
+        raise AssertionError("test reached the real LLM; replace suggestion.default_model")
+
+    monkeypatch.setattr(suggestion, "default_model", refuse)
+
+
+@pytest.fixture(autouse=True)
 def wordcut_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """The secrets folder of the test; a test never reaches the real ``~/.config/wordcut``."""
     folder = tmp_path / "config"

@@ -25,6 +25,7 @@ EXIT_CODES: dict[str, int] = {
     "default_preset": 5,
     "last_admin": 5,
     "config_not_writable": 5,
+    "llm_not_configured": 5,
     "youtube_error": 6,
     "llm_error": 6,
     "network_error": 6,

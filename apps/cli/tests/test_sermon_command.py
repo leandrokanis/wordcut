@@ -1,10 +1,15 @@
 import json
-from datetime import date
+from contextlib import closing
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
 import pytest
 
+from wordcut.db import connect, cuts, sermons
+from wordcut.db.cuts import NewCut, Segment
+from wordcut.db.sermons import SuggestionError
+from wordcut.home import Home
 from wordcut.youtube import LiveInfo, YouTubeError
 from wordcut_cli import deps, main
 
@@ -299,3 +304,52 @@ def test_each_sermon_action_help_shows_an_example_ready_to_copy(
     exit_code = main(["sermon", action, "--help"])
 
     assert (exit_code, f"wordcut sermon {action} " in capsys.readouterr().out) == (0, True)
+
+
+def record_failed_suggestion(sermon_id: int, message: str) -> None:
+    """An earlier suggestion that left one cut, then a later one that failed with ``message``."""
+    earlier = NewCut(
+        status="suggested",
+        title="Graça que alcança",
+        segments=(Segment(1, 4),),
+        range_start_word=1,
+        range_end_word=4,
+        source="llm",
+        preset_id=None,
+    )
+    with closing(connect(Home.from_environment())) as connection, connection:
+        cuts.insert_many(connection, sermon_id, [earlier], datetime.now().astimezone())
+        sermons.record_suggestion_error(
+            connection, sermon_id, SuggestionError("llm_not_configured", message)
+        )
+
+
+def test_show_tells_why_the_last_suggestion_failed(
+    live: FakeLive, capsys: pytest.CaptureFixture[str]
+) -> None:
+    main(["sermon", "create", LINK, "--quiet"])
+    record_failed_suggestion(1, "Sem a chave do LLM (wordcut settings set-key).")
+
+    exit_code = main(["sermon", "show", "1"])
+    readable = capsys.readouterr().out
+    _, shown = run_json(["sermon", "show", "1", "--json"], capsys)
+
+    assert (
+        exit_code,
+        readable.splitlines()[-2:],
+        [cut["title"] for cut in shown["cuts"]],
+        shown["suggestion_error"],
+        shown["cut_counts"],
+    ) == (
+        0,
+        [
+            "Cortes: 1",
+            "Sugestão de cortes falhou: Sem a chave do LLM (wordcut settings set-key).",
+        ],
+        ["Graça que alcança"],
+        {
+            "code": "llm_not_configured",
+            "message": "Sem a chave do LLM (wordcut settings set-key).",
+        },
+        {"suggested": 1, "chosen": 0, "discarded": 0},
+    )

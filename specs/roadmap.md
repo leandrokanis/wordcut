@@ -58,7 +58,7 @@ Depois o servidor e, por fim, a interface, seguindo o protótipo
 | 6 | 1.1.d.1 | `sermon download` | — | ☑ |
 | 7 | 2.1.a.1 | `settings`: modelo, chave e cookies pelo stdin, modelo do WhisperX | — | ☑ |
 | 8 | 2.1.a.2 | Critérios no pacote, `criteria list` e `preset` | 2.1.a.3 | ☑ |
-| 9 | 2.1.b.1 | Sugestão de cortes pelo LLM ao fim do processamento | 2.1.b.3 | ☐ |
+| 9 | 2.1.b.1 | Sugestão de cortes pelo LLM ao fim do processamento | 2.1.b.3 | ☑ |
 | 10 | 2.1.b.2 | `sermon suggest` | — | ☐ |
 | 11 | 1.1.e.1 | `cut list/show/choose/discard/restore` | 1.1.e.2 | ☐ |
 | 12 | 1.1.g.1 | `cut preview` (sequência da prévia) | — | ☐ |
@@ -100,3 +100,4 @@ Depois o servidor e, por fim, a interface, seguindo o protótipo
 | 6 1.1.d.1 | PASS na rodada 2 | (ver git log) | Cópia sem sobrescrever por hard link, com queda para `open("x")` em sistemas sem link (nome final existe pela metade durante a cópia nesse caso). |
 | 7 2.1.a.1 | PASS na rodada 3 | (ver git log) | ADR-0015: erro de uso nunca repete valor digitado (rodadas 1–2 acharam eco da chave). Mutações fora da barra: fallback "Uso inválido" e legado ignorando sobra (sem eco hoje). |
 | 8 2.1.a.2 | PASS na rodada 2 | (ver git log) | Texto dos critérios tirado de `sugerir-cortes.md` e do protótipo; duas linhas de opção não literais (reordenar). Revisão humana pendente. |
+| 9 2.1.b.1 | PASS na rodada 2 | (ver git log) | ADR-0016. Falha da sugestão fica em `suggestion_error`, sem desfazer o processamento. Nenhuma chamada real ao OpenRouter feita. |

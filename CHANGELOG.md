@@ -78,12 +78,27 @@ Formato de [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões
   (`default_preset`, saída 5). Critério novo no código entra com o nível padrão e critério
   removido é ignorado na leitura. O serviço monta o prompt de um preset para a sugestão
   (item 9).
+- Sugestão de cortes pelo LLM ao fim do `sermon process` (item 2.1.b.1; ADR-0016): uma
+  chamada ao OpenRouter com o prompt do preset padrão e as frases numeradas, sem tempos;
+  resposta validada por esquema JSON, com uma nova tentativa só quando fora do esquema; os
+  cortes válidos ficam `suggested`, com título, trechos, faixa contínua e o preset usado
+  (tabela `cuts`, migração 0007). Corte cuja duração estimada (soma dos trechos ×0,82) sai
+  da duração permitida do preset é descartado, com aviso em `suggestion_warnings` no
+  resultado da tarefa. A falha da sugestão não desfaz o processamento: a tarefa termina
+  `succeeded`, a pregação `processed`, e o erro fica em `suggestion_error` no
+  `sermon show` (e numa linha do `show` legível). Nova etapa `sugerindo` no progresso.
+  Código de erro `llm_not_configured` (saída 5) para modelo ou chave ausentes, sem chamar o
+  LLM; toda falha do OpenRouter vira `llm_error`, sem a chave, o prompt nem o corpo da
+  resposta.
 
 ### Alterado
 
 - `sermon process` transcreve com o modelo do WhisperX das configurações
   (`settings set --whisper-model`), não mais com `large-v3` fixo.
 - `settings show` traz o ID do preset padrão em `default_preset_id` (antes sempre `null`).
+- `sermon list` e `sermon show` trazem as contagens de cortes por estado reais, e o `show`, os
+  cortes e `suggestion_error`. `sermon process --force` apaga os cortes da pregação junto
+  com as palavras e as frases.
 - Erro de uso da CLI não repete o valor digitado (ADR-0015): escolha inválida lista as
   opções válidas (`details.choices`), argumento não reconhecido nunca é repetido, nem como
   nome de opção (a mensagem aponta para o `--help` do comando), e valor de tipo inválido
