@@ -1,16 +1,20 @@
 import type {
   CaptionStyle,
+  Criterion,
   Cut,
   CutPreview,
   CutWord,
   ListedCut,
   MachineStatus,
   Me,
+  Member,
+  Preset,
   Render,
   RenderOptions,
   SermonCreated,
   SermonListItem,
   SermonShown,
+  Settings,
   Task,
 } from "../api/types";
 
@@ -267,4 +271,87 @@ export function cutRender(overrides: Partial<Render> = {}): Render {
     options: defaultRenderOptions(),
     ...overrides,
   };
+}
+
+// Shaped as service/settings.py, service/presets.py and service/members.py give them; the
+// models, presets and e-mails are fictitious.
+
+export function settings(overrides: Partial<Settings> = {}): Settings {
+  return {
+    llm_model: "provedor/modelo-teste",
+    whisper_model: "large-v3",
+    llm_key: "••••7a2c",
+    youtube_cookies: false,
+    default_preset_id: 1,
+    ...overrides,
+  };
+}
+
+/** Two filters and two values, in the catalog's order. */
+export function criteria(): Criterion[] {
+  return [
+    { id: "triumphalism", name: "Triunfalismo", type: "filter", default_level: "strict" },
+    { id: "allegory", name: "Alegoria", type: "filter", default_level: "moderate" },
+    { id: "christ_centered", name: "Cristocêntrico", type: "value", default_level: "moderate" },
+    { id: "practical", name: "Aplicação prática", type: "value", default_level: "lenient" },
+  ];
+}
+
+export function preset(overrides: Partial<Preset> = {}): Preset {
+  return {
+    id: 1,
+    name: "Padrão",
+    is_default: true,
+    levels: {
+      triumphalism: "strict",
+      allegory: "moderate",
+      christ_centered: "moderate",
+      practical: "lenient",
+    },
+    duration_allowed: { min: 40, max: 75 },
+    duration_ideal: { min: 55, max: 65 },
+    reorder: true,
+    protected_words: ["não", "mas"],
+    instructions: "",
+    created_at: "2026-10-26T19:40:00+00:00",
+    updated_at: "2026-10-26T19:40:00+00:00",
+    ...overrides,
+  };
+}
+
+/** The default preset and a second one. */
+export function presets(): Preset[] {
+  return [
+    preset(),
+    preset({
+      id: 2,
+      name: "Curtos",
+      is_default: false,
+      levels: {
+        triumphalism: "lenient",
+        allegory: "moderate",
+        christ_centered: "moderate",
+        practical: "strict",
+      },
+      duration_allowed: { min: 30, max: 50 },
+      duration_ideal: { min: 35, max: 45 },
+      reorder: false,
+      instructions: "Prefira frases curtas.",
+    }),
+  ];
+}
+
+export function member(overrides: Partial<Member> = {}): Member {
+  return {
+    email: "assistente@exemplo.org",
+    role: "assistant",
+    created_at: "2026-10-26T19:40:00-03:00",
+    updated_at: "2026-10-26T19:40:00-03:00",
+    ...overrides,
+  };
+}
+
+/** The administrator calling (``admin()``) and an assistant, by e-mail. */
+export function team(): Member[] {
+  return [member({ email: "admin@exemplo.org", role: "admin" }), member()];
 }

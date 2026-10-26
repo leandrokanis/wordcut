@@ -4,7 +4,7 @@ import { getMe, type ApiError } from "../api/client";
 import type { Me } from "../api/types";
 import { useResource } from "../api/useResource";
 
-const MeContext = createContext<Me | undefined>(undefined);
+const MeContext = createContext<{ me: Me; reload: () => void } | undefined>(undefined);
 
 const BLOCKED: Record<string, { title: string; hint: string }> = {
   unauthenticated: {
@@ -30,16 +30,28 @@ export function IdentityGate({ children }: { children: ReactNode }) {
       </div>
     );
   }
-  return <MeContext.Provider value={me.data}>{children}</MeContext.Provider>;
+  return (
+    <MeContext.Provider value={{ me: me.data, reload: me.reload }}>{children}</MeContext.Provider>
+  );
 }
 
 /** The member using the application; only valid below ``IdentityGate``. */
 export function useMe(): Me {
-  const me = useContext(MeContext);
-  if (!me) {
+  return useIdentity().me;
+}
+
+/** Asks GET /api/me again, after a change of the member's own role; only below
+ * ``IdentityGate``. */
+export function useReloadMe(): () => void {
+  return useIdentity().reload;
+}
+
+function useIdentity() {
+  const identity = useContext(MeContext);
+  if (!identity) {
     throw new Error("useMe must be used below IdentityGate");
   }
-  return me;
+  return identity;
 }
 
 function Blocked({ error, retry }: { error: ApiError; retry: () => void }) {

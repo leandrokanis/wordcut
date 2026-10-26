@@ -1,8 +1,9 @@
-import { useState, type KeyboardEvent, type ReactNode } from "react";
+import { useState, type KeyboardEvent } from "react";
 
 import type { RenderOptions } from "../../api/types";
 import { Choice } from "../../ui/Choice";
 import { formatDuration } from "../../ui/format";
+import { FormRow } from "../../ui/FormRow";
 import { CloseIcon } from "../../ui/icons";
 import { useEstimate } from "./useEstimate";
 
@@ -164,14 +165,14 @@ export function ExportDialog({
             <section className="xsec" key={group}>
               <h3>{group}</h3>
               {rows.map((row) => (
-                <SettingRow key={row.option} label={row.label} description={row.description}>
+                <FormRow key={row.option} label={row.label} description={row.description}>
                   <Choice
                     name={row.label}
                     options={row.choices}
                     value={options[row.option]}
                     onPick={(value) => pick(row.option, value)}
                   />
-                </SettingRow>
+                </FormRow>
               ))}
             </section>
           ))}
@@ -208,26 +209,6 @@ export function ExportDialog({
           </button>
         </div>
       </div>
-    </div>
-  );
-}
-
-function SettingRow({
-  label,
-  description,
-  children,
-}: {
-  label: string;
-  description?: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className="srow">
-      <div>
-        <span className="sl">{label}</span>
-        {description && <p className="sd">{description}</p>}
-      </div>
-      <div className="ctl">{children}</div>
     </div>
   );
 }

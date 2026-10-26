@@ -1,5 +1,6 @@
 import type {
   CaptionStyle,
+  Criterion,
   Cut,
   CutPreview,
   ErrorBody,
@@ -7,13 +8,19 @@ import type {
   ListedCut,
   MachineStatus,
   Me,
+  Member,
+  Preset,
+  PresetChange,
   Render,
   RenderEstimate,
   RenderOptions,
+  Role,
   Sermon,
   SermonCreated,
   SermonListItem,
   SermonShown,
+  Settings,
+  SettingsModels,
   TaskLaunched,
 } from "./types";
 
@@ -195,4 +202,69 @@ export function getMe(): Promise<Me> {
 
 export function getStatus(): Promise<MachineStatus> {
   return request("/api/status");
+}
+
+// The administrator's routes of docs/api.md §2 (ADR-0021: the e-mail goes only in the body).
+
+export function getSettings(): Promise<Settings> {
+  return request("/api/settings");
+}
+
+/** Saves the models given; a blank one is refused with 400. */
+export function patchSettings(models: SettingsModels): Promise<Settings> {
+  return send("PATCH", "/api/settings", models);
+}
+
+/** Stores the LLM key; the answer brings it back only masked. */
+export function putLlmKey(value: string): Promise<Settings> {
+  return send("PUT", "/api/settings/llm-key", { value });
+}
+
+/** Stores the YouTube cookies (Netscape ``cookies.txt``); the answer tells only that they exist. */
+export function putYoutubeCookies(value: string): Promise<Settings> {
+  return send("PUT", "/api/settings/youtube-cookies", { value });
+}
+
+export async function listCriteria(): Promise<Criterion[]> {
+  return (await request<{ items: Criterion[] }>("/api/criteria")).items;
+}
+
+export async function listPresets(): Promise<Preset[]> {
+  return (await request<{ items: Preset[] }>("/api/presets")).items;
+}
+
+/** A new preset, a copy of ``fromId``; never the default. */
+export function createPreset(name: string, fromId: number): Promise<Preset> {
+  return post("/api/presets", { name, from_id: fromId });
+}
+
+export function patchPreset(id: number, change: PresetChange): Promise<Preset> {
+  return send("PATCH", `/api/presets/${id}`, change);
+}
+
+export function setDefaultPreset(id: number): Promise<Preset> {
+  return post(`/api/presets/${id}/set-default`, {});
+}
+
+/** The default preset cannot be deleted: 409 ``default_preset``. */
+export function deletePreset(id: number): Promise<{ id: number; deleted: true }> {
+  return request(`/api/presets/${id}`, { method: "DELETE" });
+}
+
+export async function listMembers(): Promise<Member[]> {
+  return (await request<{ items: Member[] }>("/api/members")).items;
+}
+
+export function addMember(email: string, role: Role): Promise<Member> {
+  return post("/api/members", { email, role });
+}
+
+/** 409 ``last_admin`` when it would leave the team without an administrator. */
+export function setMemberRole(email: string, role: Role): Promise<Member> {
+  return post("/api/members/set-role", { email, role });
+}
+
+/** 409 ``last_admin`` when it would leave the team without an administrator. */
+export function removeMember(email: string): Promise<{ email: string; removed: true }> {
+  return post("/api/members/remove", { email });
 }
