@@ -130,9 +130,15 @@ def create_parser() -> tuple[Parser, Commands]:
     return parser, commands
 
 
-def add_group(commands: Commands, name: str, *, help: str) -> Commands:
+def add_group(commands: Commands, name: str, *, help: str, example: str | None = None) -> Commands:
     """A resource whose actions are added with ``add_command`` (``wordcut <name> <ação>``)."""
-    group = commands.add_parser(name, help=help, description=help)
+    group = commands.add_parser(
+        name,
+        help=help,
+        description=help,
+        epilog=f"Exemplo:\n  {example}" if example else None,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     _add_global_options(group, default=argparse.SUPPRESS)
     return group.add_subparsers(dest="action", required=True)
 

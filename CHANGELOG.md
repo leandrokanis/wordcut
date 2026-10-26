@@ -175,6 +175,18 @@ Formato de [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões
   exportação inexistente dá `not_found`; arquivo da exportação ausente no disco,
   `internal_error` com `details.render_id`, sem caminho interno. Nenhum dos três toma a trava
   de processamento.
+- `wordcut member list`, `member add <email> --role assistant|admin`,
+  `member set-role <email> assistant|admin` e `member remove <email>` (administrador; item
+  1.2.a.1): a equipe na tabela `members` (migração 0010), que guarda, de dado pessoal, só o
+  e-mail, em minúsculas e sem os espaços das pontas, com o papel e as datas de inclusão e de
+  alteração (LGPD). O `list` traz `{"items": [...]}` em ordem de e-mail, cada membro como
+  `{email, role, created_at, updated_at}`; `add` e `set-role` devolvem o membro; `remove`
+  devolve `{"email", "removed": true}`. Remover ou rebaixar o último administrador dá
+  `last_admin` (saída 5), com a checagem e a gravação na mesma transação de escrita, para a
+  CLI e a API não zerarem os administradores ao mesmo tempo; `set-role` para o papel que o
+  membro já tem não muda nada. E-mail inválido ou já na equipe e papel fora de
+  `assistant|admin` dão `invalid_argument`; e-mail fora da equipe, `not_found`; nenhum erro
+  repete o e-mail. `service.members.role_of` dá o papel de um e-mail, ou `None`, para a API.
 
 ### Alterado
 

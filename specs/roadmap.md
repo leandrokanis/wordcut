@@ -66,7 +66,7 @@ Depois o servidor e, por fim, a interface, seguindo o protótipo
 | 14 | 1.1.f.4 | `cut caption` | 1.1.f.5 | ☑ |
 | 15 | 1.1.h.1 | `cut render` com opções e `--estimate` | 1.1.h.2, 1.1.h.3 | ☑ |
 | 16 | 1.1.i.1 | `render list/show/download` | — | ☑ |
-| 17 | 1.2.a.1 | `member` | — | ☐ |
+| 17 | 1.2.a.1 | `member` | — | ☑ |
 | 18 | cli-migration | Remover a CLI antiga e reescrever README e skills sobre a nova | — | ☐ |
 
 ### Fase 2 — Servidor
@@ -74,7 +74,8 @@ Depois o servidor e, por fim, a interface, seguindo o protótipo
 | # | ID | Item | Cobre | Estado |
 |:-:|---|---|---|---|
 | 19 | 1.2.a.2 | App `api`: FastAPI no Compose, identidade pelo Cloudflare Access e papéis | — | ☐ |
-| 20 | web-api | Rotas da API sobre a camada de serviço e progresso das tarefas por SSE | — | ☐ |
+| 20a | web-api-sermons | Rotas de pregações, tarefas e estado, com SSE | — | ☐ |
+| 20b | web-api-cuts | Rotas de cortes, exportações, configurações, presets e equipe | — | ☐ |
 
 ### Fase 3 — Interface web (React + Vite + TypeScript)
 
@@ -108,3 +109,4 @@ Depois o servidor e, por fim, a interface, seguindo o protótipo
 | 14 1.1.f.4 | PASS na rodada 1 | (ver git log) | Posições alinhadas ao protótipo (20/50/78 %, altura 10–90 %). Só Open Sans Bold incluída. |
 | 15 1.1.h.1 | PASS na rodada 2 | (ver git log) | ADR-0018. Limitação: `.mp4` órfão quando o corte é apagado por `sermon suggest`/reprocessamento (tratar em 1.2.b). Renderização real só testada em clipe sintético. |
 | 16 1.1.i.1 | PASS na rodada 1 | (ver git log) | `path` das exportações sempre absoluto. |
+| 17 1.2.a.1 | PASS na rodada 1 | (ver git log) | Último admin sob `BEGIN IMMEDIATE`. Efeito colateral: `add_group` usa `RawDescriptionHelpFormatter` e a ajuda dos grupos não quebra linha (ex.: `cut --help` com 102 colunas) — corrigir no item 18. |
