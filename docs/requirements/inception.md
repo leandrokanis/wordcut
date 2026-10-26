@@ -1,4 +1,4 @@
-# Inception — Word Cuts
+# Inception — Wordcut
 
 **Iniciada**: 2026-10-25 · **Concluída**: 2026-10-25
 
@@ -21,13 +21,13 @@
 ```
 Para a equipe de mídia da igreja,
 cujos cortes da pregação exigem edição demorada e julgamento teológico,
-o Word Cuts é uma aplicação web com CLI
+o Wordcut é uma aplicação web com CLI
 que transforma o link da live em cortes verticais prontos.
 Diferentemente de ferramentas automáticas de cortes,
 ele escolhe os trechos por critérios teológicos do projeto, na rigidez do administrador.
 ```
 
-Nome: "Word Cuts" — a Palavra e a edição palavra a palavra.
+Nome: "Wordcut" — a Palavra e a edição palavra a palavra.
 
 ## 2. É / Não é / Faz / Não faz
 

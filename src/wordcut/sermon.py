@@ -10,12 +10,12 @@ import tempfile
 from dataclasses import dataclass, replace
 from pathlib import Path
 
-from cortes_pregacao.asr import Transcriber
-from cortes_pregacao.media import cut_with_fades, duration_seconds, extract_speech_audio
-from cortes_pregacao.sermon_folder import SermonFolder
-from cortes_pregacao.sync import locate_clip
-from cortes_pregacao.transcript import Transcript
-from cortes_pregacao.youtube import YouTube
+from wordcut.asr import Transcriber
+from wordcut.media import cut_with_fades, duration_seconds, extract_speech_audio
+from wordcut.sermon_folder import SermonFolder
+from wordcut.sync import locate_clip
+from wordcut.transcript import Transcript
+from wordcut.youtube import YouTube
 
 RANGE_MARGIN_S = 60.0  # around an approximate sermon range given by the user
 SECTION_MARGIN_S = 30.0  # video downloaded beyond the cut, for sync and keyframes

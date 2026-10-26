@@ -13,9 +13,9 @@ import bisect
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
-from cortes_pregacao.edit.cleanup import remove_hesitations
-from cortes_pregacao.edit.edit_list import EditList
-from cortes_pregacao.transcript import Word
+from wordcut.edit.cleanup import remove_hesitations
+from wordcut.edit.edit_list import EditList
+from wordcut.transcript import Word
 
 PAUSE_S = 0.15
 RHETORICAL_PAUSE_S = 0.40

@@ -1,4 +1,4 @@
-# cortes-pregacao
+# Wordcut
 
 Ferramentas para transformar a transmissão de um culto em:
 
@@ -38,18 +38,18 @@ uv sync
 Host com GPU (CUDA), uma vez:
 
 ```sh
-python3 -m venv ~/.local/share/cortes-pregacao/venv
-~/.local/share/cortes-pregacao/venv/bin/pip install whisperx
+python3 -m venv ~/.local/share/wordcut/venv
+~/.local/share/wordcut/venv/bin/pip install whisperx
 ```
 
 Para baixar do YouTube (na máquina que roda o pipeline):
 
 - `yt-dlp[default]` e [Deno](https://deno.land) (resolve o desafio JavaScript do YouTube);
 - no Linux, o [build estático de ffmpeg do yt-dlp](https://github.com/yt-dlp/FFmpeg-Builds)
-  extraído em `~/.local/share/cortes-pregacao/ffmpeg/` — o ffmpeg 6.1 do Ubuntu trava
+  extraído em `~/.local/share/wordcut/ffmpeg/` — o ffmpeg 6.1 do Ubuntu trava
   ao baixar trechos;
 - cookies de uma sessão logada no YouTube em
-  `~/.config/cortes-pregacao/youtube-cookies.txt` (permissão `600`, nunca no repositório).
+  `~/.config/wordcut/youtube-cookies.txt` (permissão `600`, nunca no repositório).
 
 Para usar as skills, ligue-as ao Claude Code:
 
@@ -67,10 +67,10 @@ antes de cortar e de renderizar.
 ### 1. Pregação
 
 ```sh
-uv run cortes info <link>                    # título, data do culto, duração, se terminou
-uv run cortes transcribe-live <link> --dir "<pasta>" [--start HH:MM:SS --end HH:MM:SS]
-uv run cortes overview "<pasta>/trabalho/live-palavras.json" [--words --start … --end …]
-uv run cortes cut <link> --dir "<pasta>" --first-word <início> --last-word <fim>
+uv run wordcut info <link>                    # título, data do culto, duração, se terminou
+uv run wordcut transcribe-live <link> --dir "<pasta>" [--start HH:MM:SS --end HH:MM:SS]
+uv run wordcut overview "<pasta>/trabalho/live-palavras.json" [--words --start … --end …]
+uv run wordcut cut <link> --dir "<pasta>" --first-word <início> --last-word <fim>
 ```
 
 A pasta segue o padrão `~/Videos/Pregações/AAAA-MM-DD - Título - Referência/`. O `cut` grava
@@ -84,9 +84,9 @@ segundos do `.mp4`) e correções de grafia da legenda. Critérios e formato est
 `skills/video-corte-vertical/sugerir-cortes.md`.
 
 ```sh
-uv run cortes overview "<pasta>/palavras.json"              # pregação, uma frase por linha
-uv run cortes preview "<pasta>/roteiros/<slug>.json" --dir "<pasta>"   # texto montado
-uv run cortes short "<pasta>/roteiros/<slug>.json" --dir "<pasta>" [--alvo 0.7]
+uv run wordcut overview "<pasta>/palavras.json"              # pregação, uma frase por linha
+uv run wordcut preview "<pasta>/roteiros/<slug>.json" --dir "<pasta>"   # texto montado
+uv run wordcut short "<pasta>/roteiros/<slug>.json" --dir "<pasta>" [--alvo 0.7]
 ```
 
 O `short` grava `cortes/corte - <título>.mp4` em 1080x1920 e nunca sobrescreve (cria `-v2`,
@@ -95,8 +95,8 @@ O `short` grava `cortes/corte - <título>.mp4` em 1080x1920 e nunca sobrescreve 
 ### Transcrição avulsa
 
 ```sh
-uv run cortes transcribe pregacao.mp4 -o palavras.json                # nesta máquina
-uv run cortes transcribe pregacao.mp4 -o palavras.json --host leitao  # por SSH
+uv run wordcut transcribe pregacao.mp4 -o palavras.json                # nesta máquina
+uv run wordcut transcribe pregacao.mp4 -o palavras.json --host leitao  # por SSH
 ```
 
 ## Desenvolvimento
@@ -109,5 +109,5 @@ uv run mypy src
 
 ## Licença
 
-MIT. A fonte Open Sans incluída em `src/cortes_pregacao/assets/fonts/` é distribuída sob a
+MIT. A fonte Open Sans incluída em `src/wordcut/assets/fonts/` é distribuída sob a
 SIL Open Font License 1.1 (`OFL.txt`).

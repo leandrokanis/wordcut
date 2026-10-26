@@ -8,4 +8,4 @@ from typing import Protocol
 
 class Transcriber(Protocol):
     def transcribe(self, audio: Path, output: Path) -> None:
-        """Write a :class:`~cortes_pregacao.transcript.Transcript` JSON for ``audio``."""
+        """Write a :class:`~wordcut.transcript.Transcript` JSON for ``audio``."""

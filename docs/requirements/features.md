@@ -1,6 +1,6 @@
 # Requisitos — Temas, Épicos, Features e Histórias de Usuário
 
-Fonte canônica de requisitos funcionais do Word Cuts, gerada pela inception
+Fonte canônica de requisitos funcionais do Wordcut, gerada pela inception
 ([inception.md](inception.md)) e mantida por /dev-idea.
 
 Formato: **BDD in Action** (Smart, 2014); Temas de Investimento conforme
@@ -8,8 +8,10 @@ Formato: **BDD in Action** (Smart, 2014); Temas de Investimento conforme
 
 **MVP**: ondas 1–5.
 
-**Protótipo navegável**: [docs/prototype/word-cuts.html](../prototype/word-cuts.html), com dados
+**Protótipo navegável**: [docs/prototype/wordcut.html](../prototype/wordcut.html), com dados
 fictícios; abrir no navegador.
+
+**CLI**: [docs/cli.md](../cli.md), a especificação dos comandos `wordcut`.
 
 ## Requisitos gerais de interface
 

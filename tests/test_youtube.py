@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from cortes_pregacao.youtube import LiveInfo, YouTube
+from wordcut.youtube import LiveInfo, YouTube
 
 
 def test_service_date_uses_church_timezone_not_utc() -> None:

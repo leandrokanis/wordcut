@@ -11,9 +11,9 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 CHURCH_TIMEZONE = ZoneInfo("America/Sao_Paulo")
-DEFAULT_COOKIES = Path.home() / ".config/cortes-pregacao/youtube-cookies.txt"
+DEFAULT_COOKIES = Path.home() / ".config/wordcut/youtube-cookies.txt"
 # yt-dlp's static ffmpeg build; Ubuntu's ffmpeg 6.1 segfaults on section downloads.
-DEFAULT_FFMPEG_DIR = Path.home() / ".local/share/cortes-pregacao/ffmpeg/bin"
+DEFAULT_FFMPEG_DIR = Path.home() / ".local/share/wordcut/ffmpeg/bin"
 MAX_HEIGHT = 1080
 
 
@@ -66,7 +66,7 @@ class YouTube:
         """Video+audio between ``start`` and ``end`` (seconds), up to 1080p, as mp4.
 
         The section starts at a keyframe near ``start``, not exactly at it; use
-        :func:`cortes_pregacao.sync.locate_clip` to find the real offset.
+        :func:`wordcut.sync.locate_clip` to find the real offset.
         """
         self._run(self.section_args(url, start, end, output))
         return output

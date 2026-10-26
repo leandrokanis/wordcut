@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from cortes_pregacao.media import fade_cut_command
+from wordcut.media import fade_cut_command
 
 
 def option(command: list[str], flag: str) -> str:

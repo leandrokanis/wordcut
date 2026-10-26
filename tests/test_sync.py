@@ -1,6 +1,6 @@
 import numpy as np
 
-from cortes_pregacao.sync import find_clip_start
+from wordcut.sync import find_clip_start
 
 RATE = 1_000
 

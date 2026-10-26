@@ -1,6 +1,6 @@
 """WhisperX transcription worker, meant to run on a CUDA host.
 
-Usage: python -m cortes_pregacao.asr.worker AUDIO OUTPUT_JSON [--model NAME]
+Usage: python -m wordcut.asr.worker AUDIO OUTPUT_JSON [--model NAME]
 """
 
 from __future__ import annotations
@@ -11,8 +11,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from cortes_pregacao.asr.prompt_echo import remove_prompt_echoes
-from cortes_pregacao.transcript import RawWord, Transcript, fill_missing_times
+from wordcut.asr.prompt_echo import remove_prompt_echoes
+from wordcut.transcript import RawWord, Transcript, fill_missing_times
 
 LANGUAGE = "pt"
 SAMPLE_RATE = 16_000

@@ -4,9 +4,9 @@ from pathlib import Path
 
 import pytest
 
-from cortes_pregacao.sermon import RANGE_MARGIN_S, transcribe_live
-from cortes_pregacao.sermon_folder import SermonFolder
-from cortes_pregacao.transcript import Transcript, Word
+from wordcut.sermon import RANGE_MARGIN_S, transcribe_live
+from wordcut.sermon_folder import SermonFolder
+from wordcut.transcript import Transcript, Word
 
 pytestmark = pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="requires ffmpeg")
 

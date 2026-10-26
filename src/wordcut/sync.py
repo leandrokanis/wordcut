@@ -11,7 +11,7 @@ from pathlib import Path
 import numpy as np
 import numpy.typing as npt
 
-from cortes_pregacao.media import read_audio
+from wordcut.media import read_audio
 
 SYNC_RATE = 4_000  # Hz; plenty for speech envelopes, keeps correlation cheap
 PROBE_SECONDS = 30.0

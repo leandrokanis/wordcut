@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 import numpy.typing as npt
 
-from cortes_pregacao.media import read_audio
+from wordcut.media import read_audio
 
 SAMPLE_RATE = 8_000
 WINDOW_S = 0.010

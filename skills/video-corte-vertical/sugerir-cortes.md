@@ -49,10 +49,10 @@ Reordenar é permitido (ex.: gancho tirado da conclusão), mas é onde mora o ri
 
 ## Processo
 
-1. Leia a pregação inteira: `cortes overview "<pasta>/palavras.json"`. O contexto é o que pega o "fora de contexto".
+1. Leia a pregação inteira: `wordcut overview "<pasta>/palavras.json"`. O contexto é o que pega o "fora de contexto".
 2. Consulte `exemplos.md` para calibrar com decisões anteriores.
 3. Identifique 3–5 **ideias** fortes. Para cada uma, monte um roteiro (trechos que juntos contam a ideia em 55–65 s).
-4. Tempos dos trechos: `cortes overview … --words --start … --end …`. Cada trecho vai do **início** da primeira palavra ao **fim** da última (a ferramenta acrescenta as margens). Uma palavra só entra se estiver inteira dentro do trecho.
+4. Tempos dos trechos: `wordcut overview … --words --start … --end …`. Cada trecho vai do **início** da primeira palavra ao **fim** da última (a ferramenta acrescenta as margens). Uma palavra só entra se estiver inteira dentro do trecho.
 5. Grave cada roteiro em `<pasta>/roteiros/<slug>.json`:
    ```json
    {"version": 1, "title": "Frase marcante curta",
@@ -60,7 +60,7 @@ Reordenar é permitido (ex.: gancho tirado da conclusão), mas é onde mora o ri
                  {"start": 2414.05, "end": 2439.7, "note": ""}],
     "corrections": {"Esther": "Ester", "Esté": "Ester", "a direita": "à direita"}}
    ```
-6. Rode `cortes preview <roteiro> --dir <pasta>` para cada um e ajuste até não haver avisos. Confira nomes próprios no texto montado e corrija a grafia em `corrections` (nomes bíblicos pela NVI: Ester, Mardoqueu, Hamã…), mesmo número de palavras de cada lado.
+6. Rode `wordcut preview <roteiro> --dir <pasta>` para cada um e ajuste até não haver avisos. Confira nomes próprios no texto montado e corrija a grafia em `corrections` (nomes bíblicos pela NVI: Ester, Mardoqueu, Hamã…), mesmo número de palavras de cada lado.
 7. Apresente uma tabela e, para cada ideia, a saída do `preview` (trechos, cortes `[–hesitação–]`, texto montado):
 
 | # | Ideia | Duração | Gancho | Valor | Trechos | Alertas |

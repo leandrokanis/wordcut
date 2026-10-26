@@ -1,5 +1,5 @@
-from cortes_pregacao.asr.prompt_echo import remove_prompt_echoes
-from cortes_pregacao.transcript import Word
+from wordcut.asr.prompt_echo import remove_prompt_echoes
+from wordcut.transcript import Word
 
 PROMPT = "Hã, é... então, né, tipo assim, é, o, o Senhor, ãh, a gente, hum, aí, né."
 

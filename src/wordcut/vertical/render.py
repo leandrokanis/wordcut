@@ -9,9 +9,9 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from cortes_pregacao.vertical.camera import ASPECT, CameraPath
-from cortes_pregacao.vertical.captions import CaptionImage
-from cortes_pregacao.vertical.detection import Frame
+from wordcut.vertical.camera import ASPECT, CameraPath
+from wordcut.vertical.captions import CaptionImage
+from wordcut.vertical.detection import Frame
 
 OUTPUT_WIDTH, OUTPUT_HEIGHT = 1080, 1920
 LOUDNESS = "loudnorm=I=-14:TP=-1.5:LRA=11,aresample=48000"  # social media loudness

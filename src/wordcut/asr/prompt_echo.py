@@ -11,7 +11,7 @@ import re
 from collections.abc import Sequence
 from typing import TypeVar
 
-from cortes_pregacao.transcript import RawWord, Word
+from wordcut.transcript import RawWord, Word
 
 MIN_ECHO_RUN = 4
 

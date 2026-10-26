@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "cortes-pregacao"
+name = "wordcut"
 version = "0.1.0"
 description = "Corta pregações de cultos e gera cortes verticais editados palavra a palavra."
 readme = "README.md"
@@ -20,7 +20,7 @@ dependencies = [
 asr = ["whisperx>=3.4"]
 
 [project.scripts]
-cortes = "cortes_pregacao.cli:main"
+wordcut = "wordcut.cli:main"
 
 [dependency-groups]
 dev = [

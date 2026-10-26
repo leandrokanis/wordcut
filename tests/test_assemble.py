@@ -3,9 +3,9 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from cortes_pregacao.edit.assemble import montage_command
-from cortes_pregacao.edit.energy import EnergyProfile
-from cortes_pregacao.edit.timeline import Clip
+from wordcut.edit.assemble import montage_command
+from wordcut.edit.energy import EnergyProfile
+from wordcut.edit.timeline import Clip
 
 
 def test_one_seeked_input_per_clip_and_concat() -> None:

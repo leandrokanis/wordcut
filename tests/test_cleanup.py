@@ -1,5 +1,5 @@
-from cortes_pregacao.edit.cleanup import remove_hesitations
-from cortes_pregacao.transcript import Word
+from wordcut.edit.cleanup import remove_hesitations
+from wordcut.transcript import Word
 
 
 def words(*tokens: str, gap: float = 0.1) -> list[Word]:

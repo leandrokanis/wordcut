@@ -6,7 +6,7 @@ import subprocess
 from collections.abc import Sequence
 from pathlib import Path
 
-from cortes_pregacao.edit.timeline import Clip
+from wordcut.edit.timeline import Clip
 
 JOIN_FADE_S = 0.015
 """Fade-out then fade-in at every join: removes clicks without overlapping audio,

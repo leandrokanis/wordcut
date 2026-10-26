@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from cortes_pregacao.transcript import RawWord, Transcript, Word, fill_missing_times
+from wordcut.transcript import RawWord, Transcript, Word, fill_missing_times
 
 
 def make_transcript(*words: Word) -> Transcript:

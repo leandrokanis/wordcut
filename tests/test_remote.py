@@ -1,4 +1,4 @@
-from cortes_pregacao.asr.remote import RemoteHost, RemoteTranscriber, _last_progress_line
+from wordcut.asr.remote import RemoteHost, RemoteTranscriber, _last_progress_line
 
 
 def test_ssh_command_never_prompts() -> None:

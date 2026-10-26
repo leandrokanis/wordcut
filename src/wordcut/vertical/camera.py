@@ -15,7 +15,7 @@ import numpy as np
 import numpy.typing as npt
 from scipy.signal import medfilt, savgol_filter
 
-from cortes_pregacao.vertical.detection import Detection, FrameDetections
+from wordcut.vertical.detection import Detection, FrameDetections
 
 ASPECT = 9 / 16
 HEADS_REGION = 0.42  # heads must be in the top 42% of the frame (ignores the audience)

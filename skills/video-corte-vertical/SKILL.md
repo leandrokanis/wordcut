@@ -15,17 +15,17 @@ Segunda etapa do fluxo. A primeira é `video-cortar-pregacao`, que gera a pasta 
   cortes/          resultado
 ```
 
-Roda no **leitao**, no repositório `~/cortes-pregacao` (`uv run cortes …`). Se a pasta não existir ou não tiver `palavras.json`, rode a primeira etapa antes.
+Roda no **leitao**, no repositório `~/cortes-pregacao` (`uv run wordcut …`). Se a pasta não existir ou não tiver `palavras.json`, rode a primeira etapa antes.
 
 ## Fluxo
 
-1. **Sugerir ideias e montar roteiros** seguindo `sugerir-cortes.md` (critérios, salvaguardas da colagem e formato do roteiro), calibrado por `exemplos.md`. Cada ideia vira um roteiro em `roteiros/` e passa pelo `cortes preview` sem avisos.
+1. **Sugerir ideias e montar roteiros** seguindo `sugerir-cortes.md` (critérios, salvaguardas da colagem e formato do roteiro), calibrado por `exemplos.md`. Cada ideia vira um roteiro em `roteiros/` e passa pelo `wordcut preview` sem avisos.
 
 2. **Aprovação obrigatória do roteiro em texto.** Mostre a saída do `preview` de cada ideia. O usuário pode aprovar várias de uma vez, pedir ajustes (tirar/incluir frase, trocar gancho) ou rejeitar. Ajuste o `.json`, rode `preview` de novo e mostre. Nada é renderizado sem aprovação.
 
 3. **Renderizar** cada roteiro aprovado, em background (≈ 2–4 min por corte):
    ```
-   cortes short "<pasta>/roteiros/<slug>.json" --dir "<pasta>"
+   wordcut short "<pasta>/roteiros/<slug>.json" --dir "<pasta>"
    ```
    Com mais de uma pessoa em pé (entrevista, testemunho), olhe um quadro e passe `--alvo 0.7` (posição horizontal de quem fala, 0 = esquerda).
 

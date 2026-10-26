@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 
-from cortes_pregacao.timefmt import format_timestamp
-from cortes_pregacao.transcript import Transcript, Word
+from wordcut.timefmt import format_timestamp
+from wordcut.transcript import Transcript, Word
 
 SENTENCE_END = (".", "?", "!")
 MAX_WORDS_PER_LINE = 25

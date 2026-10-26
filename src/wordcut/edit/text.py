@@ -16,8 +16,8 @@ import re
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
 
-from cortes_pregacao.edit.cleanup import SENTENCE_END, TRAILING_MARKS, normalize
-from cortes_pregacao.transcript import Word
+from wordcut.edit.cleanup import SENTENCE_END, TRAILING_MARKS, normalize
+from wordcut.transcript import Word
 
 _AFFIXES = re.compile(r"^(\W*)(.*?)(\W*)$", re.DOTALL)
 CLAUSE_MARKS = (",", ";", ":")

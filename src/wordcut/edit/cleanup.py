@@ -19,7 +19,7 @@ import re
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
 
-from cortes_pregacao.transcript import Word
+from wordcut.transcript import Word
 
 FILLERS = frozenset({"hã", "ãh", "ah", "ahn", "eh", "éh", "hum", "hmm", "hm", "uh", "uhm", "né"})
 TRAILING_FILLERS = frozenset({"é", "e", "então", "aí"})

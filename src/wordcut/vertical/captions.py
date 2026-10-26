@@ -20,7 +20,7 @@ import numpy as np
 import numpy.typing as npt
 from PIL import Image, ImageDraw, ImageFont
 
-from cortes_pregacao.transcript import Word
+from wordcut.transcript import Word
 
 DEFAULT_FONT = Path(__file__).resolve().parents[1] / "assets/fonts/OpenSans-Bold.ttf"
 SENTENCE_END = (".", "?", "!")

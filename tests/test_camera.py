@@ -1,7 +1,7 @@
 import numpy as np
 
-from cortes_pregacao.vertical.camera import plan_camera
-from cortes_pregacao.vertical.detection import Detection, FrameDetections
+from wordcut.vertical.camera import plan_camera
+from wordcut.vertical.detection import Detection, FrameDetections
 
 WIDTH, HEIGHT = 1920, 1080
 HALF_WINDOW = HEIGHT * 9 / 16 / 2

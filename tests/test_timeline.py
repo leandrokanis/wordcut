@@ -1,8 +1,8 @@
 import pytest
 
-from cortes_pregacao.edit.edit_list import EditList, Segment
-from cortes_pregacao.edit.timeline import PAUSE_S, RHETORICAL_PAUSE_S, plan_timeline
-from cortes_pregacao.transcript import Word
+from wordcut.edit.edit_list import EditList, Segment
+from wordcut.edit.timeline import PAUSE_S, RHETORICAL_PAUSE_S, plan_timeline
+from wordcut.transcript import Word
 
 FPS = 30.0
 

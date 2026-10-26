@@ -1,5 +1,5 @@
-from cortes_pregacao.overview import overview_lines, word_lines
-from cortes_pregacao.transcript import Transcript, Word
+from wordcut.overview import overview_lines, word_lines
+from wordcut.transcript import Transcript, Word
 
 
 def transcript(*words: tuple[str, float, float]) -> Transcript:

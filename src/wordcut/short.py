@@ -7,19 +7,19 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from cortes_pregacao.edit.assemble import assemble
-from cortes_pregacao.edit.edit_list import EditList
-from cortes_pregacao.edit.energy import EnergyProfile
-from cortes_pregacao.edit.text import apply_corrections, capitalize, tidy_joins
-from cortes_pregacao.edit.timeline import Timeline, plan_timeline
-from cortes_pregacao.media import video_geometry
-from cortes_pregacao.sermon_folder import SermonFolder
-from cortes_pregacao.timefmt import format_timestamp
-from cortes_pregacao.transcript import Transcript, Word
-from cortes_pregacao.vertical.camera import plan_camera
-from cortes_pregacao.vertical.captions import CaptionRenderer, build_captions
-from cortes_pregacao.vertical.detection import detect_frames
-from cortes_pregacao.vertical.render import OUTPUT_WIDTH, render_vertical
+from wordcut.edit.assemble import assemble
+from wordcut.edit.edit_list import EditList
+from wordcut.edit.energy import EnergyProfile
+from wordcut.edit.text import apply_corrections, capitalize, tidy_joins
+from wordcut.edit.timeline import Timeline, plan_timeline
+from wordcut.media import video_geometry
+from wordcut.sermon_folder import SermonFolder
+from wordcut.timefmt import format_timestamp
+from wordcut.transcript import Transcript, Word
+from wordcut.vertical.camera import plan_camera
+from wordcut.vertical.captions import CaptionRenderer, build_captions
+from wordcut.vertical.detection import detect_frames
+from wordcut.vertical.render import OUTPUT_WIDTH, render_vertical
 
 IDEAL_DURATION_S = (55.0, 65.0)
 ALLOWED_DURATION_S = (40.0, 75.0)

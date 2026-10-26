@@ -12,7 +12,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
-from cortes_pregacao.edit.text import validate_corrections
+from wordcut.edit.text import validate_corrections
 
 SCHEMA_VERSION = 1
 

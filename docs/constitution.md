@@ -1,5 +1,7 @@
 <!--
 Sync Impact Report
+- Versão: 2.0.1 → 2.0.2 — PATCH (2026-10-26): o projeto passa a se chamar Wordcut (título).
+  Aprovada pelo administrador do projeto em 2026-10-26.
 - Versão: 2.0.0 → 2.0.1 — PATCH (2026-10-25): "roteiros sugeridos" passa a "cortes sugeridos" no
   princípio I, acompanhando o vocabulário dos requisitos.
 - Versão: 1.3.0 → 2.0.0 — emenda (2026-10-25): a constituição passa a tratar só de princípios e
@@ -22,7 +24,7 @@ Sync Impact Report
   - TODO(TRAVAS): reavaliar uma trava só versus GPU/CPU separadas depois do uso real.
 -->
 
-# cortes-pregacao Constitution
+# Wordcut Constitution
 
 Aplicação web, na máquina com GPU do administrador, que transforma a live de um culto no
 YouTube na pregação recortada e em cortes verticais editados palavra a palavra. É usada por
@@ -140,4 +142,4 @@ infraestrutura.
   - PATCH: redação e esclarecimentos.
 - Uma emenda MUST ser revisada por uma pessoa diferente de quem a redigiu antes de valer.
 
-**Version**: 2.0.1 | **Ratified**: 2026-10-24 | **Last Amended**: 2026-10-25
+**Version**: 2.0.2 | **Ratified**: 2026-10-24 | **Last Amended**: 2026-10-26

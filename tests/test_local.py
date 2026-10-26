@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from cortes_pregacao.asr.local import LocalTranscriber
+from wordcut.asr.local import LocalTranscriber
 
 
 def test_command_runs_worker_module_with_env_python(tmp_path: Path) -> None:
@@ -12,7 +12,7 @@ def test_command_runs_worker_module_with_env_python(tmp_path: Path) -> None:
 
     assert command[0] == str(tmp_path / "venv/bin/python")
     assert command[1:] == [
-        "-u", "-m", "cortes_pregacao.asr.worker", "a.wav", "out.json", "--model", "large-v3",
+        "-u", "-m", "wordcut.asr.worker", "a.wav", "out.json", "--model", "large-v3",
     ]  # fmt: skip
 
 

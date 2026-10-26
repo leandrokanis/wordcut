@@ -11,7 +11,7 @@ import subprocess
 from pathlib import Path
 
 PACKAGE_PARENT = Path(__file__).resolve().parents[2]
-DEFAULT_WORKER_ENV = Path.home() / ".local/share/cortes-pregacao/venv"
+DEFAULT_WORKER_ENV = Path.home() / ".local/share/wordcut/venv"
 
 
 class LocalTranscriber:
@@ -29,7 +29,7 @@ class LocalTranscriber:
 
     def command(self, audio: Path, output: Path) -> list[str]:
         return [
-            str(self._python), "-u", "-m", "cortes_pregacao.asr.worker",
+            str(self._python), "-u", "-m", "wordcut.asr.worker",
             str(audio), str(output), "--model", self._model,
         ]  # fmt: skip
 

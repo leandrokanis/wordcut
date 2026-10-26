@@ -1,7 +1,7 @@
 from datetime import date
 from pathlib import Path
 
-from cortes_pregacao.sermon_folder import SermonFolder, folder_name
+from wordcut.sermon_folder import SermonFolder, folder_name
 
 
 def test_folder_name_with_reference_replaces_colon() -> None:

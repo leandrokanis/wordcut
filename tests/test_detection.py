@@ -4,8 +4,8 @@ import cv2
 import numpy as np
 import pytest
 
-from cortes_pregacao.vertical import detection
-from cortes_pregacao.vertical.detection import Detection, _rescale, detect_frames
+from wordcut.vertical import detection
+from wordcut.vertical.detection import Detection, _rescale, detect_frames
 
 
 def blank_video(path: Path, frames: int, cut_at: int | None = None) -> Path:

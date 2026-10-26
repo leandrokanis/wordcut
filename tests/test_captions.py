@@ -1,7 +1,7 @@
 import pytest
 
-from cortes_pregacao.transcript import Word
-from cortes_pregacao.vertical.captions import (
+from wordcut.transcript import Word
+from wordcut.vertical.captions import (
     LINGER_S,
     CaptionRenderer,
     CaptionStyle,

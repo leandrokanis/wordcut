@@ -36,7 +36,7 @@ class RemoteHost:
     """
 
     name: str
-    home: str = "~/.local/share/cortes-pregacao"
+    home: str = "~/.local/share/wordcut"
 
     def ssh_command(self, remote_command: str) -> list[str]:
         return ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", self.name, remote_command]
@@ -87,7 +87,7 @@ class RemoteTranscriber:
         job_dir = self._host.job_dir(job_id)
         home = self._host.home
         worker = (
-            f"PYTHONPATH={home}/src {home}/venv/bin/python -u -m cortes_pregacao.asr.worker "
+            f"PYTHONPATH={home}/src {home}/venv/bin/python -u -m wordcut.asr.worker "
             f"{job_dir}/audio.wav {job_dir}/transcript.json --model {shlex.quote(self._model)}"
         )
         # setsid + nohup: survive the SSH session; status is written when the worker exits.

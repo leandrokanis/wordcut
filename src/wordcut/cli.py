@@ -1,4 +1,4 @@
-"""Command-line interface: ``cortes <command>``."""
+"""Command-line interface: ``wordcut <command>``."""
 
 from __future__ import annotations
 
@@ -7,18 +7,18 @@ import json
 import tempfile
 from pathlib import Path
 
-from cortes_pregacao.asr import Transcriber
-from cortes_pregacao.asr.local import LocalTranscriber
-from cortes_pregacao.asr.remote import RemoteHost, RemoteTranscriber
-from cortes_pregacao.edit.edit_list import EditList
-from cortes_pregacao.media import extract_speech_audio
-from cortes_pregacao.overview import overview_lines, word_lines
-from cortes_pregacao.sermon import cut_sermon, transcribe_live
-from cortes_pregacao.sermon_folder import SermonFolder, default_root, folder_name
-from cortes_pregacao.short import plan_short, preview, render_short
-from cortes_pregacao.timefmt import format_timestamp, parse_timestamp
-from cortes_pregacao.transcript import Transcript
-from cortes_pregacao.youtube import YouTube
+from wordcut.asr import Transcriber
+from wordcut.asr.local import LocalTranscriber
+from wordcut.asr.remote import RemoteHost, RemoteTranscriber
+from wordcut.edit.edit_list import EditList
+from wordcut.media import extract_speech_audio
+from wordcut.overview import overview_lines, word_lines
+from wordcut.sermon import cut_sermon, transcribe_live
+from wordcut.sermon_folder import SermonFolder, default_root, folder_name
+from wordcut.short import plan_short, preview, render_short
+from wordcut.timefmt import format_timestamp, parse_timestamp
+from wordcut.transcript import Transcript
+from wordcut.youtube import YouTube
 
 
 def _make_transcriber(args: argparse.Namespace) -> Transcriber:
@@ -98,7 +98,7 @@ def _short(args: argparse.Namespace) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="cortes", description=__doc__)
+    parser = argparse.ArgumentParser(prog="wordcut", description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
 
     info = commands.add_parser("info", help="título, data do culto e duração da live")

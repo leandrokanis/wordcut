@@ -1,6 +1,6 @@
 import pytest
 
-from cortes_pregacao.timefmt import format_timestamp, parse_timestamp
+from wordcut.timefmt import format_timestamp, parse_timestamp
 
 
 @pytest.mark.parametrize(

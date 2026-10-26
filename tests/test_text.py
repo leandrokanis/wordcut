@@ -1,8 +1,8 @@
 import pytest
 
-from cortes_pregacao.edit.edit_list import EditList, Segment
-from cortes_pregacao.edit.text import apply_corrections, capitalize, tidy_joins
-from cortes_pregacao.transcript import Word
+from wordcut.edit.edit_list import EditList, Segment
+from wordcut.edit.text import apply_corrections, capitalize, tidy_joins
+from wordcut.transcript import Word
 
 
 def words(*tokens: str) -> list[Word]:
