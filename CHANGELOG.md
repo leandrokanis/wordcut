@@ -187,6 +187,16 @@ Formato de [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões
   membro já tem não muda nada. E-mail inválido ou já na equipe e papel fora de
   `assistant|admin` dão `invalid_argument`; e-mail fora da equipe, `not_found`; nenhum erro
   repete o e-mail. `service.members.role_of` dá o papel de um e-mail, ou `None`, para a API.
+- Identidade e papéis na API (item 1.2.a.2; ADR-0019): a API valida o JWT do Cloudflare
+  Access (`Cf-Access-Jwt-Assertion`, RS256, `aud`, `iss`, `exp` e `email`) contra as chaves
+  do time, em cache de 10 minutos e buscadas de novo em `kid` desconhecido, e dá o papel por
+  `members.role_of`. `GET /api/me` devolve `{"email", "role"}`. Configuração por
+  `WORDCUT_ACCESS_TEAM_DOMAIN` e `WORDCUT_ACCESS_AUD`, repassadas à `api` pelo Compose;
+  `WORDCUT_DEV_EMAIL` fixa o e-mail só sem o Access e avisa no log; Access configurado pela
+  metade recusa subir. Os erros da API usam o objeto de erro da CLI com o status da saída
+  (400, 404, 409, 502, 500), `unauthenticated` 401 e `forbidden` 403, códigos novos com
+  saída 1 que só a API produz; erro inesperado dá 500 `internal_error` sem o texto da
+  exceção. Nenhum token ou e-mail aparece em erro ou log. Dependência nova: `pyjwt[crypto]`.
 
 ### Alterado
 
