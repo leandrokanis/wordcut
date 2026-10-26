@@ -90,6 +90,21 @@ Formato de [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões
   Código de erro `llm_not_configured` (saída 5) para modelo ou chave ausentes, sem chamar o
   LLM; toda falha do OpenRouter vira `llm_error`, sem a chave, o prompt nem o corpo da
   resposta.
+- `wordcut sermon suggest <id> [--preset <id>] [--wait]` (administrador; tarefa `suggest`,
+  sem a trava de processamento; item 2.1.b.2): pede nova sugestão de cortes de uma pregação
+  processada, com o preset indicado ou o padrão, e, só no sucesso e numa transação, troca os
+  cortes `suggested` não editados pelos novos; escolhidos, descartados e editados ficam. O
+  resultado traz `sermon_id`, `preset_id`, `suggested_cuts` (como no `sermon show`) e
+  `suggestion_warnings`; etapa `sugerindo` no progresso. Recusa sem criar tarefa a pregação
+  inexistente ou o preset inexistente (`not_found`), a não processada
+  (`sermon_not_processed`), o LLM sem modelo ou chave (`llm_not_configured`, sem tocar em
+  `suggestion_error`) e uma segunda sugestão da mesma pregação enquanto outra roda (`busy`,
+  com a tarefa nos `details`). A falha do LLM deixa a tarefa `failed` com `llm_error`, os
+  cortes como estavam e o erro em `suggestion_error`; uma pregação reprocessada durante a
+  sugestão faz a tarefa falhar com `sermon_not_processed`, sem gravar nada.
+- Guarda da suíte de testes contra a rede real (ADR-0017): com `WORDCUT_FORBID_NETWORK`
+  definida, que o `conftest.py` da raiz define e a tarefa destacada herda, a montagem do LLM
+  real e do processamento real recusa com `network_error`.
 
 ### Alterado
 

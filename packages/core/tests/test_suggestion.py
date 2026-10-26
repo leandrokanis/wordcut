@@ -10,9 +10,10 @@ from typing import Any
 import pytest
 
 from wordcut import suggestion
-from wordcut.db import connect, sermons, transcripts
+from wordcut.db import connect, cuts, sermons, transcripts
+from wordcut.db.cuts import NewCut, Segment
 from wordcut.db.presets import SecondsRange
-from wordcut.db.sermons import NewSermon
+from wordcut.db.sermons import NewSermon, SuggestionError
 from wordcut.db.transcripts import SentenceRow
 from wordcut.errors import WordcutError
 from wordcut.home import Home
@@ -29,6 +30,14 @@ SENTINEL_KEY = "sk-or-v1-sentinela-ficticia-7f3a"
 MODEL = "provedor/modelo-de-teste"
 SENTENCE_SECONDS = 10.0
 SENTENCE_COUNT = 12
+PROCESSED_AT = datetime(2026, 10, 26, 21, 0, tzinfo=timezone.utc)
+# The cuts a replacing suggestion finds: only the unedited suggestion may go.
+EARLIER_CUTS = (
+    ("Sugerido antigo", "suggested"),
+    ("Sugerido editado", "suggested"),
+    ("Escolhido", "chosen"),
+    ("Descartado", "discarded"),
+)
 
 
 @dataclass
@@ -400,4 +409,179 @@ def test_a_successful_suggestion_clears_the_previous_ones_error(
     assert ([cut["title"] for cut in shown["cuts"]], shown["suggestion_error"]) == (
         ["Terceira"],
         None,
+    )
+
+
+def recorded_processed(connection: sqlite3.Connection) -> int:
+    """A ``processed`` sermon, as a replacing suggestion requires, with the earlier cuts."""
+    sermon_id = processed_sermon(connection)
+    first, last = sentence(connection, sermon_id, 1), sentence(connection, sermon_id, 2)
+    earlier = [
+        NewCut(
+            status=status,
+            title=title,
+            segments=(Segment(first.first_word_id, last.last_word_id),),
+            range_start_word=first.first_word_id,
+            range_end_word=last.last_word_id,
+            source="llm",
+            preset_id=None,
+        )
+        for title, status in EARLIER_CUTS
+    ]
+    with connection:
+        sermons.record_processed(connection, sermon_id, 970.0, 1090.0, "sermon.mp4", PROCESSED_AT)
+        cuts.insert_many(connection, sermon_id, earlier, PROCESSED_AT)
+        connection.execute("UPDATE cuts SET edited = 1 WHERE title = 'Sugerido editado'")
+        sermons.record_suggestion_error(
+            connection, sermon_id, SuggestionError("llm_error", "A anterior falhou.")
+        )
+    return sermon_id
+
+
+def kept_cuts(connection: sqlite3.Connection, sermon_id: int) -> list[dict[str, Any]]:
+    """The cuts a replacing suggestion keeps: every one but the unedited suggestion."""
+    return [cut for cut in shown_cuts(connection, sermon_id) if cut["title"] != "Sugerido antigo"]
+
+
+def test_a_replacing_suggestion_swaps_the_unedited_suggestions_for_the_new_cuts(
+    connection: sqlite3.Connection, configured: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sermon_id = recorded_processed(connection)
+    kept = kept_cuts(connection, sermon_id)
+    preset = preset_allowing(connection, SecondsRange(10, 600))
+    install(monkeypatch, answer(("Novo", [3, 4, 5])))
+
+    result = suggest(connection, sermon_id, preset, replace_suggested=True)
+
+    shown = show_sermon(connection, sermon_id, home=home_of(connection))
+    [new] = [cut for cut in shown["cuts"] if cut not in kept]
+    assert (
+        [cut for cut in shown["cuts"] if cut in kept] == kept,
+        (new["id"], new["title"], new["status"], new["source"], new["preset_id"]),
+        shown["suggestion_error"],
+    ) == (True, (result.cut_ids[0], "Novo", "suggested", "llm", preset["id"]), None)
+
+
+@pytest.mark.parametrize(
+    ("answers", "configure", "code"),
+    [
+        (["Primeira.", "Segunda."], True, "llm_error"),
+        ([WordcutError("llm_error", "O OpenRouter recusou o pedido.")], True, "llm_error"),
+        ([], False, "llm_not_configured"),
+    ],
+    ids=["two answers outside the schema", "transport error", "not configured"],
+)
+def test_a_failed_replacing_suggestion_leaves_every_cut_as_it_was(
+    connection: sqlite3.Connection,
+    monkeypatch: pytest.MonkeyPatch,
+    answers: list[str | WordcutError],
+    configure: bool,
+    code: str,
+) -> None:
+    if configure:
+        update_settings(connection, llm_model=MODEL)
+        store_llm_key(SENTINEL_KEY)
+    sermon_id = recorded_processed(connection)
+    before = shown_cuts(connection, sermon_id)
+    install(monkeypatch, *answers)
+
+    with pytest.raises(WordcutError) as raised:
+        suggest(connection, sermon_id, default_preset(connection), replace_suggested=True)
+
+    shown = show_sermon(connection, sermon_id, home=home_of(connection))
+    assert (raised.value.code, shown["cuts"], shown["suggestion_error"]["code"]) == (
+        code,
+        before,
+        code,
+    )
+
+
+def test_a_replacing_suggestion_keeps_the_suggestions_of_another_sermon(
+    connection: sqlite3.Connection, configured: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sermon_id = recorded_processed(connection)
+    other = sermons.insert(
+        connection,
+        NewSermon(
+            youtube_id="Zz9_y-8PqRs",
+            url="https://youtu.be/Zz9_y-8PqRs",
+            title="Outro culto",
+            service_date=date(2026, 10, 25),
+            live_duration=7200.0,
+            live_finished=True,
+            created_at=datetime(2026, 10, 26, tzinfo=timezone.utc),
+        ),
+    )
+    with connection:
+        cuts.insert_many(
+            connection,
+            other.id,
+            [NewCut("suggested", "De outra pregação", (Segment(1, 2),), 1, 2, "llm", None)],
+            PROCESSED_AT,
+        )
+    elsewhere = shown_cuts(connection, other.id)
+    install(monkeypatch, answer(("Novo", [3, 4, 5, 6, 7, 8])))
+
+    suggest(connection, sermon_id, default_preset(connection), replace_suggested=True)
+
+    assert shown_cuts(connection, other.id) == elsewhere
+
+
+def test_a_valid_answer_without_cuts_to_keep_still_replaces_the_unedited_suggestions(
+    connection: sqlite3.Connection, configured: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sermon_id = recorded_processed(connection)
+    kept = kept_cuts(connection, sermon_id)
+    install(monkeypatch, answer(("Curto demais", [1])))
+
+    result = suggest(connection, sermon_id, default_preset(connection), replace_suggested=True)
+
+    shown = show_sermon(connection, sermon_id, home=home_of(connection))
+    assert (
+        result.cut_ids,
+        [warning["title"] for warning in result.warnings],
+        shown["cuts"],
+        shown["suggestion_error"],
+    ) == ((), ["Curto demais"], kept, None)
+
+
+@dataclass
+class ReprocessingModel:
+    """Answers ``answered`` once another connection has changed the sermon with ``change``."""
+
+    home: Home
+    sermon_id: int
+    change: str
+    answered: str
+
+    def complete(self, system: str, user: str) -> str:
+        with closing(connect(self.home)) as other, other:
+            if self.change == "reprocessed":
+                later = PROCESSED_AT.replace(hour=22)
+                sermons.record_processed(other, self.sermon_id, 970.0, 1090.0, "sermon.mp4", later)
+            else:
+                sermons.set_status(other, self.sermon_id, "processing", PROCESSED_AT)
+        return self.answered
+
+
+@pytest.mark.parametrize("change", ["reprocessed", "processing"])
+def test_a_replacing_suggestion_saves_nothing_when_the_sermon_was_reprocessed_meanwhile(
+    connection: sqlite3.Connection,
+    configured: None,
+    monkeypatch: pytest.MonkeyPatch,
+    change: str,
+) -> None:
+    sermon_id = recorded_processed(connection)
+    before = show_sermon(connection, sermon_id, home=home_of(connection))
+    model = ReprocessingModel(home_of(connection), sermon_id, change, answer(("Novo", [3, 4, 5])))
+    monkeypatch.setattr(suggestion, "default_model", ModelFactory(model))
+
+    with pytest.raises(WordcutError) as raised:
+        suggest(connection, sermon_id, default_preset(connection), replace_suggested=True)
+
+    shown = show_sermon(connection, sermon_id, home=home_of(connection))
+    assert (raised.value.code, shown["cuts"], shown["suggestion_error"]) == (
+        "sermon_not_processed",
+        before["cuts"],
+        before["suggestion_error"],
     )

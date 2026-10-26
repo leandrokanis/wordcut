@@ -13,18 +13,25 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from wordcut import config
+from wordcut import config, network
 from wordcut.db import cuts, sermons, transcripts
 from wordcut.db.cuts import NewCut, Segment
 from wordcut.db.sermons import SuggestionError
 from wordcut.db.transcripts import SentenceRow
 from wordcut.errors import WordcutError
+from wordcut.service.sermons import processed_row
 from wordcut.service.settings import llm_model
 from wordcut.suggestion.model import OpenRouterModel, SuggestionModel
 from wordcut.suggestion.request import SuggestionRequest, build_request
 from wordcut.suggestion.response import InvalidResponse, SuggestedCut, parse_response
 
-__all__ = ["SuggestionModel", "SuggestionResult", "default_model", "suggest"]
+__all__ = [
+    "SuggestionModel",
+    "SuggestionResult",
+    "default_model",
+    "require_configured",
+    "suggest",
+]
 
 # What to run for each setting the suggestion lacks (docs/cli.md §11.1).
 MISSING_SETTINGS = {
@@ -45,28 +52,41 @@ RETRY_NOTE = (
 
 
 def default_model(llm_model: str, key: str) -> SuggestionModel:
-    """The real LLM: ``llm_model`` on OpenRouter, called with ``key``."""
+    """The real LLM: ``llm_model`` on OpenRouter, called with ``key``; refused with
+    ``network_error`` while the network is forbidden (ADR-0017)."""
+    network.refuse_when_forbidden("o OpenRouter")
     return OpenRouterModel(llm_model, key)
 
 
 @dataclass(frozen=True)
 class SuggestionResult:
-    """What a suggestion saved, and a warning for each cut it dropped."""
+    """The IDs of the cuts a suggestion saved, and a warning for each cut it dropped."""
 
-    saved: int
+    cut_ids: tuple[int, ...]
     warnings: tuple[dict[str, Any], ...]
+
+    @property
+    def saved(self) -> int:
+        return len(self.cut_ids)
 
 
 def suggest(
-    connection: sqlite3.Connection, sermon_id: int, preset: Mapping[str, Any]
+    connection: sqlite3.Connection,
+    sermon_id: int,
+    preset: Mapping[str, Any],
+    *,
+    replace_suggested: bool = False,
 ) -> SuggestionResult:
     """Ask the LLM for the cuts of the processed sermon with ``preset``, as ``show_preset``
     gives it, and save them as ``suggested``.
 
     A cut whose estimated duration falls outside the preset's allowed one is dropped with a
     warning ``{"title", "estimated_duration", "message"}``. A failure is kept on the sermon as
-    its ``suggestion_error`` and raised as ``WordcutError``; a success clears it.
+    its ``suggestion_error`` and raised as ``WordcutError``; a success clears it. With
+    ``replace_suggested``, a success also removes, in the same transaction, the ``suggested``
+    cuts nobody has edited (2.1.b.2).
     """
+    processed_at = processed_row(connection, sermon_id).processed_at if replace_suggested else None
     try:
         chosen, sentences = _suggested(connection, sermon_id, preset)
     except WordcutError as error:
@@ -77,9 +97,29 @@ def suggest(
         raise
     kept, warnings = _within_duration(chosen, sentences, preset)
     with connection:
-        cuts.insert_many(connection, sermon_id, kept, datetime.now().astimezone())
+        if replace_suggested:
+            cuts.delete_unedited_suggestions(connection, sermon_id)
+            # Checked after the delete, which opens the write transaction: a reprocessing cannot
+            # commit between the check and the insert. The cuts' word IDs have no foreign key.
+            _require_processed_at(connection, sermon_id, processed_at)
+        saved = cuts.insert_many(connection, sermon_id, kept, datetime.now().astimezone())
         sermons.record_suggestion_error(connection, sermon_id, None)
-    return SuggestionResult(saved=len(kept), warnings=tuple(warnings))
+    return SuggestionResult(cut_ids=tuple(saved), warnings=tuple(warnings))
+
+
+def _require_processed_at(
+    connection: sqlite3.Connection, sermon_id: int, processed_at: datetime | None
+) -> None:
+    """Refuse the cuts when the sermon was processed again, or is being processed, since the
+    suggestion started: they point to words that may be gone."""
+    row = sermons.by_id(connection, sermon_id)
+    if row is None or row.status != "processed" or row.processed_at != processed_at:
+        raise WordcutError(
+            "sermon_not_processed",
+            f"A pregação {sermon_id} foi processada de novo durante a sugestão;"
+            " nenhum corte foi gravado.",
+            {"sermon_id": sermon_id, "status": None if row is None else row.status},
+        )
 
 
 def _suggested(
@@ -113,8 +153,9 @@ def _asked(
         ) from None
 
 
-def _configured_model(connection: sqlite3.Connection) -> SuggestionModel:
-    """The model of the settings, or ``llm_not_configured`` naming what is missing."""
+def require_configured(connection: sqlite3.Connection) -> tuple[str, str]:
+    """The LLM model and key of the settings, or ``llm_not_configured`` naming what is
+    missing; the message never carries the key."""
     name, key = llm_model(connection), config.llm_key()
     if name is None or key is None:
         missing = [
@@ -127,7 +168,11 @@ def _configured_model(connection: sqlite3.Connection) -> SuggestionModel:
             + "; nenhum corte foi sugerido.",
             {"missing": missing},
         )
-    return default_model(name, key)
+    return name, key
+
+
+def _configured_model(connection: sqlite3.Connection) -> SuggestionModel:
+    return default_model(*require_configured(connection))
 
 
 def _new_cut(cut: SuggestedCut, sentences: Sequence[SentenceRow], preset_id: int) -> NewCut:

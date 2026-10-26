@@ -291,13 +291,18 @@ def test_show_without_json_describes_the_sermon_in_portuguese(
 def test_sermon_help_lists_its_actions(capsys: pytest.CaptureFixture[str]) -> None:
     exit_code = main(["sermon", "--help"])
 
-    assert (exit_code, "{create,list,show,trim,process,download}" in capsys.readouterr().out) == (
+    assert (
+        exit_code,
+        "{create,list,show,trim,process,download,suggest}" in capsys.readouterr().out,
+    ) == (
         0,
         True,
     )
 
 
-@pytest.mark.parametrize("action", ["create", "list", "show", "trim", "process", "download"])
+@pytest.mark.parametrize(
+    "action", ["create", "list", "show", "trim", "process", "download", "suggest"]
+)
 def test_each_sermon_action_help_shows_an_example_ready_to_copy(
     action: str, capsys: pytest.CaptureFixture[str]
 ) -> None:

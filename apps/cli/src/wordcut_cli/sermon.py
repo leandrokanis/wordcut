@@ -1,5 +1,5 @@
-"""``wordcut sermon <action>``: create, list, show, trim, process and download sermons
-(docs/cli.md §7)."""
+"""``wordcut sermon <action>``: create, list, show, trim, process, download and suggest the
+cuts of sermons (docs/cli.md §7)."""
 
 from __future__ import annotations
 
@@ -22,6 +22,7 @@ from wordcut.service.sermons import (
     show_sermon,
     trim_sermon,
 )
+from wordcut.service.suggestion import start_suggestion
 from wordcut.timefmt import format_timestamp, parse_timestamp
 from wordcut_cli import deps
 from wordcut_cli.contract import Context, add_command, add_group
@@ -127,6 +128,21 @@ def register(commands: Commands) -> None:
         example="wordcut sermon download 12 -o ~/Vídeos/ --json",
     )
     download.add_argument("id", type=int, help="ID da pregação")
+    suggest = add_command(
+        actions,
+        "suggest",
+        help=(
+            "pede ao LLM nova sugestão de cortes da pregação processada, com o preset indicado"
+            " ou o padrão; troca os cortes sugeridos não editados e mantém escolhidos,"
+            " descartados e editados — administrador"
+        ),
+        run=_suggest,
+        render=_render_suggestion,
+        example="wordcut sermon suggest 12 --preset 3 --wait --json",
+    )
+    suggest.add_argument("id", type=int, help="ID da pregação")
+    suggest.add_argument("--preset", type=int, help="ID do preset; padrão: o preset padrão")
+    add_wait_option(suggest)
     download.add_argument(
         "-o",
         "--output",
@@ -213,6 +229,12 @@ def _processing(ctx: Context, sermon_id: int, *, force: bool, wait: bool) -> dic
         return show_sermon(connection, sermon_id, home=home)
 
 
+def _suggest(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:
+    """The launched task, or with ``wait`` the new suggestion (docs/cli.md §7.6)."""
+    start = partial(start_suggestion, Home.from_environment(), args.id, args.preset)
+    return launch(ctx, args.wait, start)
+
+
 def _download(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:
     """Copy outside the processing lock: reading a finished video races with nothing."""
     with closing(deps.connection()) as connection:
@@ -249,6 +271,22 @@ def _render_processing(result: dict[str, Any]) -> str:
         f"Tarefa {result['task_id']} iniciada: processamento da pregação {result['sermon_id']}."
         f" Acompanhe com wordcut task wait {result['task_id']}."
     )
+
+
+def _render_suggestion(result: dict[str, Any]) -> str:
+    if "task_id" in result:
+        return (
+            f"Tarefa {result['task_id']} iniciada: sugestão de cortes da pregação"
+            f" {result['sermon_id']}. Acompanhe com wordcut task wait {result['task_id']}."
+        )
+    suggested = result["suggested_cuts"]
+    count = "1 corte sugerido" if len(suggested) == 1 else f"{len(suggested)} cortes sugeridos"
+    lines = [
+        f"{count} para a pregação {result['sermon_id']} com o preset {result['preset_id']}.",
+        *(f"{cut['id']}  {cut['title']}" for cut in suggested),
+        *(warning["message"] for warning in result["suggestion_warnings"]),
+    ]
+    return "\n".join(lines)
 
 
 def _render_downloaded(result: dict[str, Any]) -> str:

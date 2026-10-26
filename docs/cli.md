@@ -227,7 +227,7 @@ Sem `--json`, o `message` vai para o stderr.
 | `processing_error` | 1 | o processamento não achou palavra dentro das bordas, ou o vídeo baixado não cobre a pregação; nada é gravado |
 | `invalid_argument` | 2 | argumento inválido; `details.argument` diz qual opção do comando, quando identificável, com o nome que o parser define, e `details.choices` lista as opções válidas de uma escolha; argumento não reconhecido não traz `details`; a mensagem nunca repete o que foi digitado, nem como nome de opção (ADR-0015) |
 | `not_found` | 3 | ID ou e-mail inexistente |
-| `busy` | 4 | outra tarefa segura a trava; `details` traz a tarefa |
+| `busy` | 4 | outra tarefa segura a trava, ou já há uma sugestão da mesma pregação em andamento (§7.6); `details` traz a tarefa (`task_id`, `kind`, `started_at`) |
 | `live_not_finished` | 5 | processar uma live que ainda não terminou |
 | `sermon_not_trimmed` | 5 | processar sem bordas definidas |
 | `sermon_too_short` | 5 | bordas com menos de 1 minuto |
@@ -240,7 +240,7 @@ Sem `--json`, o `message` vai para o stderr.
 | `llm_not_configured` | 5 | sugerir cortes sem o modelo do LLM ou sem a chave; `details.missing` lista o que falta (`llm_model`, `llm_key`); a mensagem não traz a chave |
 | `youtube_error` | 6 | falha ao consultar ou baixar do YouTube |
 | `llm_error` | 6 | falha do LLM depois da nova tentativa (constituição §III) |
-| `network_error` | 6 | falha de rede genérica |
+| `network_error` | 6 | falha de rede genérica; também a rede proibida por `WORDCUT_FORBID_NETWORK`, que a suíte de testes define (`details.forbidden_by`, ADR-0017) |
 | `transcription_error` | 6 | falha da transcrição: ambiente do WhisperX ausente, GPU ou processo de transcrição |
 
 Códigos novos MAY ser acrescentados; os existentes MUST NOT mudar de saída.
@@ -404,10 +404,40 @@ título). Devolve o caminho de destino (1.1.d).
 ### 7.6. `sermon suggest <id> [--preset <id>] [--wait]` — administrador
 
 Tarefa sem trava: pede nova sugestão ao LLM (2.1.b.2), com o preset indicado ou o padrão.
+O pedido e a validação da resposta são os do `sermon process` (§7.4).
 
-- Os cortes `suggested` não editados são substituídos.
+- Os cortes `suggested` não editados são substituídos, só no sucesso e numa transação.
 - Os cortes escolhidos, descartados ou editados permanecem.
-- Numa pregação não processada, falha com `sermon_not_processed`.
+- Recusas antes de criar a tarefa: pregação inexistente ou preset inexistente (`not_found`,
+  com `details.sermon_id` ou `details.preset_id`); pregação não processada
+  (`sermon_not_processed`); sem o modelo do LLM ou sem a chave (`llm_not_configured`, que não
+  muda a pregação nem o `suggestion_error`); outra tarefa `suggest` da mesma pregação em
+  andamento (`busy`, com `task_id`, `kind` e `started_at` dela). A tarefa órfã (§6.5) não
+  conta. A conferência e a criação da tarefa não são atômicas: dois pedidos no mesmo instante
+  podem passar os dois; cada substituição continua inteira.
+- A tarefa guarda o preset resolvido (o padrão de quando foi lançada, sem `--preset`). Um
+  preset apagado antes da execução faz a tarefa terminar `failed` com `not_found`.
+- A falha do LLM (`llm_error`, ou `llm_not_configured` se a configuração mudou depois do
+  lançamento) deixa a tarefa `failed`, os cortes como estavam e o erro em `suggestion_error`
+  (§7.2); o sucesso limpa `suggestion_error`.
+- Resposta no esquema, mas sem corte dentro da duração permitida, é sucesso: os sugeridos não
+  editados saem, `suggested_cuts` vem vazio e `suggestion_warnings` traz os descartados.
+- Se a pregação for processada de novo (ou estiver processando) quando a resposta chega, a
+  tarefa falha com `sermon_not_processed` e nada é gravado.
+- Etapa no progresso: `sugerindo`.
+- Resultado (com `--wait`, e o que `task wait` devolve):
+
+```json
+{
+  "sermon_id": 12,
+  "preset_id": 3,
+  "suggested_cuts": [ { "id": 41, "status": "suggested", "title": "…", "preset_id": 3, "…": "…" } ],
+  "suggestion_warnings": [ { "title": "…", "estimated_duration": 92.3, "message": "…" } ]
+}
+```
+
+  `suggested_cuts` traz os cortes novos no formato do `sermon show`; `suggestion_warnings`,
+  os descartados pela duração, como no §7.4.
 
 ### 7.7. `sermon delete <id>` — administrador
 

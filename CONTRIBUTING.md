@@ -38,6 +38,11 @@ nenhuma app; apps não dependem umas das outras. Regra de negócio vive só no `
   [specs/roadmap.md](specs/roadmap.md)).
 - Testes de comportamento pela interface pública. Serviço externo (YouTube, WhisperX,
   OpenRouter) é dublê nos testes.
+- A suíte não usa a rede real. O `conftest.py` da raiz define `WORDCUT_FORBID_NETWORK`, que
+  todo processo lançado pelo teste herda, inclusive uma tarefa destacada. Com ela definida,
+  `suggestion.default_model` e `processing.default_gateways` recusam com `network_error`
+  ([ADR-0017](docs/adr/0017-testes-sem-rede-real.md)). Um teste que precise da tarefa
+  `running` usa `harmless_tasks`.
 
 ### 3.1. Decisões de arquitetura
 

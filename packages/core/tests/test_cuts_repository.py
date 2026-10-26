@@ -141,6 +141,34 @@ def test_deleting_the_cuts_of_one_sermon_keeps_the_other_sermons_ones(
     ) == ([], ["Mantido"])
 
 
+def test_deleting_the_unedited_suggestions_keeps_edited_chosen_discarded_and_other_sermons(
+    connection: sqlite3.Connection,
+) -> None:
+    sermon = sermons.insert(connection, new_sermon("Aaaaaaaaaa1"))
+    other = sermons.insert(connection, new_sermon("Aaaaaaaaaa2"))
+    store(
+        connection,
+        sermon.id,
+        new_cut("Sugerido"),
+        new_cut("Editado"),
+        new_cut("Escolhido", status="chosen"),
+        new_cut("Descartado", status="discarded"),
+    )
+    store(connection, other.id, new_cut("De outra pregação"))
+    with connection:
+        connection.execute("UPDATE cuts SET edited = 1 WHERE title = 'Editado'")
+    kept = [cut for cut in cuts.of_sermon(connection, sermon.id) if cut.title != "Sugerido"]
+    elsewhere = cuts.of_sermon(connection, other.id)
+
+    with connection:
+        cuts.delete_unedited_suggestions(connection, sermon.id)
+
+    assert (cuts.of_sermon(connection, sermon.id), cuts.of_sermon(connection, other.id)) == (
+        kept,
+        elsewhere,
+    )
+
+
 def test_deleting_a_sermon_deletes_its_cuts(connection: sqlite3.Connection) -> None:
     sermon = sermons.insert(connection, new_sermon())
     store(connection, sermon.id, new_cut())
