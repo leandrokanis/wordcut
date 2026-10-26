@@ -1,12 +1,13 @@
 import errno
 import os
 import shutil
+from datetime import date
 from pathlib import Path
 from typing import BinaryIO
 
 import pytest
 
-from wordcut.files import copy_without_overwrite
+from wordcut.files import copy_without_overwrite, folder_name
 
 SUGGESTED = "2026-10-18 - Culto de domingo.mp4"
 # Arbitrary, non-repeating bytes: a copy that drops or reorders any of them is caught.
@@ -218,3 +219,7 @@ def test_without_hard_links_a_failed_copy_leaves_no_final_name_and_no_temporary_
         copy_without_overwrite(source, folder / "pregacao.mp4", SUGGESTED)
 
     assert list(folder.iterdir()) == []
+
+
+def test_folder_name_strips_path_unsafe_characters() -> None:
+    assert folder_name(date(2026, 1, 2), 'Quem é "Deus"?/') == "2026-01-02 - Quem é Deus"

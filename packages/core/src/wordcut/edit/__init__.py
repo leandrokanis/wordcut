@@ -1,1 +1,1 @@
-"""Word-level editing: edit lists, hesitation cleanup and the clip timeline."""
+"""Word-level editing: hesitation cleanup, caption text and the clip timeline."""

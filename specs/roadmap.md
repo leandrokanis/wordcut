@@ -67,7 +67,7 @@ Depois o servidor e, por fim, a interface, seguindo o protótipo
 | 15 | 1.1.h.1 | `cut render` com opções e `--estimate` | 1.1.h.2, 1.1.h.3 | ☑ |
 | 16 | 1.1.i.1 | `render list/show/download` | — | ☑ |
 | 17 | 1.2.a.1 | `member` | — | ☑ |
-| 18 | cli-migration | Remover a CLI antiga e reescrever README e skills sobre a nova | — | ☐ |
+| 18 | cli-migration | Remover a CLI antiga e reescrever README e skills sobre a nova | — | ☑ |
 
 ### Fase 2 — Servidor
 
@@ -110,3 +110,4 @@ Depois o servidor e, por fim, a interface, seguindo o protótipo
 | 15 1.1.h.1 | PASS na rodada 2 | (ver git log) | ADR-0018. Limitação: `.mp4` órfão quando o corte é apagado por `sermon suggest`/reprocessamento (tratar em 1.2.b). Renderização real só testada em clipe sintético. |
 | 16 1.1.i.1 | PASS na rodada 1 | (ver git log) | `path` das exportações sempre absoluto. |
 | 17 1.2.a.1 | PASS na rodada 1 | (ver git log) | Último admin sob `BEGIN IMMEDIATE`. Efeito colateral: `add_group` usa `RawDescriptionHelpFormatter` e a ajuda dos grupos não quebra linha (ex.: `cut --help` com 102 colunas) — corrigir no item 18. |
+| 18 cli-migration | PASS na rodada 2 | (ver git log) | CLI antiga, `asr/remote.py`, `short`, `overview`, `edit_list` e símbolos mortos removidos; skills reescritas sobre a CLI nova. Fora da barra: `sermon list --help` chega a 83 colunas e o exemplo de `preset update` a 107; mutação `stammers=False` sobrevive (lacuna anterior). |

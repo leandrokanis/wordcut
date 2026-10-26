@@ -39,7 +39,7 @@ MISSING_SETTINGS = {
     "llm_key": "a chave do LLM (wordcut settings set-key)",
 }
 
-# sugerir-cortes.md: cleaning hesitations and pauses takes 15-20% of the raw time; 18% here.
+# criteria/texts/base.md: cleaning hesitations and pauses takes 15-20% of the raw time; 18% here.
 CLEANED_SHARE = 0.82
 # Durations are kept to the millisecond, so a bound is reached exactly (docs/cli.md §2).
 MILLISECOND_DIGITS = 3

@@ -46,9 +46,6 @@ class CameraPath:
     subject: Path1D  # tracked person x per frame
     scene_cuts: list[int] = field(default_factory=list)
 
-    def max_offset(self) -> float:
-        return float(np.abs(self.subject - self.centres).max())
-
 
 def plan_camera(
     frames: Sequence[FrameDetections],
@@ -61,7 +58,7 @@ def plan_camera(
     """``target``: horizontal position (0-1) of who to follow; default is the largest face.
 
     ``forced_cuts``: frame indexes where the shot changes for editorial reasons
-    (e.g. a jump between edit-list segments).
+    (e.g. a jump between segments of a cut).
     """
     cuts = sorted({i for i, f in enumerate(frames) if f.scene_cut} | set(forced_cuts))
     subject = track_subject(frames, height, width, target, set(cuts))

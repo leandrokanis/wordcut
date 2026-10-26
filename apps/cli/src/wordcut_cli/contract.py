@@ -117,6 +117,33 @@ class Command:
     render: Renderer
 
 
+EXAMPLE_HEADING = "Exemplo:"
+# docs/cli.md §3.1: wordcut [opções globais] <recurso> <ação>.
+ACTION_METAVAR = "<ação>"
+
+
+class HelpFormatter(argparse.HelpFormatter):
+    """Wraps the description to the terminal width, keeps the example as written and names
+    a group's actions ``<ação>`` in the usage line, which argparse cannot wrap inside
+    ``{…}``; the list of actions below keeps the ``{…}``."""
+
+    # argparse's own formatters (RawDescriptionHelpFormatter, MetavarTypeHelpFormatter)
+    # change the help by overriding these two methods.
+    def _fill_text(self, text: str, width: int, indent: str) -> str:
+        if text.startswith(EXAMPLE_HEADING):
+            return "".join(indent + line for line in text.splitlines(keepends=True))
+        return super()._fill_text(text, width, indent)
+
+    def _format_args(self, action: argparse.Action, default_metavar: str) -> str:
+        if isinstance(action, argparse._SubParsersAction):
+            return f"{ACTION_METAVAR} ..."
+        return super()._format_args(action, default_metavar)
+
+
+def _example(example: str | None) -> str | None:
+    return f"{EXAMPLE_HEADING}\n  {example}" if example else None
+
+
 def create_parser() -> tuple[Parser, Commands]:
     parser = Parser(
         prog="wordcut",
@@ -136,8 +163,8 @@ def add_group(commands: Commands, name: str, *, help: str, example: str | None =
         name,
         help=help,
         description=help,
-        epilog=f"Exemplo:\n  {example}" if example else None,
-        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=_example(example),
+        formatter_class=HelpFormatter,
     )
     _add_global_options(group, default=argparse.SUPPRESS)
     return group.add_subparsers(dest="action", required=True)
@@ -156,8 +183,8 @@ def add_command(
         name,
         help=help,
         description=help,
-        epilog=f"Exemplo:\n  {example}" if example else None,
-        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=_example(example),
+        formatter_class=HelpFormatter,
     )
     _add_global_options(command, default=argparse.SUPPRESS)
     command.set_defaults(contract=Command(run, render))
@@ -177,19 +204,13 @@ def execute(parser: argparse.ArgumentParser, argv: list[str]) -> int:
     """Parse ``argv``, run the chosen command and return the process exit code."""
     try:
         args, stray = parser.parse_known_args(argv)
-        command: Command | None = getattr(args, "contract", None)
         if stray:
             raise _stray_arguments_error(args)
     except SystemExit as stop:
         return int(stop.code or 0)
     except WordcutError as error:
         return _report(error, as_json=JSON_OPTION in argv)
-    if command is None:
-        # Commands of the previous CLI (wordcut_cli.legacy) keep their own output and runtime
-        # errors until the cli-migration roadmap item; their usage errors follow the contract.
-        args.handler(args)
-        return 0
-    return _run(command, args, Context(json=args.json, quiet=args.quiet))
+    return _run(args.contract, args, Context(json=args.json, quiet=args.quiet))
 
 
 def _run(command: Command, args: argparse.Namespace, ctx: Context) -> int:

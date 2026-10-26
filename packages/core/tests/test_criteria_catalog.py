@@ -5,8 +5,8 @@ import pytest
 
 from wordcut.criteria import LEVELS, TEXTS, CatalogError, catalog, load_catalog
 
-# docs/requirements 2.1.a.2 and the prototype: the criteria in the order of
-# sugerir-cortes.md, filters first, with the default level of each.
+# docs/requirements 2.1.a.2 and the prototype: the criteria in the order of the
+# prototype, filters first, with the default level of each.
 EXPECTED = [
     ("triumphalism", "filter", "strict"),
     ("fragile_theology", "filter", "strict"),

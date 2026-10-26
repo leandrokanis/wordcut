@@ -19,19 +19,6 @@ class TestWord:
 
 
 class TestTranscript:
-    def test_between_keeps_words_inside_and_rebases(self) -> None:
-        transcript = make_transcript(
-            Word("antes", 0.0, 0.4),
-            Word("dentro", 1.0, 1.4),
-            Word("cruza", 1.8, 2.3),
-        )
-
-        sliced = transcript.between(1.0, 2.0)
-
-        assert [w.text for w in sliced.words] == ["dentro"]
-        assert sliced.words[0].start == 0.0
-        assert sliced.words[0].end == pytest.approx(0.4)
-
     def test_json_round_trip(self, tmp_path: Path) -> None:
         transcript = make_transcript(Word("Cristo", 0.1, 0.6, score=0.9, estimated=True))
         path = tmp_path / "palavras.json"

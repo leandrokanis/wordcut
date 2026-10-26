@@ -10,8 +10,8 @@ from typing import Any
 from wordcut.db import renders
 from wordcut.db.renders import RenderRow
 from wordcut.errors import WordcutError
+from wordcut.files import folder_name
 from wordcut.home import Home
-from wordcut.sermon_folder import folder_name
 from wordcut.service.cuts import existing_cut, shown_render
 from wordcut.service.sermons import existing_sermon
 

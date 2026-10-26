@@ -197,9 +197,6 @@ Formato de [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões
   absoluto mesmo com `WORDCUT_HOME` relativo.
 - `cut show` traz em `caption` o estilo efetivo da legenda (o padrão completo quando o corte
   não tem estilo), não mais `{}`.
-- O comando `cut` da CLI anterior passa a se chamar `cut-sermon`, com os mesmos argumentos e
-  a mesma saída, porque `cut` é agora o grupo dos cortes; sai junto com a CLI anterior
-  (roadmap, item 18).
 - `sermon process` transcreve com o modelo do WhisperX das configurações
   (`settings set --whisper-model`), não mais com `large-v3` fixo.
 - `settings show` traz o ID do preset padrão em `default_preset_id` (antes sempre `null`).
@@ -210,8 +207,6 @@ Formato de [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões
   opções válidas (`details.choices`), argumento não reconhecido nunca é repetido, nem como
   nome de opção (a mensagem aponta para o `--help` do comando), e valor de tipo inválido
   nomeia só a opção, como o parser a define.
-- `overview` passa a quebrar as frases com o mesmo módulo do processamento
-  (`wordcut.processing.sentences`), sem mudar a saída.
 - Tempos (`T`) aceitam só dígitos: minutos e segundos depois do primeiro componente ficam
   abaixo de 60, e valores como `inf`, `nan`, `1e3` ou negativos são recusados.
 - O projeto passa a se chamar Wordcut; executável `wordcut`, pacote `wordcut`.
@@ -220,3 +215,19 @@ Formato de [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões
 - Os cookies do YouTube vêm da pasta de segredos (`WORDCUT_CONFIG`, ou `~/.config/wordcut`),
   resolvida a cada uso; falhas do YouTube (inclusive cookies ausentes) viram `youtube_error`
   (saída 6), com mensagem sem o comando do `yt-dlp` nem o caminho dos cookies.
+
+### Removido
+
+- Os comandos da CLI anterior: `info`, `transcribe`, `transcribe-live`, `overview`,
+  `cut-sermon`, `preview` e `short`. O fluxo inteiro passa por `sermon`, `cut` e `render`, e
+  um nome antigo dá `invalid_argument` (saída 2).
+- A transcrição por SSH em outra máquina (`--host`); o WhisperX roda na máquina da CLI.
+- O formato em pastas com `.json` (`palavras.json`, `roteiros/`, `cortes/`, `trabalho/`): a
+  pregação, os cortes e as exportações ficam no banco e em `media/` na pasta de dados.
+- Os módulos do core que só a CLI anterior usava: `wordcut.short`, `wordcut.overview`,
+  `wordcut.sermon`, `wordcut.sermon_folder`, `wordcut.asr.remote` e `wordcut.edit.edit_list`,
+  com o código que só eles chamavam. O nome legível dos arquivos baixados passa a
+  `wordcut.files` e as margens do corte, a `wordcut.processing.pipeline`, sem mudar o
+  comportamento.
+- `skills/video-corte-vertical/sugerir-cortes.md` e `exemplos.md`: os critérios da sugestão
+  vivem no pacote (`criteria list`, presets).

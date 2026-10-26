@@ -25,6 +25,7 @@ packages/core/   domínio e camada de serviço (Python, pacote `wordcut`)
 apps/cli/        CLI `wordcut` (Python, pacote `wordcut_cli`)
 apps/api/        API HTTP (Python, FastAPI, pacote `wordcut_api`)
 apps/web/        interface (React + Vite + TypeScript)
+skills/          guias do Claude Code para usar a CLI, sem lógica própria
 ```
 
 Regra de dependência: `apps/*` dependem de `packages/core`; `packages/core` não depende de
