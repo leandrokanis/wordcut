@@ -364,6 +364,12 @@ do roadmap; até lá, o processamento termina ao gravar palavras e frases.
 Copia a pregação 16:9 para `caminho`, ou para a pasta atual com um nome legível (data e
 título). Devolve o caminho de destino (1.1.d).
 
+- `caminho` que é pasta existente, ou que termina em `/`, recebe o nome legível dentro.
+- Destino existente não é sobrescrito: o nome ganha ` (2)`, ` (3)`… antes da extensão.
+- Saída: `{"path": "<caminho absoluto>", "bytes": N}`; em texto, só o caminho.
+- Não toma a trava de processamento. Numa pregação não processada, falha com
+  `sermon_not_processed`.
+
 ### 7.6. `sermon suggest <id> [--preset <id>] [--wait]` — administrador
 
 Tarefa sem trava: pede nova sugestão ao LLM (2.1.b.2), com o preset indicado ou o padrão.

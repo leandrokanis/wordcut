@@ -1,1 +1,1 @@
-active_plan: specs/1.1.c.1-sermon-process/plan.md
+active_plan: specs/1.1.d.1-sermon-download/plan.md
