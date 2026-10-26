@@ -40,7 +40,7 @@ Depois o servidor e, por fim, a interface, seguindo o protótipo
 
 | # | ID | Item | Cobre | Estado |
 |:-:|---|---|---|---|
-| 0 | monorepo | Monorepo (`packages/core`, `apps/cli`, `apps/api`, `apps/web`), workspace `uv`, Docker Compose | ADR-0002, ADR-0003 | ☐ |
+| 0 | monorepo | Monorepo (`packages/core`, `apps/cli`, `apps/api`, `apps/web`), workspace `uv`, Docker Compose | ADR-0002, ADR-0003 | ☑ |
 
 ### Fase 1 — Camada de serviço e CLI
 
@@ -87,4 +87,4 @@ Depois o servidor e, por fim, a interface, seguindo o protótipo
 
 | Item | Resultado | Commit | Observações |
 |---|---|---|---|
-| 0 monorepo | PASS na rodada 1 | (este commit) | Mutações fora da barra que sobreviveram (ver qa.md): barra final no `rsync` do worker remoto; `setStatus("ok")` fixo na web. Cobrir quando a web real chegar (fase 3). |
+| 0 monorepo | PASS na rodada 1 | aafe521 | Mutações fora da barra que sobreviveram (ver qa.md): barra final no `rsync` do worker remoto; `setStatus("ok")` fixo na web. Cobrir quando a web real chegar (fase 3). |
