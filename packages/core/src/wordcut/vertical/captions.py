@@ -1,7 +1,7 @@
 """Film-style captions timed word by word.
 
-Blocks of up to two lines in Open Sans Bold, saturated yellow with a black
-outline, centred on the frame. Each block shows from its first word until the
+Blocks of up to two lines, by default in Open Sans Bold, saturated yellow with a
+black outline, centred on the frame. Each block shows from its first word until the
 next block (or shortly after its last word when a pause follows).
 
 A block never mixes two sentences (or crosses a long pause). A sentence too
@@ -39,11 +39,15 @@ class CaptionStyle:
     size: int = 60
     color: tuple[int, int, int] = (255, 214, 0)  # saturated subtitle yellow
     outline: int = 3
+    outline_color: tuple[int, int, int] = (0, 0, 0)
     shadow_offset: int = 3
+    shadow_alpha: int = 140  # 0 draws no shadow
     max_width: int = 960
     max_lines: int = 2
     centre_y: int = 960  # vertical middle of the 1920 px frame
+    frame_height: int = 1920
     line_spacing: float = 1.2
+    font: Path = DEFAULT_FONT
 
 
 DEFAULT_STYLE = CaptionStyle()
@@ -180,12 +184,10 @@ class CaptionImage:
 
 
 class CaptionRenderer:
-    def __init__(
-        self, frame_width: int, style: CaptionStyle = DEFAULT_STYLE, font: Path | None = None
-    ) -> None:
+    def __init__(self, frame_width: int, style: CaptionStyle = DEFAULT_STYLE) -> None:
         self.style = style
         self._width = frame_width
-        self._font = ImageFont.truetype(str(font or DEFAULT_FONT), style.size)
+        self._font = ImageFont.truetype(str(style.font), style.size)
 
     def measure(self, text: str) -> float:
         return float(self._font.getlength(text))
@@ -198,12 +200,16 @@ class CaptionRenderer:
         draw = ImageDraw.Draw(image)
         for index, line in enumerate(caption.lines):
             x, y = self._width / 2, style.outline + index * line_height
-            shadow = (x + style.shadow_offset, y + style.shadow_offset)
-            draw.text(shadow, line, font=self._font, anchor="ma", fill=(0, 0, 0, 140))
+            if style.shadow_alpha:
+                shadow = (x + style.shadow_offset, y + style.shadow_offset)
+                draw.text(
+                    shadow, line, font=self._font, anchor="ma", fill=(0, 0, 0, style.shadow_alpha)
+                )
             draw.text(
                 (x, y), line, font=self._font, anchor="ma", fill=(*style.color, 255),
-                stroke_width=style.outline, stroke_fill=(0, 0, 0, 255),
+                stroke_width=style.outline, stroke_fill=(*style.outline_color, 255),
             )  # fmt: skip
         rgba = np.asarray(image).astype(np.float32)
-        top = style.centre_y - height // 2
+        # Rest on the frame edge rather than cross it: render.py's overlay slices rows by top.
+        top = min(max(style.centre_y - height // 2, 0), style.frame_height - height)
         return CaptionImage(caption, top, rgba[..., 2::-1].copy(), rgba[..., 3:4] / 255.0)

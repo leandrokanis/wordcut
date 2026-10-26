@@ -133,9 +133,27 @@ Formato de [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões
   correção marca o corte como editado, e o `sermon suggest` o mantém. `cut list`, `cut show`
   (`text`, `segments[].text` e `words[].corrected`) e `cut preview` passam a trazer as
   correções; `words[].text` segue com o original.
+- `wordcut cut caption <id> [opções]` (item 1.1.f.4): mostra ou altera o estilo da legenda do
+  corte, que vale para todas as legendas dele. Opções `--font` (fontes do pacote, pelo nome
+  dos metadados do arquivo), `--size` (24–160 px), `--color` e `--border-color`
+  (`#RRGGBB`, gravadas em maiúsculas), `--position top|center|bottom` (20, 50 e 78 % da
+  altura do quadro, como no protótipo), `--offset` (10–90 %, vence `--position`; sozinho
+  mantém o `position`), `--border` (0–12 px), `--shadow none|soft|strong`, `--on`/`--off` e
+  `--reset`. O padrão é o estilo da igreja (Open Sans Bold, 60 px, `#FFD600`, centro,
+  contorno preto de 3 px, sombra suave). O estilo fica em JSON no corte (`NULL` é o padrão,
+  que o `--reset` volta a gravar); um estilo gravado incompleto é completado pelo padrão.
+  Alterar ou restaurar marca o corte como editado. Valor fora da faixa ou da forma,
+  `--on --off` e `--reset` com outra opção dão `invalid_argument` e nada muda; fonte
+  inexistente traz as fontes em `details.choices`.
+- Desenho da legenda (`CaptionStyle`/`CaptionRenderer`) com cor do contorno, sombra em três
+  níveis (nenhuma, suave com alpha 140, forte com alpha 220), arquivo da fonte e altura do
+  quadro; a imagem encosta na borda em vez de sair do quadro. O estilo padrão desenha igual
+  ao de antes, pixel a pixel.
 
 ### Alterado
 
+- `cut show` traz em `caption` o estilo efetivo da legenda (o padrão completo quando o corte
+  não tem estilo), não mais `{}`.
 - O comando `cut` da CLI anterior passa a se chamar `cut-sermon`, com os mesmos argumentos e
   a mesma saída, porque `cut` é agora o grupo dos cortes; sai junto com a CLI anterior
   (roadmap, item 18).
