@@ -12,7 +12,8 @@ const POLL_MS = 3000;
 
 const MachineStatusContext = createContext<MachineState>({});
 
-/** Polls GET /api/status for the screens below it; the task events (SSE) come in item 22. */
+/** Polls GET /api/status for the screens below it; a screen that follows one task uses its
+ * events (SSE, ``useTaskEvents``). */
 export function MachineStatusProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<MachineState>({});
 

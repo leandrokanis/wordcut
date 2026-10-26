@@ -1,5 +1,6 @@
 import { useRoutes, type RouteObject } from "react-router-dom";
 
+import { SermonPage } from "../features/sermon/SermonPage";
 import { SermonList } from "../features/sermons/SermonList";
 import { SettingsPage } from "../features/settings/SettingsPage";
 import { Layout } from "./Layout";
@@ -14,10 +15,7 @@ export const routes: RouteObject[] = [
         element: <Layout />,
         children: [
           { path: "/", element: <SermonList /> },
-          {
-            path: "/sermons/:id",
-            element: <LevelPlaceholder notFound="Pregação não encontrada." />,
-          },
+          { path: "/sermons/:id", element: <SermonPage /> },
           { path: "/cuts/:id", element: <LevelPlaceholder notFound="Corte não encontrado." /> },
         ],
       },

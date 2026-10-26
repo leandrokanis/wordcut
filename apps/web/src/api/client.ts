@@ -6,6 +6,8 @@ import type {
   Sermon,
   SermonCreated,
   SermonListItem,
+  SermonShown,
+  TaskLaunched,
 } from "./types";
 
 /** A failed call: the API's error object, with the HTTP status. */
@@ -43,12 +45,16 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   throw new ApiError(response.status, { code: "unavailable", message: UNAVAILABLE_MESSAGE });
 }
 
-function post<T>(path: string, body: object): Promise<T> {
+function send<T>(method: "POST" | "PATCH", path: string, body: object): Promise<T> {
   return request(path, {
-    method: "POST",
+    method,
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
+}
+
+function post<T>(path: string, body: object): Promise<T> {
+  return send("POST", path, body);
 }
 
 async function jsonOf(response: Response): Promise<unknown> {
@@ -69,6 +75,21 @@ export async function listSermons(): Promise<SermonListItem[]> {
 
 export function getSermon(id: number): Promise<Sermon> {
   return request(`/api/sermons/${id}`);
+}
+
+/** The sermon with its borders, last task and cuts, as the level 2 screen shows it. */
+export function showSermon(id: number): Promise<SermonShown> {
+  return request(`/api/sermons/${id}`);
+}
+
+/** Saves the sermon's borders, in seconds of the live. */
+export function trimSermon(id: number, start: number, end: number): Promise<SermonShown> {
+  return send("PATCH", `/api/sermons/${id}`, { start, end });
+}
+
+/** Launches the processing; ``force`` discards the edits of the cuts of a processed sermon. */
+export function processSermon(id: number, force = false): Promise<TaskLaunched> {
+  return post(`/api/sermons/${id}/process`, force ? { force } : {});
 }
 
 export function getCut(id: number): Promise<Cut> {

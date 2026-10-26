@@ -50,10 +50,15 @@ function MachineSummary({ status: { lock, running_tasks } }: { status: MachineSt
   );
 }
 
-function busyText(lock: Extract<Lock, { held: true }>): string {
-  const what = [KIND_LABELS[lock.kind ?? ""] ?? lock.kind, resourceText(lock.resource)]
+/** What holds the machine, as "processando a pregação 7"; empty while the lock is unwritten. */
+export function lockedWork(lock: Extract<Lock, { held: true }>): string {
+  return [KIND_LABELS[lock.kind ?? ""] ?? lock.kind, resourceText(lock.resource)]
     .filter(Boolean)
     .join(" ");
+}
+
+function busyText(lock: Extract<Lock, { held: true }>): string {
+  const what = lockedWork(lock);
   const since =
     lock.elapsed_seconds == null
       ? ""

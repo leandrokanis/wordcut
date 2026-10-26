@@ -1,4 +1,11 @@
-import type { MachineStatus, Me, SermonCreated, SermonListItem, Task } from "../api/types";
+import type {
+  MachineStatus,
+  Me,
+  SermonCreated,
+  SermonListItem,
+  SermonShown,
+  Task,
+} from "../api/types";
 
 // Bodies shaped as packages/core service/sermons.py, service/status.py and service/tasks.py
 // give them; the data is fictitious.
@@ -78,4 +85,41 @@ export function busyMachine(task: Task = runningTask()): MachineStatus {
     },
     running_tasks: [task],
   };
+}
+
+/** A trimmed sermon as ``GET /api/sermons/{id}`` gives it, not processed yet. */
+export function shownSermon(overrides: Partial<SermonShown> = {}): SermonShown {
+  return {
+    ...listedSermon({ status: "trimmed", duration: 2475, cut_counts: noCuts() }),
+    live_start: 1800,
+    live_end: 4275,
+    sermon_start: null,
+    sermon_end: null,
+    processed_at: null,
+    last_task: null,
+    cuts: [],
+    suggestion_error: null,
+    ...overrides,
+  };
+}
+
+/** ``shownSermon`` after processing: the borders were fitted to the words. */
+export function processedSermon(overrides: Partial<SermonShown> = {}): SermonShown {
+  return shownSermon({
+    status: "processed",
+    sermon_start: 1801.2,
+    sermon_end: 4274.6,
+    processed_at: "2026-10-18T22:30:00-03:00",
+    last_task: runningTask({
+      status: "succeeded",
+      progress: 1,
+      progress_message: null,
+      finished_at: "2026-10-18T22:30:00-03:00",
+    }),
+    ...overrides,
+  });
+}
+
+function noCuts(): SermonListItem["cut_counts"] {
+  return { suggested: 0, chosen: 0, discarded: 0 };
 }
