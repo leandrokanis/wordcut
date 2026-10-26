@@ -735,14 +735,32 @@ os critérios do código, com o nível padrão para os que o preset não gravou:
 
 ## 12. Equipe (`member`)
 
-Comandos do administrador (1.2.a). Membros são identificados pelo e-mail.
+Comandos do administrador (1.2.a). Membros são identificados pelo e-mail, gravado e
+comparado em minúsculas, sem os espaços das pontas: `Admin@Exemplo.org` e `admin@exemplo.org`
+são o mesmo membro em todos os comandos.
 
-- `member list`
-- `member add <email> --role assistant|admin`
-- `member set-role <email> assistant|admin`
-- `member remove <email>`
+- `member list`: `{"items": [ … ]}` com os membros em ordem de e-mail.
+- `member add <email> --role assistant|admin`: `--role` é obrigatório. Devolve o membro.
+- `member set-role <email> assistant|admin`: devolve o membro. O papel que o membro já tem
+  não muda nada e não é erro.
+- `member remove <email>`: devolve `{"email": "assistente@exemplo.org", "removed": true}`.
 
-Remover ou rebaixar o último administrador falha com `last_admin`.
+O membro:
+
+```json
+{
+  "email": "assistente@exemplo.org",
+  "role": "assistant",
+  "created_at": "2026-10-26T19:40:00-03:00",
+  "updated_at": "2026-10-26T19:40:00-03:00"
+}
+```
+
+Remover ou rebaixar o último administrador falha com `last_admin`, também quando a CLI e a API
+mudam a equipe ao mesmo tempo. Antes do primeiro administrador, qualquer papel pode ser
+incluído. E-mail fora da forma de endereço (parte local, `@` e domínio com ponto), e-mail já
+na equipe e papel fora de `assistant|admin` dão `invalid_argument` (papel com
+`details.choices`); e-mail fora da equipe dá `not_found`. Nenhum erro repete o e-mail digitado (ADR-0015).
 
 ## 13. Servidor
 
@@ -802,7 +820,8 @@ critério teológico vai para o pacote (2.1.a).
 
 ## 17. Considerações de privacidade (LGPD)
 
-- Da equipe, a CLI guarda e mostra só o e-mail e o papel.
+- Da equipe, de dado pessoal, a CLI guarda e mostra só o e-mail; além dele, o papel e as
+  datas de inclusão e de alteração. Mensagens de erro não repetem o e-mail.
 - Textos livres (instruções adicionais dos presets) e relatórios MUST NOT conter nomes de
   pessoas (constituição §VI).
 - Exemplos no `--help` e neste documento usam dados fictícios.
