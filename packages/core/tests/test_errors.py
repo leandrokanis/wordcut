@@ -23,6 +23,8 @@ EXIT_CODE_BY_ERROR_CODE = {
     "transcription_error": 6,
     "interrupted": 1,
     "processing_error": 1,
+    "unauthenticated": 1,
+    "forbidden": 1,
 }
 
 

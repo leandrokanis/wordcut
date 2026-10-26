@@ -191,8 +191,13 @@ Em desenvolvimento, `npm --prefix apps/web run dev` serve a web e repassa `/api`
 local em `127.0.0.1:8781` (o uvicorn escuta só em `127.0.0.1` por padrão):
 
 ```sh
-uv run uvicorn wordcut_api.app:create_app --factory --port 8781
+WORDCUT_DEV_EMAIL=admin@exemplo.org uv run uvicorn wordcut_api.app:create_app --factory --port 8781
 ```
+
+A API identifica quem chama pelo token do Cloudflare Access (`WORDCUT_ACCESS_TEAM_DOMAIN` e
+`WORDCUT_ACCESS_AUD`). Sem o Access, `WORDCUT_DEV_EMAIL` fixa o e-mail de um membro da equipe,
+só em desenvolvimento; sem nenhum dos dois, toda rota menos `/api/health` dá 401
+([ADR-0019](docs/adr/0019-identidade-e-erros-na-api.md)).
 
 ## Docker Compose
 
@@ -216,7 +221,8 @@ Os contêineres Python rodam com o usuário do host (`UID`/`GID`, padrão `1000`
 
 Crie os dois diretórios antes do primeiro `up`; se não existirem, o Docker os cria como
 `root`. Portas e usuário mudam por variável de ambiente: `WORDCUT_WEB_PORT`,
-`WORDCUT_API_PORT`, `UID`, `GID`. A imagem sai sem WhisperX; o argumento de build `WITH_ASR`
+`WORDCUT_API_PORT`, `UID`, `GID`. O Access do time chega à `api` por `WORDCUT_ACCESS_TEAM_DOMAIN`
+e `WORDCUT_ACCESS_AUD`; o Compose nunca repassa `WORDCUT_DEV_EMAIL`. A imagem sai sem WhisperX; o argumento de build `WITH_ASR`
 (`WORDCUT_WITH_ASR=1`) fica para o item de processamento do roadmap, junto com a GPU.
 
 ## Licença

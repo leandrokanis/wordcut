@@ -9,7 +9,7 @@ x-python-build: &python-build
 # Shared data and read-only secrets, see ADR-0003 and docs/constitution.md §VI.
 x-python-runtime: &python-runtime
   user: "${UID:-1000}:${GID:-1000}"
-  environment:
+  environment: &python-environment
     WORDCUT_HOME: /data
     WORDCUT_CONFIG: /config
   volumes:
@@ -19,6 +19,12 @@ x-python-runtime: &python-runtime
 services:
   api:
     <<: *python-runtime
+    # The Cloudflare Access team and the AUD tag of the application, see ADR-0009 and
+    # ADR-0019. Empty, the API identifies nobody. WORDCUT_DEV_EMAIL is never passed here.
+    environment:
+      <<: *python-environment
+      WORDCUT_ACCESS_TEAM_DOMAIN: ${WORDCUT_ACCESS_TEAM_DOMAIN:-}
+      WORDCUT_ACCESS_AUD: ${WORDCUT_ACCESS_AUD:-}
     build:
       <<: *python-build
       target: api

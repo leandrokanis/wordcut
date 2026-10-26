@@ -13,6 +13,9 @@ EXIT_CODES: dict[str, int] = {
     "internal_error": 1,
     "interrupted": 1,
     "processing_error": 1,
+    # Only the API raises these two; the exit code exists because the table is shared.
+    "unauthenticated": 1,
+    "forbidden": 1,
     "invalid_argument": 2,
     "not_found": 3,
     "busy": 4,

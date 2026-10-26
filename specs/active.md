@@ -1,1 +1,1 @@
-active_plan: specs/cli-migration/plan.md
+active_plan: specs/1.2.a.2-api-identity/plan.md

@@ -22,3 +22,4 @@ Uma decisão por arquivo, no formato de Michael Nygard ([ADR-0001](0001-registra
 | [ADR-0016](0016-sugestao-por-porta-com-falha-na-pregacao.md) | Sugestão de cortes por porta, com a falha gravada na pregação (complementa a ADR-0010 e a ADR-0014) | Aceita |
 | [ADR-0017](0017-testes-sem-rede-real.md) | Testes sem rede real (complementa a ADR-0014 e a ADR-0016) | Aceita |
 | [ADR-0018](0018-exportacao-por-portas-sem-arquivo-parcial.md) | Exportação do corte por portas, sem arquivo parcial (complementa a ADR-0014 e a ADR-0017) | Aceita |
+| [ADR-0019](0019-identidade-e-erros-na-api.md) | Identidade e erros na API (complementa a ADR-0009 e a ADR-0012) | Aceita |

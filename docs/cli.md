@@ -189,7 +189,7 @@ Comandos longos escrevem o progresso no stderr, uma linha por etapa ou atualiza�
 | Saída | Nome | Significado |
 |:-:|---|---|
 | 0 | — | sucesso |
-| 1 | `internal_error`, `interrupted`, `processing_error` | erro interno inesperado; tarefa interrompida; processamento sem resultado (§5.3) |
+| 1 | `internal_error`, `interrupted`, `processing_error`, `unauthenticated`, `forbidden` | erro interno inesperado; tarefa interrompida; processamento sem resultado; quem chama a API não foi identificado ou não tem permissão (§5.3) |
 | 2 | `invalid_argument` | uso inválido: argumento faltando, mal formado ou fora da faixa |
 | 3 | `not_found` | recurso inexistente |
 | 4 | `busy` | máquina ocupada pela trava de processamento |
@@ -225,6 +225,8 @@ Sem `--json`, o `message` vai para o stderr.
 | `internal_error` | 1 | falha não prevista |
 | `interrupted` | 1 | a tarefa parou antes do fim: Ctrl+C durante `--wait` ou processo da tarefa morto (§6.5) |
 | `processing_error` | 1 | o processamento não achou palavra dentro das bordas, ou o vídeo baixado não cobre a pregação; nada é gravado |
+| `unauthenticated` | 1 | só na API (HTTP 401): requisição sem o token do Cloudflare Access, com token inválido (assinatura, validade, `aud` ou emissor) ou sem Access configurado nem e-mail de desenvolvimento; a mensagem nunca traz o token (ADR-0019) |
+| `forbidden` | 1 | só na API (HTTP 403): e-mail fora da equipe, ou papel sem permissão para a rota; a mensagem nunca traz o e-mail (ADR-0015, ADR-0019) |
 | `invalid_argument` | 2 | argumento inválido; `details.argument` diz qual opção do comando, quando identificável, com o nome que o parser define, e `details.choices` lista as opções válidas de uma escolha; argumento não reconhecido não traz `details`; a mensagem nunca repete o que foi digitado, nem como nome de opção (ADR-0015) |
 | `not_found` | 3 | ID ou e-mail inexistente |
 | `busy` | 4 | outra tarefa segura a trava, ou já há uma sugestão da mesma pregação em andamento (§7.6); `details` traz a tarefa (`task_id`, `kind`, `started_at`) |
