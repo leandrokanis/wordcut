@@ -46,18 +46,8 @@ class Transcript:
     model: str
     metadata: dict[str, Any] = field(default_factory=dict)
 
-    def text(self) -> str:
-        return " ".join(word.text for word in self.words)
-
     def shifted(self, delta: float) -> Transcript:
         return replace(self, words=tuple(word.shifted(delta) for word in self.words))
-
-    def between(self, start: float, end: float) -> Transcript:
-        """Words fully inside ``[start, end]``, rebased so ``start`` becomes 0."""
-        kept = tuple(
-            word.shifted(-start) for word in self.words if word.start >= start and word.end <= end
-        )
-        return replace(self, words=kept)
 
     def to_json(self) -> dict[str, Any]:
         return {

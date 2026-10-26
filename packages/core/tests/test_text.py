@@ -1,7 +1,4 @@
-import pytest
-
-from wordcut.edit.edit_list import EditList, Segment
-from wordcut.edit.text import apply_corrections, capitalize, tidy_joins
+from wordcut.edit.text import capitalize, tidy_joins
 from wordcut.transcript import Word
 
 
@@ -11,24 +8,6 @@ def words(*tokens: str) -> list[Word]:
 
 def texts(items: list[Word]) -> str:
     return " ".join(word.text for word in items)
-
-
-def test_correction_keeps_punctuation_and_timing() -> None:
-    fixed = apply_corrections(words("Em", "Esté,", "o", "decreto"), {"Esté": "Ester"})
-
-    assert texts(fixed) == "Em Ester, o decreto"
-    assert fixed[1].start == 1.0
-
-
-def test_phrase_correction_and_capital_preserved() -> None:
-    fixed = apply_corrections(words("A", "direita", "do", "Pai."), {"a direita": "à direita"})
-
-    assert texts(fixed) == "À direita do Pai."
-
-
-def test_correction_needs_same_word_count() -> None:
-    with pytest.raises(ValueError, match="mesmo número"):
-        EditList("x", (Segment(0, 1),), corrections={"Amã": "o Hamã"})
 
 
 def test_capitalize_skips_leading_punctuation() -> None:

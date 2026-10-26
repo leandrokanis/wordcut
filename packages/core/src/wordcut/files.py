@@ -1,12 +1,15 @@
-"""Copies of media files to a place the user chose, never overwriting what is there."""
+"""Copies of media files to a place the user chose, never overwriting what is there, and the
+readable names they suggest."""
 
 from __future__ import annotations
 
 import errno
 import os
+import re
 import shutil
 import uuid
 from collections.abc import Iterator
+from datetime import date
 from itertools import count
 from pathlib import Path
 
@@ -16,6 +19,15 @@ FIRST_COPY_NUMBER = 2
 # os.link fails this way on filesystems without hard links (FAT, some network shares) and
 # across devices; the copy then falls back to an exclusive create of the final name.
 NO_HARD_LINK = frozenset({errno.EPERM, errno.ENOTSUP, errno.EOPNOTSUPP, errno.EXDEV})
+
+# Characters that some filesystem refuses in a file name.
+PATH_UNSAFE = re.compile(r'[/\\:*?"<>|]')
+
+
+def folder_name(service_date: date, title: str) -> str:
+    """``2026-10-18 - Título``, without the characters a file name cannot hold."""
+    clean_title = re.sub(r"\s+", " ", PATH_UNSAFE.sub("", title)).strip()
+    return f"{service_date.isoformat()} - {clean_title}"
 
 
 def copy_without_overwrite(

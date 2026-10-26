@@ -11,13 +11,17 @@ from pathlib import Path
 from wordcut.errors import WordcutError
 from wordcut.processing import ProcessingGateways
 from wordcut.processing.sentences import Sentence, split_sentences
-from wordcut.sermon import LEAD_IN_S, SECTION_MARGIN_S, SYNC_SEARCH_S, TAIL_S
 from wordcut.transcript import Word
 from wordcut.youtube import YouTubeError
 
 # The audio window is downloaded exactly, so it is the ruler the section is synced against.
 WINDOW_BEFORE_S = 50.0
 WINDOW_AFTER_S = 40.0
+
+SECTION_MARGIN_S = 30.0  # video downloaded beyond the cut, for sync and keyframes
+SYNC_SEARCH_S = 20.0
+LEAD_IN_S = 0.3  # before the first word
+TAIL_S = 1.5  # after the last word
 
 SECTION_FILE = "section.mp4"
 WINDOW_FILE = "window.m4a"

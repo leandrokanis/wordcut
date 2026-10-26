@@ -12,14 +12,10 @@ import numpy.typing as npt
 FADE_SECONDS = 0.5
 
 
-def extract_speech_audio(
-    media: Path, output: Path, start: float = 0.0, duration: float | None = None
-) -> Path:
+def extract_speech_audio(media: Path, output: Path) -> Path:
     """Write audio as 16 kHz mono PCM, the format speech models expect."""
-    command = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{start:.3f}"]
-    if duration is not None:
-        command += ["-t", f"{duration:.3f}"]
-    command += ["-i", str(media), "-vn", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le"]
+    command = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(media)]
+    command += ["-vn", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le"]
     subprocess.run([*command, str(output)], check=True)
     return output
 

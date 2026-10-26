@@ -8,7 +8,6 @@ import sys
 from wordcut_cli import (
     criteria,
     cut,
-    legacy,
     member,
     preset,
     render,
@@ -22,7 +21,6 @@ from wordcut_cli.contract import create_parser, execute
 
 def build_parser() -> argparse.ArgumentParser:
     parser, commands = create_parser()
-    legacy.register(commands)
     criteria.register(commands)
     cut.register(commands)
     member.register(commands)

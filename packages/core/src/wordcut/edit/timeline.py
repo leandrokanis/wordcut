@@ -1,4 +1,4 @@
-"""From an edit list to the exact source intervals ("clips") of a short.
+"""From the segments of a cut to the exact source intervals ("clips") it plays.
 
 Within each segment, hesitations are cut out and silences are shortened:
 pauses after a sentence end keep up to ``RHETORICAL_PAUSE_S`` (the preacher's
@@ -15,7 +15,6 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 from wordcut.edit.cleanup import remove_hesitations
-from wordcut.edit.edit_list import EditList
 from wordcut.transcript import Word
 
 PAUSE_S = 0.15
@@ -94,7 +93,7 @@ class Timeline:
         return words
 
     def segment_starts(self) -> list[float]:
-        """Output times where a new edit-list segment begins (excluding 0)."""
+        """Output times where a new segment begins (excluding 0)."""
         starts: list[float] = []
         offset = 0.0
         for previous, clip in zip(self.clips, self.clips[1:], strict=False):
@@ -102,21 +101,6 @@ class Timeline:
             if clip.segment != previous.segment:
                 starts.append(offset)
         return starts
-
-
-def plan_timeline(
-    edit_list: EditList,
-    words: Sequence[Word],
-    fps: float,
-    energy: Energy | None = None,
-    cleanup: Cleanup = DEFAULT_CLEANUP,
-) -> Timeline:
-    """The clips of ``edit_list``, each segment made of the ``words`` inside its times."""
-    segments = [
-        [w for w in words if segment.start <= w.start and w.end <= segment.end]
-        for segment in edit_list.segments
-    ]
-    return plan_segments(segments, words, fps, energy, cleanup)
 
 
 def plan_segments(

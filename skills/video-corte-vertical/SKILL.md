@@ -1,59 +1,56 @@
 ---
 name: video-corte-vertical
-description: Gera cortes verticais 9:16 (1080x1920) de pregação para Reels/Shorts com edição dinâmica palavra a palavra — colagem de trechos de uma ideia, remoção de hesitações e pausas, janela acompanhando o pregador e legenda amarela sincronizada por palavra. Sugere as melhores ideias a partir da transcrição (cristológicas, aplicação prática, frases marcantes; filtra triunfalismo, alegoria e teologia frágil). Use quando o usuário pedir corte vertical, Reels, Shorts, TikTok, "sugerir cortes" ou "melhores trechos" de uma pregação.
+description: Revisa e exporta os cortes verticais 9:16 de uma pregação processada pela CLI wordcut — lista os cortes sugeridos, mostra o texto montado e a sequência de trechos, marca os escolhidos, corrige a grafia da legenda e exporta com hesitações e pausas removidas, janela acompanhando o pregador e legenda por palavra. Use quando o usuário pedir corte vertical, Reels, Shorts, TikTok, "sugerir cortes" ou "melhores trechos" de uma pregação.
 ---
 
-# Cortes verticais com edição dinâmica
+# Cortes verticais de uma pregação
 
-Segunda etapa do fluxo. A primeira é `video-cortar-pregacao`, que gera a pasta da pregação:
+Segunda etapa do fluxo. A primeira é a skill `video-cortar-pregacao`, que deixa a pregação
+processada e com cortes sugeridos. A especificação dos comandos está em `docs/cli.md`.
 
-```
-~/Videos/Pregações/AAAA-MM-DD - Título - Referência/
-  <pasta>.mp4      pregação horizontal
-  palavras.json    transcrição por palavra (tempos do .mp4)
-  roteiros/        um .json por corte
-  cortes/          resultado
-```
+## Pré-requisitos
 
-Roda no **leitao**, no repositório `~/cortes-pregacao` (`uv run wordcut …`). Se a pasta não existir ou não tiver `palavras.json`, rode a primeira etapa antes.
+- Repositório `~/cortes-pregacao` com `uv sync --all-packages`; os comandos abaixo são
+  `uv run wordcut …` a partir dele.
+- Pregação processada: `uv run wordcut sermon list` mostra o ID e o estado `processed`.
+  Se não estiver, rode a primeira etapa antes.
+- Cortes sugeridos: `uv run wordcut sermon show <id>` mostra os cortes e o erro da última
+  sugestão. Sem cortes por falta de modelo ou chave do LLM, peça ao administrador para
+  configurá-los (`settings set`, `settings set-key`) e pedir uma nova sugestão.
 
 ## Fluxo
 
-1. **Sugerir ideias e montar roteiros** seguindo `sugerir-cortes.md` (critérios, salvaguardas da colagem e formato do roteiro), calibrado por `exemplos.md`. Cada ideia vira um roteiro em `roteiros/` e passa pelo `wordcut preview` sem avisos.
-
-2. **Aprovação obrigatória do roteiro em texto.** Mostre a saída do `preview` de cada ideia. O usuário pode aprovar várias de uma vez, pedir ajustes (tirar/incluir frase, trocar gancho) ou rejeitar. Ajuste o `.json`, rode `preview` de novo e mostre. Nada é renderizado sem aprovação.
-
-3. **Renderizar** cada roteiro aprovado, em background (≈ 2–4 min por corte):
+1. **Ver os cortes**: `uv run wordcut cut list --sermon <id>`. Os critérios da sugestão são
+   os do preset (`uv run wordcut criteria list`, `uv run wordcut preset show <preset>`);
+   esta skill não aplica critério próprio. Outra sugestão, com outro preset, é
+   `uv run wordcut sermon suggest <id> --preset <preset> --wait`.
+2. **Mostrar cada corte em texto** com `uv run wordcut cut preview <corte>`: a sequência de
+   trechos, com `↑` no que volta no tempo. O usuário decide; nada é exportado sem aprovação.
+3. **Registrar a decisão**: `uv run wordcut cut choose <corte>` ou
+   `uv run wordcut cut discard <corte>` (`cut restore` desfaz o descarte).
+4. **Ajustar a legenda**, se preciso: `uv run wordcut cut show <corte>` lista as palavras com
+   `word_id`; `uv run wordcut cut fix-word <corte> <word_id> <texto>` corrige a grafia só
+   neste corte; `uv run wordcut cut caption <corte>` mostra ou troca o estilo.
+5. **Exportar** cada corte escolhido (tarefa com trava):
    ```
-   wordcut short "<pasta>/roteiros/<slug>.json" --dir "<pasta>"
+   uv run wordcut cut render <corte> --estimate
+   uv run wordcut cut render <corte> --wait --json
    ```
-   Com mais de uma pessoa em pé (entrevista, testemunho), olhe um quadro e passe `--alvo 0.7` (posição horizontal de quem fala, 0 = esquerda).
+   As opções (`--fillers`, `--stammers`, `--pauses`, `--resolution`, `--quality`,
+   `--smooth-joins`, `--fade`, `--normalize`, `--caption`) ficam salvas no corte. Se a
+   máquina estiver ocupada (saída 4), espere a tarefa de `uv run wordcut status` com
+   `uv run wordcut task wait <task_id>`.
+6. **Relatar**: título, duração e caminho de cada exportação. Lembre o usuário de assistir
+   antes de publicar.
 
-4. **Verificação visual obrigatória** de cada corte: 6 quadros espalhados, incluindo emendas entre trechos:
-   ```
-   ffmpeg -i "<corte>" -vf "select='eq(n\,90)+eq(n\,600)+…',scale=270:480,tile=6x1" -frames:v 1 check.png
-   ```
-   Pregador enquadrado com o rosto livre? Legenda legível, sem cobrir o rosto? Se não, ajuste e refaça.
+## Onde ver o resultado
 
-5. **Relatar**: duração, número de emendas, hesitações removidas, caminho, e o comando para trazer o arquivo:
-   ```
-   scp "leitao:Videos/Pregações/<pasta>/cortes/*.mp4" ~/Movies/Pregações/
-   ```
-   Lembre o usuário de assistir antes de publicar. Registre a decisão em `exemplos.md`.
-
-## O que a ferramenta faz
-
-- **Limpeza** (conservadora): remove "hã", "hum", "né", "é…"/"então…" arrastados, gaguejo de palavra curta ("o, o Senhor") e de expressão recomeçada ("não teve, não teve sonho"). Repetição retórica ("santo, santo, santo") fica. Se a hesitação removida tinha o ponto final, ele passa para a palavra anterior.
-- **Correções de grafia** da legenda vêm do campo `corrections` do roteiro; cada trecho começa com maiúscula.
-- **Pausas**: depois de fim de frase ficam até 0,4 s (respiro antes da próxima ideia); demais pausas, 0,15 s.
-- **Emendas**: corte seco, no quadro mais silencioso perto da fronteira; fade-out/in de 15 ms no áudio contra estalos. Áudio e vídeo nunca dessincronizam.
-- **Enquadramento**: detecção de rosto (Haar) com corpo (HOG) como reserva; segue a mesma pessoa por continuidade, ignora cabeças da plateia; suavização tipo operador de câmera. Em troca de trecho do roteiro a janela reposiciona de uma vez.
-- **Legenda**: Open Sans Bold 60 px (fonte incluída no pacote), amarelo saturado (#FFD600), contorno preto e sombra, centralizada na metade do vídeo; blocos de até 2 linhas, cada um entra na primeira palavra e sai na próxima.
-- **Codificação**: H.264 CRF 18, AAC 192k, loudnorm −14 LUFS, `+faststart`. Nunca sobrescreve: usa `-v2`, `-v3`…
+- `uv run wordcut render list --cut <corte>`: as exportações do corte, com o caminho local.
+- `uv run wordcut render download <exportação> -o <pasta>/`: copia o vídeo com nome legível
+  (data do culto e título do corte), sem sobrescrever, e mostra o caminho.
 
 ## Regras
 
-- Não apague nem altere a pregação, `palavras.json` ou roteiros aprovados sem perguntar.
-- Intermediários ficam em `<pasta>/trabalho/`.
-- Avaliação teológica é sugestão; publicar é decisão do usuário, após assistir.
-- Sem nomes de pessoas em `exemplos.md` (LGPD).
+- Não descarte, reprocesse nem apague nada sem o "ok" do usuário.
+- A sugestão é do LLM com os critérios do preset; publicar é decisão do usuário, após assistir.
+- Não registre nomes de pessoas em relatórios (LGPD).

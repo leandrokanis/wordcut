@@ -14,9 +14,9 @@ from wordcut.db.cuts import CutRow
 from wordcut.db.sermons import NewSermon, SermonRow, SuggestionError
 from wordcut.db.transcripts import SentenceRow
 from wordcut.errors import WordcutError
+from wordcut.files import folder_name
 from wordcut.home import Home
 from wordcut.lock import ProcessingLock
-from wordcut.sermon_folder import folder_name
 from wordcut.service.tasks import reconcile, shown_task
 from wordcut.tasks import Resource
 from wordcut.youtube import LiveInfo, LiveSource, YouTubeError, video_id

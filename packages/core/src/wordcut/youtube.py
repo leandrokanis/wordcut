@@ -123,11 +123,6 @@ class YouTube:
                 "O vídeo não tem horário de início no YouTube; sem ele não há data do culto."
             ) from None
 
-    def download_audio(self, url: str, output: Path) -> Path:
-        """Whole audio track as m4a; ``output`` must end in ``.m4a``."""
-        self._run(["-f", AUDIO_FORMAT, "-o", str(output), url])
-        return output
-
     def download_audio_window(self, url: str, start: float, end: float, output: Path) -> Path:
         """Audio only between ``start`` and ``end`` (seconds), as m4a.
 

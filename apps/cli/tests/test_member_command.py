@@ -70,7 +70,7 @@ def test_the_help_of_the_group_and_of_each_action_says_administrator_with_an_exa
     example = help_text.partition("Exemplo:")[2]
     assert (
         exit_code,
-        "— administrador" in help_text,
+        "— administrador" in " ".join(help_text.split()),
         example.strip().startswith(" ".join(["wordcut", "member", *action])),
         "@exemplo.org" in example or action == ["list"],
     ) == (0, True, True, True)
