@@ -1,9 +1,12 @@
-"""Sermons: create one from the live's link, list, show and trim them (docs/cli.md §7.1-§7.3)."""
+"""Sermons: create one from the live's link, list, show and trim them, and find the video
+to download (docs/cli.md §7.1-§7.3, §7.5)."""
 
 from __future__ import annotations
 
 import sqlite3
+from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 from wordcut.db import sermons, tasks, transcripts
@@ -12,6 +15,7 @@ from wordcut.db.transcripts import SentenceRow
 from wordcut.errors import WordcutError
 from wordcut.home import Home
 from wordcut.lock import ProcessingLock
+from wordcut.sermon_folder import folder_name
 from wordcut.service.tasks import reconcile, shown_task
 from wordcut.tasks import Resource
 from wordcut.youtube import LiveInfo, LiveSource, YouTubeError, video_id
@@ -158,6 +162,42 @@ def processed_sermon(connection: sqlite3.Connection, sermon_id: int) -> dict[str
     shown = _shown(connection, _existing(connection, sermon_id))
     del shown["last_task"]
     return shown
+
+
+@dataclass(frozen=True)
+class SermonVideo:
+    """The processed 16:9 video of a sermon and the readable name to save it under."""
+
+    path: Path
+    suggested_name: str
+
+
+def sermon_video(connection: sqlite3.Connection, home: Home, sermon_id: int) -> SermonVideo:
+    """The processed video of the sermon, named ``AAAA-MM-DD - Título.mp4``."""
+    row = _existing(connection, sermon_id)
+    if row.status != "processed":
+        raise WordcutError(
+            "sermon_not_processed",
+            f"A pregação {sermon_id} ainda não foi processada;"
+            f" rode wordcut sermon process {sermon_id}.",
+            {"sermon_id": sermon_id, "status": row.status},
+        )
+    return SermonVideo(
+        path=_video_file(home, row),
+        suggested_name=f"{folder_name(row.service_date, row.title)}.mp4",
+    )
+
+
+def _video_file(home: Home, row: SermonRow) -> Path:
+    video = None if row.video_path is None else home.root / row.video_path
+    if video is None or not video.is_file():
+        # The message stays free of the data folder's path, which is internal (spec 1.1.d.1).
+        raise WordcutError(
+            "internal_error",
+            f"Vídeo da pregação {row.id} não encontrado.",
+            {"sermon_id": row.id},
+        )
+    return video
 
 
 def _reconciled(home: Home, connection: sqlite3.Connection, row: SermonRow) -> SermonRow:

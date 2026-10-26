@@ -1,20 +1,24 @@
-"""``wordcut sermon <action>``: create, list, show, trim and process sermons (docs/cli.md §7)."""
+"""``wordcut sermon <action>``: create, list, show, trim, process and download sermons
+(docs/cli.md §7)."""
 
 from __future__ import annotations
 
 import argparse
+import os
 from contextlib import closing
 from datetime import date
 from functools import partial
 from typing import TYPE_CHECKING, Any
 
 from wordcut.errors import WordcutError
+from wordcut.files import copy_without_overwrite
 from wordcut.home import Home
 from wordcut.service.processing import start_processing
 from wordcut.service.sermons import (
     SERMON_STATES,
     create_sermon,
     list_sermons,
+    sermon_video,
     show_sermon,
     trim_sermon,
 )
@@ -111,6 +115,27 @@ def register(commands: Commands) -> None:
         help="processa de novo uma pregação já processada, descartando palavras, frases e cortes",
     )
     add_wait_option(process)
+    download = add_command(
+        actions,
+        "download",
+        help=(
+            "copia o vídeo 16:9 da pregação processada para o caminho indicado, ou para a pasta"
+            " atual com nome legível (data e título), sem sobrescrever; mostra o caminho"
+        ),
+        run=_download,
+        render=_render_downloaded,
+        example="wordcut sermon download 12 -o ~/Vídeos/ --json",
+    )
+    download.add_argument("id", type=int, help="ID da pregação")
+    download.add_argument(
+        "-o",
+        "--output",
+        default=os.curdir,
+        help=(
+            "arquivo de destino, ou pasta (existente ou terminada em /) que recebe o nome"
+            " legível; padrão: a pasta atual"
+        ),
+    )
 
 
 def _add_borders(command: argparse.ArgumentParser, *, required: bool) -> None:
@@ -188,6 +213,14 @@ def _processing(ctx: Context, sermon_id: int, *, force: bool, wait: bool) -> dic
         return show_sermon(connection, sermon_id, home=home)
 
 
+def _download(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:
+    """Copy outside the processing lock: reading a finished video races with nothing."""
+    with closing(deps.connection()) as connection:
+        video = sermon_video(connection, Home.from_environment(), args.id)
+    copied = copy_without_overwrite(video.path, args.output, video.suggested_name)
+    return {"path": str(copied), "bytes": copied.stat().st_size}
+
+
 def _warn_if_reprocess_needed(sermon: dict[str, Any], ctx: Context) -> None:
     """Take the service's ``needs_reprocess`` out of the answer, which keeps show's format."""
     if sermon.pop("needs_reprocess", False):
@@ -216,6 +249,10 @@ def _render_processing(result: dict[str, Any]) -> str:
         f"Tarefa {result['task_id']} iniciada: processamento da pregação {result['sermon_id']}."
         f" Acompanhe com wordcut task wait {result['task_id']}."
     )
+
+
+def _render_downloaded(result: dict[str, Any]) -> str:
+    return str(result["path"])
 
 
 def _render_listed(result: dict[str, Any]) -> str:

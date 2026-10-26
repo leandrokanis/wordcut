@@ -48,6 +48,13 @@ Formato de [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões
   `processed_at` e a última tarefa (`last_task`); `show` e `list` deixam `failed` a pregação
   `processing` cujo processo morreu.
 - Códigos de erro `transcription_error` (saída 6) e `processing_error` (saída 1).
+- `wordcut sermon download <id> [-o caminho]`: copia o vídeo 16:9 da pregação processada
+  para o caminho indicado ou, sem `-o`, para a pasta atual com o nome legível
+  `AAAA-MM-DD - Título.mp4`; `-o` com uma pasta existente (ou terminado em `/`) grava o
+  nome legível dentro dela. Nunca sobrescreve: um destino ocupado ganha ` (2)`, ` (3)`…
+  antes da extensão, e o nome final só aparece com a cópia completa. Devolve `path`
+  (absoluto) e `bytes`; não toma a trava de processamento. Pregação não processada falha
+  com `sermon_not_processed`.
 
 ### Alterado
 
