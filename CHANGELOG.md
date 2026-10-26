@@ -105,9 +105,21 @@ Formato de [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões
 - Guarda da suíte de testes contra a rede real (ADR-0017): com `WORDCUT_FORBID_NETWORK`
   definida, que o `conftest.py` da raiz define e a tarefa destacada herda, a montagem do LLM
   real e do processamento real recusa com `network_error`.
+- `wordcut cut list --sermon <id> [--status S]`, `cut show <id>`, `cut choose <id>`,
+  `cut discard <id>` e `cut restore <id>` (item 1.1.e.1): o `list` traz cada corte com o
+  texto montado (as palavras de cada trecho, na ordem em que o corte toca) e a duração (soma
+  das faixas dos trechos, sem a estimativa de limpeza), com os descartados por último; o
+  `show` traz também os trechos com tempos e texto, as palavras (`word_id`, texto, tempos e
+  `corrected`, sempre `null` até a correção de grafia), `caption` e `render_options` (`{}`
+  enquanto valem os padrões) e `renders: []`. `choose`, `discard` e `restore` mudam só o
+  estado e devolvem o corte como o `show`; `restore` só tira um corte de `discarded`, e
+  repetir uma transição não grava nada. Corte ou pregação inexistente dá `not_found`.
 
 ### Alterado
 
+- O comando `cut` da CLI anterior passa a se chamar `cut-sermon`, com os mesmos argumentos e
+  a mesma saída, porque `cut` é agora o grupo dos cortes; sai junto com a CLI anterior
+  (roadmap, item 18).
 - `sermon process` transcreve com o modelo do WhisperX das configurações
   (`settings set --whisper-model`), não mais com `large-v3` fixo.
 - `settings show` traz o ID do preset padrão em `default_preset_id` (antes sempre `null`).

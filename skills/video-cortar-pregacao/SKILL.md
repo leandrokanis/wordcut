@@ -38,7 +38,7 @@ Roda no **leitao** (GPU), no repositório `~/cortes-pregacao`. Todos os comandos
 
 6. **Cortar** em background:
    ```
-   wordcut cut <link> --dir "<pasta>" --first-word <início> --last-word <fim>
+   wordcut cut-sermon <link> --dir "<pasta>" --first-word <início> --last-word <fim>
    ```
    Baixa o trecho (1080p, 30 s de folga), sincroniza pelo áudio, codifica com fades de 0,5 s (~17 min para 40 min de pregação) e grava `palavras.json` com tempos relativos ao vídeo.
 

@@ -136,7 +136,9 @@ def register(commands: Commands) -> None:
     )
     overview.set_defaults(handler=_overview)
 
-    cut = commands.add_parser("cut", help="corta a pregação com fades e gera palavras.json")
+    # Not "cut": that name belongs to the group of cuts (docs/cli.md §8), and argparse refuses
+    # a repeated command. The cli-migration roadmap item removes this command.
+    cut = commands.add_parser("cut-sermon", help="corta a pregação com fades e gera palavras.json")
     cut.add_argument("url")
     cut.add_argument("--dir", type=Path, required=True, help="pasta da pregação")
     cut.add_argument("--first-word", type=parse_timestamp, required=True, help="tempo na live")
