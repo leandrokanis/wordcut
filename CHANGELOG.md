@@ -197,6 +197,18 @@ Formato de [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões
   (400, 404, 409, 502, 500), `unauthenticated` 401 e `forbidden` 403, códigos novos com
   saída 1 que só a API produz; erro inesperado dá 500 `internal_error` sem o texto da
   exceção. Nenhum token ou e-mail aparece em erro ou log. Dependência nova: `pyjwt[crypto]`.
+- Rotas da API para pregações, tarefas e estado (item 20a; ADR-0020; `docs/api.md`):
+  `POST /api/sermons {"url"}` (201, ou 200 com `created: false`), `GET /api/sermons
+  [?status=]`, `GET /api/sermons/{id}[?transcript=true]`, `PATCH /api/sermons/{id}
+  {"start", "end"}`, `POST /api/sermons/{id}/process {"force"}` e
+  `POST /api/sermons/{id}/suggest {"preset_id"}` (só administrador), as duas com 202 e a
+  tarefa lançada em processo destacado, `GET /api/sermons/{id}/video` (anexo com o nome
+  `AAAA-MM-DD - Título.mp4`), `GET /api/tasks[?status=&kind=]`, `GET /api/tasks/{id}` e
+  `GET /api/status`, com o mesmo JSON da CLI. `GET /api/tasks/{id}/events` acompanha a
+  tarefa por SSE (`progress`, `done`, `failed`, com a tarefa no `data`, e `: ping` a cada
+  15 s), lendo o banco a cada 0,5 s. Requisição malformada dá 400 `invalid_argument` sem
+  repetir o valor enviado, com `details.choices` nos filtros; rota inexistente, 404
+  `not_found`. O esquema OpenAPI fica em `/api/docs` só em desenvolvimento.
 
 ### Alterado
 

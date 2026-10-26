@@ -74,7 +74,7 @@ Depois o servidor e, por fim, a interface, seguindo o protótipo
 | # | ID | Item | Cobre | Estado |
 |:-:|---|---|---|---|
 | 19 | 1.2.a.2 | App `api`: FastAPI no Compose, identidade pelo Cloudflare Access e papéis | — | ☑ |
-| 20a | web-api-sermons | Rotas de pregações, tarefas e estado, com SSE | — | ☐ |
+| 20a | web-api-sermons | Rotas de pregações, tarefas e estado, com SSE | — | ☑ |
 | 20b | web-api-cuts | Rotas de cortes, exportações, configurações, presets e equipe | — | ☐ |
 
 ### Fase 3 — Interface web (React + Vite + TypeScript)
@@ -112,3 +112,4 @@ Depois o servidor e, por fim, a interface, seguindo o protótipo
 | 17 1.2.a.1 | PASS na rodada 1 | (ver git log) | Último admin sob `BEGIN IMMEDIATE`. Efeito colateral: `add_group` usa `RawDescriptionHelpFormatter` e a ajuda dos grupos não quebra linha (ex.: `cut --help` com 102 colunas) — corrigir no item 18. |
 | 18 cli-migration | PASS na rodada 2 | (ver git log) | CLI antiga, `asr/remote.py`, `short`, `overview`, `edit_list` e símbolos mortos removidos; skills reescritas sobre a CLI nova. Fora da barra: `sermon list --help` chega a 83 colunas e o exemplo de `preset update` a 107; mutação `stammers=False` sobrevive (lacuna anterior). |
 | 19 1.2.a.2 | PASS na rodada 2 | (ver git log) | ADR-0019. JWT do Access com `exp`/`aud`/`iss` obrigatórios; modo dev só sem Access. Não testado contra o Cloudflare real (domínio pendente). |
+| 20a web-api-sermons | PASS na rodada 1 | (ver git log) | ADR-0020. Risco: rota futura oculta do OpenAPI e sem identidade passaria na varredura — tratado no 20b com dependência de identidade no nível do router. |

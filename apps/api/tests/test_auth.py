@@ -1,3 +1,4 @@
+import re
 import sqlite3
 from collections.abc import Iterator
 from contextlib import closing
@@ -298,3 +299,52 @@ def test_access_read_from_the_environment_reaches_for_the_team_keys(
 
     # Only Access fetches the keys of the team, which the network guard refuses here.
     assert response.json()["error"]["details"] == {"forbidden_by": FORBID_NETWORK}
+
+
+def business_routes(app: FastAPI) -> list[tuple[str, str]]:
+    """Method and path, with ``1`` for each path parameter, of every route but health.
+
+    Read from the OpenAPI schema: included routers are not flat in ``app.routes``.
+    """
+    return [
+        (method.upper(), re.sub(r"\{[^}]+\}", "1", path))
+        for path, operations in app.openapi()["paths"].items()
+        if path != "/api/health"
+        for method in operations
+    ]
+
+
+def test_every_route_but_health_requires_someone_identified(wordcut_home: Path) -> None:
+    app = create_app(settings=ApiSettings())
+    client = TestClient(app)
+
+    answers = {
+        f"{method} {path}": client.request(method, path).status_code
+        for method, path in business_routes(app)
+    }
+
+    assert (len(answers) > 2, set(answers.values())) == (True, {401})
+
+
+SCHEMA_PATHS = ["/docs", "/openapi.json", "/redoc", "/api/docs", "/api/openapi.json"]
+
+
+def test_with_access_the_api_schema_and_its_pages_are_not_served(
+    access: ApiSettings, team_keys: Any
+) -> None:
+    client = TestClient(create_app(settings=access, keys=team_keys))
+
+    answers = {path: client.get(path) for path in SCHEMA_PATHS}
+
+    assert {path: (answer.status_code, answer.json()) for path, answer in answers.items()} == {
+        path: (404, {"error": {"code": "not_found", "message": "Rota não encontrada."}})
+        for path in SCHEMA_PATHS
+    }
+
+
+def test_in_development_the_api_schema_is_served_under_api(wordcut_home: Path) -> None:
+    client = TestClient(create_app(settings=ApiSettings(dev_email="dev@exemplo.org")))
+
+    answers = [client.get(path).status_code for path in ("/api/docs", "/api/openapi.json")]
+
+    assert answers == [200, 200]
