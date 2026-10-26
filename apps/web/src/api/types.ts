@@ -35,6 +35,36 @@ export interface SermonCreated extends Sermon {
   created: boolean;
 }
 
+/** A cut as service/sermons.py ``shown_cut`` gives it inside the sermon. */
+export interface SermonCut {
+  id: number;
+  status: CutStatus;
+  title: string;
+}
+
+/** ``GET /api/sermons/{id}``, service/sermons.py ``_shown``: the borders are null until the
+ * sermon is trimmed, and ``sermon_start``/``sermon_end`` until it is processed. */
+export interface SermonShown extends Omit<SermonListItem, "live_duration"> {
+  live_duration: number | null;
+  live_start: number | null;
+  live_end: number | null;
+  sermon_start: number | null;
+  sermon_end: number | null;
+  processed_at: string | null;
+  last_task: Task | null;
+  cuts: SermonCut[];
+  suggestion_error: { code: string; message: string } | null;
+}
+
+/** The 202 of a route that launches a task. */
+export interface TaskLaunched {
+  task_id: number;
+  kind: TaskKind;
+  status: "running";
+  sermon_id?: number;
+  cut_id?: number;
+}
+
 /** The fields of ``GET /api/cuts/{id}`` the web reads so far. */
 export interface Cut {
   id: number;

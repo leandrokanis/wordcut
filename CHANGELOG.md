@@ -224,6 +224,18 @@ Formato de [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões
   pregação" com aviso de live no ar e motivo junto ao campo, barra de status atualizada a
   cada 3 s, configurações em tela inteira só para o administrador e indicador "Salvo". O
   visual segue o protótipo, com as fontes Geist empacotadas no build.
+- Nível 2 da web (item 22, ADR-0023): prévia 16:9 e timeline sempre visíveis numa pregação.
+  A prévia é o embed do YouTube (`youtube-nocookie.com`) antes do processamento e fora do
+  trecho processado, e o vídeo da API dentro dele, com o tempo da live convertido. A timeline
+  mostra a régua em tempo da live, a live esmaecida e o clipe entre as bordas, sem miniaturas
+  nem forma de onda (a API ainda não as serve). As bordas mudam por arraste, com o quadro da
+  borda na prévia, e por I e O no cursor, com mínimo de 1 min; o arraste salva ao soltar e
+  I/O depois de 500 ms, com "Salvo" só depois da resposta e o motivo do erro junto à
+  timeline. Processar fica no lugar de Exportar, com o progresso no botão pelos eventos SSE
+  (o fluxo fecha no fim e ao sair da tela), a tarefa em andamento retomada ao abrir a página,
+  o motivo da falha, a máquina ocupada e a live no ar. Reprocessar aparece numa pregação
+  processada depois de salvar bordas novas na sessão, com o aviso de que as edições dos cortes
+  se perdem.
 
 ### Alterado
 

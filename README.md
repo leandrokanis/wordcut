@@ -209,7 +209,14 @@ A web navega pelos três níveis (`/`, `/sermons/:id`, `/cuts/:id`) e pelas conf
 (`/settings`, só do administrador) com o React Router, fala com a API por um cliente próprio
 e mostra a tela só depois de `GET /api/me`. O visual segue o protótipo
 (`docs/prototype/wordcut.html`), com as fontes Geist empacotadas no build e nenhum recurso de
-outro host ([ADR-0022](docs/adr/0022-arquitetura-do-cliente-web.md)).
+outro host ([ADR-0022](docs/adr/0022-arquitetura-do-cliente-web.md)), salvo a prévia da live.
+
+Dentro de uma pregação (nível 2), a prévia 16:9 e a timeline ficam sempre visíveis: o
+assistente puxa as bordas do clipe ou as traz ao cursor com I e O, e elas são salvas sozinhas.
+Antes do processamento, e fora do trecho processado, a prévia é o embed do YouTube
+(`youtube-nocookie.com`); dentro dele, o vídeo processado servido pela API
+([ADR-0023](docs/adr/0023-previa-da-live-pelo-embed-do-youtube.md)). Processar e Reprocessar
+acompanham a tarefa pelos eventos SSE.
 
 ## Docker Compose
 

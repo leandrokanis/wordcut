@@ -33,3 +33,23 @@ export function GearIcon() {
 export function BackIcon() {
   return <Icon path="M19 12H5M12 19l-7-7 7-7" />;
 }
+
+export function FilmIcon() {
+  return <Icon path="M5 5h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2zM7 5v14M17 5v14M3 9.5h4M3 14.5h4M17 9.5h4M17 14.5h4" />;
+}
+
+export function PlayIcon() {
+  return (
+    <svg viewBox="0 0 12 12" aria-hidden="true">
+      <path d="M2 1l9 5-9 5z" fill="currentColor" />
+    </svg>
+  );
+}
+
+export function PauseIcon() {
+  return (
+    <svg viewBox="0 0 12 12" aria-hidden="true">
+      <path d="M2 1h3v10H2zM7 1h3v10H7z" fill="currentColor" />
+    </svg>
+  );
+}

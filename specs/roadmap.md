@@ -37,6 +37,9 @@ Definidas pelo administrador em 2026-10-26:
   `/config` é montado só leitura no contêiner da API (ADR-0003), e a gravação é pela CLI no
   host (item 20b, L5).
 
+- API: miniaturas e forma de onda da timeline e sinal de bordas alteradas desde o
+  processamento (item 22).
+
 ## Ordem
 
 CLI primeiro (constituição §II): ela cobre o fluxo inteiro e é a base que a web reaproveita.
@@ -86,7 +89,7 @@ Depois o servidor e, por fim, a interface, seguindo o protótipo
 | # | ID | Item | Cobre | Estado |
 |:-:|---|---|---|---|
 | 21 | web-shell | Navegação em três níveis, barra de status, lista de pregações e Nova pregação | 1.1.a.1 (web) | ☑ |
-| 22 | 1.1.b.1 | Nível 2: prévia 16:9, timeline, delimitar pelas bordas, processar | 1.1.b.3, 1.1.c.2 (web) | ☐ |
+| 22 | 1.1.b.1 | Nível 2: prévia 16:9, timeline, delimitar pelas bordas, processar | 1.1.b.3, 1.1.c.2 (web) | ☑ |
 | 23 | 1.1.e-web | Nível 2: painel de cortes | 1.1.e.1, 1.1.e.2 (web) | ☐ |
 | 24 | 1.1.g-web | Nível 3: prévia 9:16 sem renderizar, abas Texto e Legenda, grafia na prévia | 1.1.g.1, 1.1.f (web) | ☐ |
 | 25 | 1.1.h-web | Caixa de exportação e downloads | 1.1.h.1, 1.1.h.3, 1.1.i.1 (web) | ☐ |
@@ -119,3 +122,4 @@ Depois o servidor e, por fim, a interface, seguindo o protótipo
 | 20a web-api-sermons | PASS na rodada 1 | (ver git log) | ADR-0020. Risco: rota futura oculta do OpenAPI e sem identidade passaria na varredura — tratado no 20b com dependência de identidade no nível do router. |
 | 20b web-api-cuts | PASS na rodada 2 | (ver git log) | ADR-0021. Identidade estrutural em `ROUTERS`; API sem `path` nem caminho do servidor; e-mail só no corpo. Segredos pela web dão 409 no Compose (pendência do administrador). |
 | 21 web-shell | PASS na rodada 2 | (ver git log) | ADR-0022. `BrowserRouter` + `useRoutes` (data router não funcionou com jsdom). Geist via @fontsource; 390 px medido no Chromium headless. |
+| 22 1.1.b.1 (web) | PASS na rodada 2 | (ver git log) | ADR-0023 (embed do YouTube). Timeline sem miniaturas/forma de onda (pendência de API). Reprocessar só aparece após mudar bordas na sessão. |
