@@ -56,6 +56,23 @@ export interface SermonShown extends Omit<SermonListItem, "live_duration"> {
   suggestion_error: { code: string; message: string } | null;
 }
 
+/** An item of ``GET /api/sermons/{id}/cuts``, service/cuts.py ``_spanned``: ``text`` is the
+ * assembled text and ``duration`` the sum of the segments' spans, in seconds; ``start`` and
+ * ``end`` are the earliest start and the latest end of the segments, in sermon time. */
+export interface ListedCut extends SermonCut {
+  sermon_id: number;
+  text: string;
+  duration: number;
+  start: number;
+  end: number;
+  segments: { from_word: number; to_word: number }[];
+  range_start_word: number;
+  range_end_word: number;
+  source: string;
+  preset_id: number | null;
+  edited: boolean;
+}
+
 /** The 202 of a route that launches a task. */
 export interface TaskLaunched {
   task_id: number;

@@ -1,4 +1,5 @@
 import type {
+  ListedCut,
   MachineStatus,
   Me,
   SermonCreated,
@@ -122,4 +123,25 @@ export function processedSermon(overrides: Partial<SermonShown> = {}): SermonSho
 
 function noCuts(): SermonListItem["cut_counts"] {
   return { suggested: 0, chosen: 0, discarded: 0 };
+}
+
+/** An item of ``GET /api/sermons/12/cuts``, as service/cuts.py ``_listed`` gives it. */
+export function listedCut(overrides: Partial<ListedCut> = {}): ListedCut {
+  return {
+    id: 34,
+    sermon_id: 12,
+    status: "suggested",
+    title: "Fé no deserto",
+    text: "Mesmo no deserto, Deus sustenta quem confia nele.",
+    duration: 58.4,
+    start: 620.5,
+    end: 678.9,
+    segments: [{ from_word: 1201, to_word: 1230 }],
+    range_start_word: 1201,
+    range_end_word: 1230,
+    source: "llm",
+    preset_id: 1,
+    edited: false,
+    ...overrides,
+  };
 }

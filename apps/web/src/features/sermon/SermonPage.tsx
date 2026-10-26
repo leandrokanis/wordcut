@@ -7,12 +7,14 @@ import { useResource } from "../../api/useResource";
 import { Saved } from "../../ui/Saved";
 import { isTrimmed, savedBounds } from "./bounds";
 import { useClipEdges, type Edge } from "./ClipEdges";
+import { cutLayers } from "./CutLayers";
+import { CutsPanel, useSermonCuts } from "./CutsPanel";
 import { Preview, type PreviewHandle } from "./Preview";
 import { ProcessButton } from "./ProcessButton";
 import { Timeline } from "./Timeline";
 import { Transport } from "./Transport";
 
-/** Level 2: the 16:9 preview and the timeline of one sermon. */
+/** Level 2: the cuts panel beside the 16:9 preview and the timeline of one sermon. */
 export function SermonPage() {
   const id = Number(useParams().id);
   const sermon = useResource(() => showSermon(id), `sermon:${id}`);
@@ -21,6 +23,7 @@ export function SermonPage() {
   const [patched, setPatched] = useState<SermonShown>();
   const [bordersChanged, setBordersChanged] = useState(false);
   const shown = patched ?? sermon.data;
+  const cuts = useSermonCuts(sermon.data);
   // A fresh load of the sermon already has the borders the PATCH saved.
   useEffect(() => setPatched(undefined), [sermon.data]);
 
@@ -58,46 +61,50 @@ export function SermonPage() {
     return null;
   }
   return (
-    <main className="work">
-      <div className="l2-bar">
-        <span className="spacer" />
-        <Saved savedAt={edges.savedAt} />
-        <ProcessButton
+    <div className="l2">
+      <CutsPanel sermon={shown} cuts={cuts} />
+      <main className="work">
+        <div className="l2-bar">
+          <span className="spacer" />
+          <Saved savedAt={edges.savedAt} />
+          <ProcessButton
+            sermon={shown}
+            bordersChanged={bordersChanged}
+            onEnd={() => {
+              setBordersChanged(false);
+              sermon.reload();
+            }}
+          />
+        </div>
+        <Preview
+          key={shown.status === "processed" ? "processed" : "live"}
+          ref={preview}
           sermon={shown}
-          bordersChanged={bordersChanged}
-          onEnd={() => {
-            setBordersChanged(false);
-            sermon.reload();
-          }}
+          onTime={setCursor}
         />
-      </div>
-      <Preview
-        key={shown.status === "processed" ? "processed" : "live"}
-        ref={preview}
-        sermon={shown}
-        onTime={setCursor}
-      />
-      <Transport
-        preview={preview}
-        cursor={cursor}
-        liveDuration={liveDuration}
-        onMark={markAtCursor}
-      />
-      {edges.error && (
-        <p className="ferr edge-error" role="alert">
-          {edges.error}
-        </p>
-      )}
-      <Timeline
-        liveDuration={liveDuration}
-        bounds={edges.bounds}
-        trimmed={isTrimmed(shown) || edges.moving}
-        cursor={cursor}
-        onSeek={(liveSeconds) => preview.current?.seek(liveSeconds)}
-        onEdgeMove={editable ? moveEdge : null}
-        onEdgeRelease={edges.release}
-      />
-    </main>
+        <Transport
+          preview={preview}
+          cursor={cursor}
+          liveDuration={liveDuration}
+          onMark={markAtCursor}
+        />
+        {edges.error && (
+          <p className="ferr edge-error" role="alert">
+            {edges.error}
+          </p>
+        )}
+        <Timeline
+          liveDuration={liveDuration}
+          bounds={edges.bounds}
+          trimmed={isTrimmed(shown) || edges.moving}
+          cursor={cursor}
+          onSeek={(liveSeconds) => preview.current?.seek(liveSeconds)}
+          onEdgeMove={editable ? moveEdge : null}
+          onEdgeRelease={edges.release}
+          layers={cutLayers(shown, cuts.data)}
+        />
+      </main>
+    </div>
   );
 }
 

@@ -53,3 +53,9 @@ export function PauseIcon() {
     </svg>
   );
 }
+
+export function DotsIcon() {
+  return (
+    <Icon path="M5 10.7a1.3 1.3 0 1 0 0 2.6 1.3 1.3 0 0 0 0-2.6zM12 10.7a1.3 1.3 0 1 0 0 2.6 1.3 1.3 0 0 0 0-2.6zM19 10.7a1.3 1.3 0 1 0 0 2.6 1.3 1.3 0 0 0 0-2.6z" />
+  );
+}

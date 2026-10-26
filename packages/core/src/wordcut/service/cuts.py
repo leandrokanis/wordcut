@@ -9,7 +9,7 @@ from collections.abc import Mapping
 from datetime import datetime
 from typing import Any
 
-from wordcut.cuts.assembly import AssembledCut, AssembledSegment, assemble
+from wordcut.cuts.assembly import MILLISECOND_DIGITS, AssembledCut, AssembledSegment, assemble
 from wordcut.cuts.caption import DEFAULT_CAPTION, stored_caption, validated
 from wordcut.cuts.spelling import check_spelling
 from wordcut.db import cuts, renders, transcripts, word_fixes
@@ -26,8 +26,8 @@ def list_cuts(
     connection: sqlite3.Connection, sermon_id: int, status: str | None = None
 ) -> dict[str, Any]:
     """The cuts of the sermon in the order they were added, the discarded ones last, each
-    with what it says and how long it lasts; only those in ``status`` when given
-    (docs/cli.md §8.1)."""
+    with what it says, how long it lasts and the stretch of the sermon it spans (``start``
+    and ``end``, in sermon time); only those in ``status`` when given (docs/cli.md §8.1)."""
     existing_sermon(connection, sermon_id)
     words = transcripts.words_of(connection, sermon_id)
     found = [row for row in cuts.of_sermon(connection, sermon_id) if status in (None, row.status)]
@@ -35,7 +35,7 @@ def list_cuts(
     fixes = word_fixes.of_sermon(connection, sermon_id)
     return {
         "items": [
-            _listed(row, assemble(row.segments, words, fixes.get(row.id, {}))) for row in in_order
+            _spanned(row, assemble(row.segments, words, fixes.get(row.id, {}))) for row in in_order
         ]
     }
 
@@ -236,6 +236,16 @@ def _listed(row: CutRow, assembled: AssembledCut) -> dict[str, Any]:
         "sermon_id": row.sermon_id,
         "text": assembled.text,
         "duration": assembled.duration,
+    }
+
+
+def _spanned(row: CutRow, assembled: AssembledCut) -> dict[str, Any]:
+    """The cut as ``_listed`` gives it, with the earliest start and the latest end of its
+    segments: the stretch of the sermon the level 2 timeline draws it over."""
+    return {
+        **_listed(row, assembled),
+        "start": round(min(segment.start for segment in assembled.segments), MILLISECOND_DIGITS),
+        "end": round(max(segment.end for segment in assembled.segments), MILLISECOND_DIGITS),
     }
 
 

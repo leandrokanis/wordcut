@@ -4,6 +4,7 @@ import { formatDuration } from "../../ui/format";
 import { FilmIcon } from "../../ui/icons";
 import type { Bounds } from "./bounds";
 import type { Edge } from "./ClipEdges";
+import { CutLayerHead, CutLayerLane, type CutLayer } from "./CutLayers";
 
 // The ruler's steps, in seconds, as the prototype picks them: about 8 labelled marks.
 const RULER_STEPS = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600];
@@ -21,6 +22,8 @@ interface TimelineProps {
   /** Null while the borders cannot change: no handles are drawn. */
   onEdgeMove: ((edge: Edge, liveSeconds: number) => void) | null;
   onEdgeRelease: () => void;
+  /** The cuts, drawn read only above the video track. */
+  layers?: CutLayer[];
 }
 
 /** The live in time of the live: the ruler and the "Vídeo" track with the sermon's clip.
@@ -44,6 +47,7 @@ function LiveTimeline({
   onSeek,
   onEdgeMove,
   onEdgeRelease,
+  layers = [],
 }: TimelineProps & { liveDuration: number }) {
   const content = useRef<HTMLDivElement>(null);
   const endDrag = useRef<() => void>();
@@ -91,6 +95,9 @@ function LiveTimeline({
     <section className="tl" aria-label="Timeline">
       <div className="tl-heads">
         <div className="th ruler-head" />
+        {layers.map((layer) => (
+          <CutLayerHead key={layer.id} layer={layer} />
+        ))}
         <div className="th video-head">
           <FilmIcon />
           <span className="thn">Vídeo</span>
@@ -113,6 +120,9 @@ function LiveTimeline({
               </div>
             ))}
           </div>
+          {layers.map((layer) => (
+            <CutLayerLane key={layer.id} layer={layer} at={at} />
+          ))}
           <div className="lane video">
             <div className="clip vid ghost" data-faded style={{ left: "0%", width: "100%" }} />
             <div

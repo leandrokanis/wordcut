@@ -236,8 +236,19 @@ Formato de [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões
   o motivo da falha, a máquina ocupada e a live no ar. Reprocessar aparece numa pregação
   processada depois de salvar bordas novas na sessão, com o aviso de que as edições dos cortes
   se perdem.
+- Painel de cortes no nível 2 da web (item 23): painel lateral com um card por corte (número,
+  título, texto montado, duração e estado), na ordem do serviço, com os descartados por
+  último. Um clique abre o corte: o sugerido é marcado escolhido e o nível 3 abre depois da
+  resposta da API; o descartado não abre. "Mais ações" descarta ou restaura e pede a lista de
+  novo. O painel diz por que a pregação não tem cortes (`suggestion_error`) e que os cortes
+  aparecem depois do processamento, e recarrega quando o processamento termina. Cada corte
+  vira uma camada da timeline, acima de "Vídeo", em tempo da live e só para leitura, com a
+  mesma cor do card. Em telas estreitas o painel fica abaixo da timeline.
 
 ### Alterado
+
+- `cut list` e `GET /api/sermons/{id}/cuts` trazem em cada corte `start` e `end`: o menor
+  início e o maior fim dos trechos, em tempo da pregação, ao milissegundo.
 
 - A web deixa de ser o esqueleto que mostrava só o estado da API (`fetchHealth`) e passa a
   ser a interface do item 21.

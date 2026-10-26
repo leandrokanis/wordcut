@@ -90,7 +90,7 @@ Depois o servidor e, por fim, a interface, seguindo o protótipo
 |:-:|---|---|---|---|
 | 21 | web-shell | Navegação em três níveis, barra de status, lista de pregações e Nova pregação | 1.1.a.1 (web) | ☑ |
 | 22 | 1.1.b.1 | Nível 2: prévia 16:9, timeline, delimitar pelas bordas, processar | 1.1.b.3, 1.1.c.2 (web) | ☑ |
-| 23 | 1.1.e-web | Nível 2: painel de cortes | 1.1.e.1, 1.1.e.2 (web) | ☐ |
+| 23 | 1.1.e-web | Nível 2: painel de cortes | 1.1.e.1, 1.1.e.2 (web) | ☑ |
 | 24 | 1.1.g-web | Nível 3: prévia 9:16 sem renderizar, abas Texto e Legenda, grafia na prévia | 1.1.g.1, 1.1.f (web) | ☐ |
 | 25 | 1.1.h-web | Caixa de exportação e downloads | 1.1.h.1, 1.1.h.3, 1.1.i.1 (web) | ☐ |
 | 26 | 2.1.a-web | Configurações e equipe | 2.1.a, 1.2.a.1 (web) | ☐ |
@@ -123,3 +123,4 @@ Depois o servidor e, por fim, a interface, seguindo o protótipo
 | 20b web-api-cuts | PASS na rodada 2 | (ver git log) | ADR-0021. Identidade estrutural em `ROUTERS`; API sem `path` nem caminho do servidor; e-mail só no corpo. Segredos pela web dão 409 no Compose (pendência do administrador). |
 | 21 web-shell | PASS na rodada 2 | (ver git log) | ADR-0022. `BrowserRouter` + `useRoutes` (data router não funcionou com jsdom). Geist via @fontsource; 390 px medido no Chromium headless. |
 | 22 1.1.b.1 (web) | PASS na rodada 2 | (ver git log) | ADR-0023 (embed do YouTube). Timeline sem miniaturas/forma de onda (pendência de API). Reprocessar só aparece após mudar bordas na sessão. |
+| 23 1.1.e (web) | PASS na rodada 1 | (ver git log) | `cut list` ganhou `start`/`end` (core, CLI e API). Um clique abre o corte (spec), diferente do protótipo. |

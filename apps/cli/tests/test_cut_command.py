@@ -78,6 +78,19 @@ def test_list_with_json_prints_the_items_with_text_duration_and_state_discarded_
     )
 
 
+def test_list_with_json_gives_each_cut_its_span_in_sermon_time(
+    wordcut_home: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    sermon_id, _ = sermon_with_cuts("suggested")
+
+    exit_code, listed = run_json(["cut", "list", "--sermon", str(sermon_id), "--json"], capsys)
+
+    assert (exit_code, [(item["start"], item["end"]) for item in listed["items"]]) == (
+        0,
+        [(0.3, 3.4)],
+    )
+
+
 def test_list_by_status_keeps_only_the_cuts_in_that_state(
     wordcut_home: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
