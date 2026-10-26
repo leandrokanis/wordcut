@@ -1,1 +1,1 @@
-active_plan: specs/3.1.a.3-cli-foundation-lock/plan.md
+active_plan: specs/1.1.a.1-sermon-create/plan.md

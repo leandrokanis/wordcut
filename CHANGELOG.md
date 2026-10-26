@@ -16,9 +16,15 @@ Formato de [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões
 - Base da CLI nova: contrato de saída e erros (`--json`, `--quiet`, códigos de saída;
   ADR-0012), banco SQLite com migrações em `WORDCUT_HOME`, trava global de processamento e
   `wordcut status`.
+- `wordcut sermon create <link>`, `sermon list [--status]` e `sermon show <id>`: a pregação
+  passa a existir no banco (tabela `sermons`, migração 0002) a partir do link da live, com o
+  mesmo vídeo devolvendo a pregação existente e aviso no stderr para live ainda no ar.
 
 ### Alterado
 
 - O projeto passa a se chamar Wordcut; executável `wordcut`, pacote `wordcut`.
 - Organização em monorepo orquestrado por Docker Compose (ADR-0002, ADR-0003): domínio em
   `packages/core`, CLI em `apps/cli`, workspace `uv` com lock único na raiz.
+- Os cookies do YouTube vêm da pasta de segredos (`WORDCUT_CONFIG`, ou `~/.config/wordcut`),
+  resolvida a cada uso; falhas do YouTube (inclusive cookies ausentes) viram `youtube_error`
+  (saída 6), com mensagem sem o comando do `yt-dlp` nem o caminho dos cookies.

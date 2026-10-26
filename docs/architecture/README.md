@@ -90,9 +90,10 @@ flowchart LR
 | Docker Compose (`api`, `web`, `cli` no perfil `tools`; portas só em `127.0.0.1`) | existe; sem GPU e sem WhisperX na imagem (roadmap, item 5) |
 | Domínio (`youtube`, `asr`, `edit`, `vertical`) | existe em `packages/core`, herdado da CLI anterior |
 | Erros (`errors`), raiz de dados (`home`), banco com migrações (`db`), trava global (`lock`) | existe em `packages/core` (item 3.1.a.3; ADR-0005, ADR-0006) |
-| Camada de serviço | `service.status` existe; as demais operações em construção (roadmap, fase 1) |
+| Tabela `sermons` (migração 0002, repositório `db.sermons`) e pasta de segredos (`config`, `WORDCUT_CONFIG`) | existe em `packages/core` (item 1.1.a.1) |
+| Camada de serviço | `service.status` e `service.sermons` (criar a pregação pelo link, listar e detalhar; item 1.1.a.1) existem; as demais operações em construção (roadmap, fase 1) |
 | Tarefas | planejadas (roadmap, item 4) |
-| CLI | contrato de saída e erros (ADR-0012) e `wordcut status` existem; os comandos da CLI anterior seguem no mesmo executável, com saída e erros de execução fora do contrato (o erro de uso segue o contrato), até o item `cli-migration`; os demais comandos de `docs/cli.md` em construção (roadmap, fase 1) |
+| CLI | contrato de saída e erros (ADR-0012), `wordcut status` e `wordcut sermon create`, `list` e `show` existem; os comandos da CLI anterior seguem no mesmo executável, com saída e erros de execução fora do contrato (o erro de uso segue o contrato), até o item `cli-migration`; os demais comandos de `docs/cli.md` em construção (roadmap, fase 1) |
 | API | esqueleto em `apps/api` com `GET /api/health`; rotas planejadas (roadmap, fase 2) |
 | Web | esqueleto em `apps/web` que mostra o estado da API; protótipo em `docs/prototype/wordcut.html`; interface planejada (roadmap, fase 3) |
 
