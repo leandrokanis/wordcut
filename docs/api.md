@@ -63,7 +63,7 @@ As palavras-chave DEVE, NÃO DEVE e PODE seguem o BCP 14
 | `GET /api/tasks/{id}` | — | 200 a tarefa de `task show` | 404 | assistente |
 | `GET /api/tasks/{id}/events` | — | 200 `text/event-stream` (§3) | 404 em JSON, antes de abrir o fluxo | assistente |
 | `GET /api/status` | — | 200 `{"lock", "running_tasks"}` de `wordcut status` | — | assistente |
-| `GET /api/sermons/{id}/cuts[?status=]` | — | 200 `{"items"}` de `cut list`, os descartados por último | 400 `status` fora de `suggested`, `chosen`, `discarded`; 404 | assistente |
+| `GET /api/sermons/{id}/cuts[?status=]` | — | 200 `{"items"}` de `cut list`, os descartados por último, cada corte com `start` e `end` (vão dos trechos, em tempo da pregação) | 400 `status` fora de `suggested`, `chosen`, `discarded`; 404 | assistente |
 | `GET /api/cuts/{id}` | — | 200 o corte de `cut show`, com as exportações sem `path` | 404 | assistente |
 | `GET /api/cuts/{id}/preview` | — | 200 a sequência de `cut preview`; nunca espera a trava | 404 | assistente |
 | `POST /api/cuts/{id}/choose` | — | 200 o corte como o `GET` o mostra | 404 | assistente |

@@ -453,7 +453,9 @@ Estados (`status`): `suggested`, `chosen`, `discarded`.
 ### 8.1. `cut list --sermon <id> [--status S]`
 
 Lista os cortes da pregação com texto montado, duração e estado (1.1.e.1). Descartados vêm
-por último.
+por último. Cada corte traz também `start` e `end`: o menor início e o maior fim dos seus
+trechos, em tempo da pregação, arredondados ao milissegundo. É o vão que a timeline do
+nível 2 desenha; com trechos fora de ordem ele vai além do que o corte toca.
 
 ### 8.2. `cut show <id>`
 

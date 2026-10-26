@@ -35,6 +35,16 @@ def test_listing_answers_the_cuts_as_the_cli_lists_them_the_discarded_last(
     ) == (200, expected, [kept, discarded])
 
 
+def test_listing_gives_each_cut_its_span_in_sermon_time(
+    assistant: TestClient, processed_sermon_id: int, add_cut: Any
+) -> None:
+    add_cut()
+
+    response = assistant.get(f"/api/sermons/{processed_sermon_id}/cuts")
+
+    assert [(item["start"], item["end"]) for item in response.json()["items"]] == [(0.3, 1.9)]
+
+
 def test_listing_by_status_answers_only_the_cuts_in_that_status(
     assistant: TestClient, processed_sermon_id: int, add_cut: Any
 ) -> None:

@@ -1,1 +1,1 @@
-active_plan: specs/1.1.b.1-web-sermon-level/plan.md
+active_plan: specs/1.1.e-web-cuts-panel/plan.md

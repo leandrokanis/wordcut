@@ -1,6 +1,7 @@
 import type {
   Cut,
   ErrorBody,
+  ListedCut,
   MachineStatus,
   Me,
   Sermon,
@@ -90,6 +91,26 @@ export function trimSermon(id: number, start: number, end: number): Promise<Serm
 /** Launches the processing; ``force`` discards the edits of the cuts of a processed sermon. */
 export function processSermon(id: number, force = false): Promise<TaskLaunched> {
   return post(`/api/sermons/${id}/process`, force ? { force } : {});
+}
+
+/** The cuts of the sermon in the service's order: the discarded ones last. */
+export async function listCuts(sermonId: number): Promise<ListedCut[]> {
+  return (await request<{ items: ListedCut[] }>(`/api/sermons/${sermonId}/cuts`)).items;
+}
+
+/** Marks the cut ``chosen``; answers the cut as ``GET /api/cuts/{id}`` shows it. */
+export function chooseCut(id: number): Promise<Cut> {
+  return post(`/api/cuts/${id}/choose`, {});
+}
+
+/** Marks the cut ``discarded``, answering as ``chooseCut``. */
+export function discardCut(id: number): Promise<Cut> {
+  return post(`/api/cuts/${id}/discard`, {});
+}
+
+/** Brings a discarded cut back to ``suggested``, answering as ``chooseCut``. */
+export function restoreCut(id: number): Promise<Cut> {
+  return post(`/api/cuts/${id}/restore`, {});
 }
 
 export function getCut(id: number): Promise<Cut> {

@@ -238,7 +238,7 @@ def test_cuts_are_listed_in_the_order_they_were_added_with_the_discarded_ones_la
     ]
 
 
-def test_listed_cut_has_the_sermon_cut_fields_plus_its_text_and_duration_without_words(
+def test_listed_cut_has_the_sermon_cut_fields_plus_its_text_duration_and_span_without_words(
     connection: sqlite3.Connection,
 ) -> None:
     sermon_id, word = processed_sermon(connection)
@@ -255,6 +255,8 @@ def test_listed_cut_has_the_sermon_cut_fields_plus_its_text_and_duration_without
                 "title": "Graça que alcança",
                 "text": "Deus governa.",
                 "duration": 0.9,
+                "start": 2.5,
+                "end": 3.4,
                 "segments": [{"from_word": word[4], "to_word": word[5]}],
                 "range_start_word": word[4],
                 "range_end_word": word[5],
@@ -264,6 +266,34 @@ def test_listed_cut_has_the_sermon_cut_fields_plus_its_text_and_duration_without
             }
         ]
     }
+
+
+def test_listed_cut_spans_from_its_earliest_start_to_its_latest_end_in_sermon_time(
+    connection: sqlite3.Connection,
+) -> None:
+    sermon_id, word = processed_sermon(connection)
+    stored_cut(connection, sermon_id, (Segment(word[4], word[5]), Segment(word[1], word[2])))
+
+    [listed] = list_cuts(connection, sermon_id)["items"]
+
+    assert (listed["start"], listed["end"]) == (0.9, 3.4)
+
+
+def test_listed_cut_span_is_kept_to_the_millisecond(connection: sqlite3.Connection) -> None:
+    sermon_id, _ = processed_sermon(connection)
+    with connection:
+        transcripts.replace(
+            connection,
+            sermon_id,
+            (Word("Deus", 12.34567, 12.8), Word("reina.", 12.9, 13.45678)),
+            (),
+        )
+    first, last = (word.id for word in transcripts.words_of(connection, sermon_id))
+    stored_cut(connection, sermon_id, (Segment(first, last),))
+
+    [listed] = list_cuts(connection, sermon_id)["items"]
+
+    assert (listed["start"], listed["end"]) == (12.346, 13.457)
 
 
 def test_listing_by_status_keeps_only_the_cuts_in_that_state(
