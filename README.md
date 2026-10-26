@@ -132,12 +132,12 @@ tipo (2 uso inválido, 4 máquina ocupada; tabela em `docs/cli.md` §5).
 uv run wordcut info <link>                    # título, data do culto, duração, se terminou
 uv run wordcut transcribe-live <link> --dir "<pasta>" [--start HH:MM:SS --end HH:MM:SS]
 uv run wordcut overview "<pasta>/trabalho/live-palavras.json" [--words --start … --end …]
-uv run wordcut cut <link> --dir "<pasta>" --first-word <início> --last-word <fim>
+uv run wordcut cut-sermon <link> --dir "<pasta>" --first-word <início> --last-word <fim>
 ```
 
-A pasta segue o padrão `~/Videos/Pregações/AAAA-MM-DD - Título - Referência/`. O `cut` grava
-`<pasta>.mp4` e `palavras.json`, com tempos relativos ao vídeo; os intermediários ficam em
-`trabalho/`.
+A pasta segue o padrão `~/Videos/Pregações/AAAA-MM-DD - Título - Referência/`. O
+`cut-sermon` grava `<pasta>.mp4` e `palavras.json`, com tempos relativos ao vídeo; os
+intermediários ficam em `trabalho/`.
 
 ### 2. Cortes verticais
 

@@ -92,6 +92,21 @@ def of_sermon(connection: sqlite3.Connection, sermon_id: int) -> list[CutRow]:
     return [_row(values) for values in found]
 
 
+def by_id(connection: sqlite3.Connection, cut_id: int) -> CutRow | None:
+    found = connection.execute(f"SELECT {COLUMNS} FROM cuts WHERE id = ?", (cut_id,)).fetchone()
+    return None if found is None else _row(found)
+
+
+def set_status(
+    connection: sqlite3.Connection, cut_id: int, status: str, updated_at: datetime
+) -> None:
+    """Change the status of the cut and nothing else, in the caller's transaction."""
+    connection.execute(
+        "UPDATE cuts SET status = ?, updated_at = ? WHERE id = ?",
+        (status, updated_at.isoformat(), cut_id),
+    )
+
+
 def counts_of(connection: sqlite3.Connection, sermon_id: int) -> dict[str, int]:
     """How many cuts of the sermon are in each state; a state without cuts is left out."""
     found = connection.execute(

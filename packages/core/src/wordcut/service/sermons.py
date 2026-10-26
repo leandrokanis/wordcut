@@ -138,7 +138,7 @@ def show_sermon(
 
     With ``transcript``, also its ``sentences`` in order, in sermon time.
     """
-    row = _reconciled(home, connection, _existing(connection, sermon_id))
+    row = _reconciled(home, connection, existing_sermon(connection, sermon_id))
     shown = _shown(connection, row)
     if transcript:
         shown["sentences"] = [
@@ -160,7 +160,7 @@ def _sentence(row: SentenceRow) -> dict[str, Any]:
 
 def processed_sermon(connection: sqlite3.Connection, sermon_id: int) -> dict[str, Any]:
     """The sermon as ``show_sermon`` gives it, without ``last_task``: what processing made."""
-    shown = _shown(connection, _existing(connection, sermon_id))
+    shown = _shown(connection, existing_sermon(connection, sermon_id))
     del shown["last_task"]
     return shown
 
@@ -184,7 +184,7 @@ def sermon_video(connection: sqlite3.Connection, home: Home, sermon_id: int) -> 
 
 def processed_row(connection: sqlite3.Connection, sermon_id: int) -> SermonRow:
     """The sermon, once processed; otherwise ``not_found`` or ``sermon_not_processed``."""
-    row = _existing(connection, sermon_id)
+    row = existing_sermon(connection, sermon_id)
     if row.status != "processed":
         raise WordcutError(
             "sermon_not_processed",
@@ -216,7 +216,7 @@ def _reconciled(home: Home, connection: sqlite3.Connection, row: SermonRow) -> S
         return row
     with connection:
         sermons.set_status(connection, row.id, "failed", datetime.now().astimezone())
-    return _existing(connection, row.id)
+    return existing_sermon(connection, row.id)
 
 
 def _is_being_processed(home: Home, connection: sqlite3.Connection, sermon_id: int) -> bool:
@@ -232,7 +232,8 @@ def _is_being_processed(home: Home, connection: sqlite3.Connection, sermon_id: i
     )
 
 
-def _existing(connection: sqlite3.Connection, sermon_id: int) -> SermonRow:
+def existing_sermon(connection: sqlite3.Connection, sermon_id: int) -> SermonRow:
+    """The sermon, or ``not_found`` when there is none with ``sermon_id``."""
     row = sermons.by_id(connection, sermon_id)
     if row is None:
         raise WordcutError(
@@ -253,7 +254,7 @@ def trim_sermon(
     Returns the sermon as ``show_sermon`` does, plus ``needs_reprocess``: true when the
     sermon was already processed, which keeps its status and its cuts until reprocessed.
     """
-    row = _existing(connection, sermon_id)
+    row = existing_sermon(connection, sermon_id)
     trimmed = _record_range(connection, row, start, end, now or datetime.now().astimezone())
     return {**_shown(connection, trimmed), "needs_reprocess": _needs_reprocess(row)}
 
@@ -266,7 +267,7 @@ def _record_range(
     start, end = _checked_range(start, end, row.live_duration)
     status = row.status if _needs_reprocess(row) else "trimmed"
     sermons.update_range(connection, row.id, start, end, status, now)
-    return _existing(connection, row.id)
+    return existing_sermon(connection, row.id)
 
 
 def _needs_reprocess(row: SermonRow) -> bool:
