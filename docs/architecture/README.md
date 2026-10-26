@@ -91,9 +91,9 @@ flowchart LR
 | Domínio (`youtube`, `asr`, `edit`, `vertical`) | existe em `packages/core`, herdado da CLI anterior |
 | Erros (`errors`), raiz de dados (`home`), banco com migrações (`db`), trava global (`lock`) | existe em `packages/core` (item 3.1.a.3; ADR-0005, ADR-0006) |
 | Tabela `sermons` (migração 0002, repositório `db.sermons`) e pasta de segredos (`config`, `WORDCUT_CONFIG`) | existe em `packages/core` (item 1.1.a.1) |
-| Camada de serviço | `service.status` e `service.sermons` (criar a pregação pelo link, listar e detalhar; item 1.1.a.1) existem; as demais operações em construção (roadmap, fase 1) |
-| Tarefas | planejadas (roadmap, item 4) |
-| CLI | contrato de saída e erros (ADR-0012), `wordcut status` e `wordcut sermon create`, `list` e `show` existem; os comandos da CLI anterior seguem no mesmo executável, com saída e erros de execução fora do contrato (o erro de uso segue o contrato), até o item `cli-migration`; os demais comandos de `docs/cli.md` em construção (roadmap, fase 1) |
+| Camada de serviço | `service.status` (trava e tarefas em andamento), `service.sermons` (criar a pregação pelo link, listar e detalhar; item 1.1.a.1) e `service.tasks` (listar, detalhar e esperar tarefas; item 3.1.a.2) existem; as demais operações em construção (roadmap, fase 1) |
+| Tarefas | tabela `tasks` (migração 0003) e `wordcut.tasks`: registro de tipos, execução em primeiro plano ou em processo destacado que herda a trava (`wordcut.tasks.runner`, saída em `tasks/<id>.log`), progresso no banco e tarefa órfã marcada `interrupted` na leitura; o tipo interno `diagnostic` exercita o mecanismo; os tipos `process`, `render` e `suggest` chegam com as operações (item 3.1.a.2; ADR-0007, ADR-0013) |
+| CLI | contrato de saída e erros (ADR-0012), `wordcut status`, `wordcut sermon create`, `list` e `show`, `wordcut task list`, `show` e `wait` e o auxiliar de `--wait` dos comandos que lançam tarefa existem; os comandos da CLI anterior seguem no mesmo executável, com saída e erros de execução fora do contrato (o erro de uso segue o contrato), até o item `cli-migration`; os demais comandos de `docs/cli.md` em construção (roadmap, fase 1) |
 | API | esqueleto em `apps/api` com `GET /api/health`; rotas planejadas (roadmap, fase 2) |
 | Web | esqueleto em `apps/web` que mostra o estado da API; protótipo em `docs/prototype/wordcut.html`; interface planejada (roadmap, fase 3) |
 
@@ -124,16 +124,25 @@ sequenceDiagram
     SVC-->>CLI: WordcutError busy
     CLI-->>Op: saída 4
   else livre
-    SVC->>DB: tarefa running
-    SVC->>Child: lança em sessão própria (herda a trava)
+    SVC->>DB: tarefa running (PID do lançador)
+    SVC->>Lock: dono = task_id
+    SVC->>Child: lança em sessão própria (herda o descritor da trava)
+    SVC->>Lock: fecha a sua cópia do descritor
+    SVC->>DB: PID do filho na tarefa
     SVC-->>CLI: task_id
     CLI-->>Op: {"task_id": …}
+    Child->>Lock: dono = PID do filho
     Child->>YT: baixa só a faixa
     Child->>Child: transcreve, corta 16:9, pede sugestões
-    Child->>DB: palavras, cortes, tarefa succeeded
-    Child->>Lock: libera ao terminar
+    Child->>DB: palavras e cortes
+    Child->>Lock: libera
+    Child->>DB: tarefa succeeded
   end
 ```
+
+O lançador trava antes de criar a tarefa e o filho herda a trava; o filho a solta antes de
+gravar o fim, para que `task wait` termine com a máquina livre
+([ADR-0013](../adr/0013-trava-herdada-pelo-processo-da-tarefa.md)).
 
 ### 5.2. Exportar um corte pela web
 

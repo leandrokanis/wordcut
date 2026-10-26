@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 import sys
 
-from wordcut_cli import legacy, sermon, status
+from wordcut_cli import legacy, sermon, status, task
 from wordcut_cli.contract import create_parser, execute
 
 
@@ -14,6 +14,7 @@ def build_parser() -> argparse.ArgumentParser:
     legacy.register(commands)
     sermon.register(commands)
     status.register(commands)
+    task.register(commands)
     return parser
 
 

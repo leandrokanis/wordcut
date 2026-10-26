@@ -26,6 +26,10 @@ class Home:
     def lock_file(self) -> Path:
         return self.root / "processing.lock"
 
+    def task_log(self, task_id: int) -> Path:
+        """The output of the detached process of task ``task_id``."""
+        return self.root / "tasks" / f"{task_id}.log"
+
     def ensure(self) -> None:
         """Create the data folder, readable only by its owner, if it does not exist."""
         self.root.mkdir(mode=PRIVATE_FOLDER_MODE, parents=True, exist_ok=True)

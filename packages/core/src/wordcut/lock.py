@@ -13,7 +13,7 @@ import json
 import os
 from collections.abc import Iterator
 from contextlib import contextmanager
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import datetime
 
 from wordcut.errors import WordcutError
@@ -30,6 +30,31 @@ class LockHolder:
     resource: str | None
     pid: int | None
     started_at: str | None
+    task_id: int | None = None
+
+
+class HeldLock:
+    """The lock taken through ``descriptor``; it stays held until every copy is closed."""
+
+    def __init__(self, descriptor: int) -> None:
+        self.descriptor = descriptor
+        self._holder: LockHolder | None = None
+        self._released = False
+
+    def describe(self, holder: LockHolder) -> None:
+        self._holder = holder
+        _describe(self.descriptor, holder)
+
+    def assign(self, task_id: int) -> None:
+        """Describe the holder as the task ``task_id``."""
+        assert self._holder is not None
+        self.describe(replace(self._holder, task_id=task_id))
+
+    def release(self) -> None:
+        """Close this process's copy of the descriptor; a task process may keep another."""
+        if not self._released:
+            os.close(self.descriptor)
+            self._released = True
 
 
 class ProcessingLock:
@@ -37,17 +62,33 @@ class ProcessingLock:
         self._home = home
 
     @contextmanager
-    def acquire(self, kind: str, resource: str) -> Iterator[None]:
+    def acquire(self, kind: str, resource: str) -> Iterator[HeldLock]:
         """Hold the lock for the block, or raise ``busy`` at once if another process has it."""
         self._home.ensure()
         # Do not open with O_TRUNC: a refused attempt would erase the holder's description.
-        descriptor = os.open(self._home.lock_file, os.O_RDWR | os.O_CREAT, LOCK_FILE_MODE)
+        held = HeldLock(os.open(self._home.lock_file, os.O_RDWR | os.O_CREAT, LOCK_FILE_MODE))
+        try:
+            self._lock_exclusively(held.descriptor)
+            held.describe(LockHolder(kind, resource, os.getpid(), _now()))
+            yield held
+        finally:
+            held.release()
+
+    @contextmanager
+    def adopt(self, descriptor: int) -> Iterator[HeldLock]:
+        """Hold the lock the launching process passed on as ``descriptor``, see ADR-0013.
+
+        The description keeps the operation, the task and the start time, with this
+        process's PID.
+        """
+        held = HeldLock(descriptor)
         try:
             self._lock_exclusively(descriptor)
-            _describe(descriptor, LockHolder(kind, resource, os.getpid(), _now()))
-            yield
+            inherited = _parse_holder(os.pread(descriptor, os.fstat(descriptor).st_size, 0))
+            held.describe(replace(inherited, pid=os.getpid()))
+            yield held
         finally:
-            os.close(descriptor)
+            held.release()
 
     def holder(self) -> LockHolder | None:
         """The current holder, or ``None`` when the lock is free."""
@@ -80,7 +121,8 @@ def _is_free(descriptor: int) -> bool:
 
 def _describe(descriptor: int, holder: LockHolder) -> None:
     os.ftruncate(descriptor, 0)
-    os.write(descriptor, json.dumps(asdict(holder)).encode())
+    # pwrite at 0: a second description must not land after the first one's end.
+    os.pwrite(descriptor, json.dumps(asdict(holder)).encode(), 0)
 
 
 def _now() -> str:
@@ -97,13 +139,18 @@ def _parse_holder(raw: bytes) -> LockHolder:
     return LockHolder(
         kind=_text(description.get("kind")),
         resource=_text(description.get("resource")),
-        pid=description.get("pid") if isinstance(description.get("pid"), int) else None,
+        pid=_integer(description.get("pid")),
         started_at=_text(description.get("started_at")),
+        task_id=_integer(description.get("task_id")),
     )
 
 
 def _text(value: object) -> str | None:
     return value if isinstance(value, str) else None
+
+
+def _integer(value: object) -> int | None:
+    return value if isinstance(value, int) else None
 
 
 def _busy(holder: LockHolder | None) -> WordcutError:

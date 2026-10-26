@@ -1,4 +1,4 @@
-"""Machine status: whether a heavy operation holds the processing lock (docs/cli.md §10)."""
+"""Machine status: who holds the processing lock and which tasks run (docs/cli.md §10)."""
 
 from __future__ import annotations
 
@@ -6,19 +6,21 @@ from dataclasses import asdict
 from datetime import datetime
 from typing import Any
 
-from wordcut.db import connect
 from wordcut.home import Home
 from wordcut.lock import LockHolder, ProcessingLock
+from wordcut.service.tasks import list_tasks
 
 
 def machine_status(home: Home, now: datetime | None = None) -> dict[str, Any]:
-    """Who holds the processing lock, never waiting for it; ``now`` defaults to the clock."""
-    # docs/cli.md §14: the first call of any command creates and migrates the database.
-    connect(home).close()
+    """Who holds the processing lock, never waiting for it, and the tasks still running.
+
+    ``now`` defaults to the clock.
+    """
     holder = ProcessingLock(home).holder()
-    if holder is None:
-        return {"lock": {"held": False}}
-    return {"lock": _held(holder, now or datetime.now().astimezone())}
+    # docs/cli.md §14: listing the tasks creates and migrates the database on the first call.
+    running = list_tasks(home, status="running")["items"]
+    lock = {"held": False} if holder is None else _held(holder, now or datetime.now().astimezone())
+    return {"lock": lock, "running_tasks": running}
 
 
 def _held(holder: LockHolder, now: datetime) -> dict[str, Any]:

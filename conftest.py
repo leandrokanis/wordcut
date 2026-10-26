@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import contextlib
+import os
 import signal
 import subprocess
 import sys
 from collections.abc import Callable, Iterator
 from pathlib import Path
 from types import FrameType
+from typing import Any
 
 import pytest
 
@@ -34,7 +37,23 @@ def wordcut_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 @pytest.fixture
-def lock_owner(wordcut_home: Path) -> Iterator[StartLockOwner]:
+def time_limit() -> Iterator[None]:
+    """Fail the test with ``TimeoutError`` once it runs longer than ``TIME_LIMIT_SECONDS``."""
+
+    def time_out(signum: int, frame: FrameType | None) -> None:
+        raise TimeoutError(f"test took longer than {TIME_LIMIT_SECONDS} s")
+
+    previous = signal.signal(signal.SIGALRM, time_out)
+    signal.alarm(TIME_LIMIT_SECONDS)
+    try:
+        yield
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, previous)
+
+
+@pytest.fixture
+def lock_owner(wordcut_home: Path, time_limit: None) -> Iterator[StartLockOwner]:
     """Start another process that holds the processing lock of ``wordcut_home``."""
     owners: list[subprocess.Popen[str]] = []
 
@@ -47,16 +66,35 @@ def lock_owner(wordcut_home: Path) -> Iterator[StartLockOwner]:
         assert owner.stdout.readline() == "ready\n"
         return owner
 
-    def time_out(signum: int, frame: FrameType | None) -> None:
-        raise TimeoutError(f"test took longer than {TIME_LIMIT_SECONDS} s")
-
-    previous = signal.signal(signal.SIGALRM, time_out)
-    signal.alarm(TIME_LIMIT_SECONDS)
     try:
         yield start
     finally:
-        signal.alarm(0)
-        signal.signal(signal.SIGALRM, previous)
         for owner in owners:
             owner.kill()
             owner.wait()
+
+
+@pytest.fixture
+def detached_tasks(
+    wordcut_home: Path, time_limit: None, monkeypatch: pytest.MonkeyPatch
+) -> Iterator[list[subprocess.Popen[bytes]]]:
+    """The processes of the tasks the test launches detached, killed and reaped at its end."""
+    from wordcut.tasks import execution
+
+    launched: list[subprocess.Popen[bytes]] = []
+    launch = execution.Popen
+
+    def record(*args: Any, **kwargs: Any) -> subprocess.Popen[bytes]:
+        process = launch(*args, **kwargs)
+        launched.append(process)
+        return process
+
+    monkeypatch.setattr(execution, "Popen", record)
+    try:
+        yield launched
+    finally:
+        for process in launched:
+            # The task process leads its own session, so its group id is its PID.
+            with contextlib.suppress(ProcessLookupError):
+                os.killpg(process.pid, signal.SIGKILL)
+            process.wait()

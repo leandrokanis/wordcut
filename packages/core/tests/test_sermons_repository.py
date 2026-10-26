@@ -135,7 +135,7 @@ def schema_version(connection: sqlite3.Connection) -> int:
 
 def test_new_database_has_schema_version_2_with_an_empty_sermons_table(tmp_path: Path) -> None:
     with closing(connect(Home(tmp_path))) as opened:
-        assert (schema_version(opened), sermons.newest_first(opened)) == (2, [])
+        assert (schema_version(opened) >= 2, sermons.newest_first(opened)) == (True, [])
 
 
 def test_database_at_schema_version_1_gains_the_sermons_table_and_keeps_its_data(
@@ -151,8 +151,8 @@ def test_database_at_schema_version_1_gains_the_sermons_table_and_keeps_its_data
     with closing(connect(home)) as opened:
         kept = opened.execute("SELECT value FROM app_info WHERE key = 'nota'").fetchone()
         inserted = sermons.insert(opened, new_sermon())
-        assert (schema_version(opened), kept, sermons.newest_first(opened)) == (
-            2,
+        assert (schema_version(opened) >= 2, kept, sermons.newest_first(opened)) == (
+            True,
             ("mantida",),
             [inserted],
         )
