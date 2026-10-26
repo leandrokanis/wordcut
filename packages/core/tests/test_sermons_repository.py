@@ -2,7 +2,7 @@ import sqlite3
 from collections.abc import Iterator
 from contextlib import closing
 from dataclasses import replace
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -52,6 +52,19 @@ def test_inserted_sermon_is_read_back_by_its_id_with_every_field(
         live_end=None,
         created_at=CREATED_AT,
         updated_at=CREATED_AT,
+    )
+
+
+def test_recorded_range_is_read_back_with_its_status_and_update_time(
+    connection: sqlite3.Connection,
+) -> None:
+    inserted = sermons.insert(connection, new_sermon())
+    updated_at = CREATED_AT + timedelta(minutes=5)
+
+    sermons.update_range(connection, inserted.id, 3730.0, 6510.0, "trimmed", updated_at)
+
+    assert sermons.by_id(connection, inserted.id) == replace(
+        inserted, live_start=3730.0, live_end=6510.0, status="trimmed", updated_at=updated_at
     )
 
 

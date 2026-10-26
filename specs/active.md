@@ -1,1 +1,1 @@
-active_plan: specs/1.1.a.1-sermon-create/plan.md
+active_plan: specs/1.1.b.2-sermon-trim/plan.md

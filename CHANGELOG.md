@@ -19,9 +19,16 @@ Formato de [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões
 - `wordcut sermon create <link>`, `sermon list [--status]` e `sermon show <id>`: a pregação
   passa a existir no banco (tabela `sermons`, migração 0002) a partir do link da live, com o
   mesmo vídeo devolvendo a pregação existente e aviso no stderr para live ainda no ar.
+- `wordcut sermon trim <id> --start T --end T` e `--start/--end` no `sermon create`: grava as
+  bordas da pregação em tempo da live (mínimo de 1 minuto, dentro da live), leva a pregação a
+  `delimitada` e, numa pregação já processada, mantém o estado e avisa que reprocessar exige
+  `sermon process --force`. `sermon list` e `sermon show` passam a trazer a duração da
+  pregação.
 
 ### Alterado
 
+- Tempos (`T`) aceitam só dígitos: minutos e segundos depois do primeiro componente ficam
+  abaixo de 60, e valores como `inf`, `nan`, `1e3` ou negativos são recusados.
 - O projeto passa a se chamar Wordcut; executável `wordcut`, pacote `wordcut`.
 - Organização em monorepo orquestrado por Docker Compose (ADR-0002, ADR-0003): domínio em
   `packages/core`, CLI em `apps/cli`, workspace `uv` com lock único na raiz.

@@ -301,7 +301,9 @@ Cria a pregação a partir do link da live e devolve título, data do culto e du
 - O mesmo vídeo duas vezes MUST devolver a pregação existente, com `"created": false` e
   saída 0.
 - Live não terminada: cria, avisa no stderr e devolve `"live_finished": false` (1.1.a.2).
-- `--start`/`--end`: delimita na criação, como `sermon trim`.
+- `--start`/`--end`: delimita na criação, como `sermon trim`; os dois juntos ou nenhum. Bordas
+  recusadas MUST NOT deixar pregação criada. Para um vídeo que já tem pregação, delimita a
+  existente, com as mesmas regras e aviso de `sermon trim`, e devolve `"created": false`.
 - `--process`: em seguida processa, como `sermon process`; exige `--start` e `--end`.
 
 ```
@@ -320,6 +322,8 @@ wordcut sermon create https://youtube.com/live/… --start 1:02:10 --end 1:48:30
 Define as bordas da pregação, em tempo da live (1.1.b.2).
 
 - Faixa com menos de 1 minuto: `sermon_too_short`.
+- Bordas fora de `[0, duração da live]` ou com o início no fim ou depois dele:
+  `invalid_argument`. Com a duração da live desconhecida (live no ar), vale só a ordem.
 - Numa pregação processada, só grava as bordas; reprocessar é `sermon process --force`.
 
 ### 7.4. `sermon process <id> [--force] [--wait]`
