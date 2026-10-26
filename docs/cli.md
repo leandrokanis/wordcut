@@ -1,7 +1,7 @@
 ```
 Wordcut                                                    Administrador
 Especificação de interface                                 2026-10-26
-Situação: rascunho, aguardando revisão
+Situação: aprovado
 
 
                     Interface de linha de comando do Wordcut
@@ -16,7 +16,7 @@ cortes, e é operável por pessoas e por agentes.
 
 ## Situação deste documento
 
-Rascunho. Vale depois de revisado e aprovado por uma pessoa diferente de quem o redigiu.
+Aprovado pelo administrador do projeto em 2026-10-26.
 Em funcionalidade, prevalecem os requisitos (`docs/requirements/`); em princípios e
 arquitetura, a constituição (`docs/constitution.md`). Este documento detalha como os dois se
 traduzem em comandos.
