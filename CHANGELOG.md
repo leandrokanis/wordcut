@@ -13,6 +13,9 @@ Formato de [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões
 - Esqueleto da web (`apps/web`, React + Vite + TypeScript) que mostra o estado da API.
 - `compose.yaml` com os serviços `api`, `web` e `cli`, portas só em `127.0.0.1`, dados em
   `WORDCUT_HOME` e segredos montados só para leitura.
+- Base da CLI nova: contrato de saída e erros (`--json`, `--quiet`, códigos de saída;
+  ADR-0012), banco SQLite com migrações em `WORDCUT_HOME`, trava global de processamento e
+  `wordcut status`.
 
 ### Alterado
 

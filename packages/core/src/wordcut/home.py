@@ -1,0 +1,31 @@
+"""Where the data of a Wordcut installation lives (docs/cli.md §14)."""
+
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass
+from pathlib import Path
+
+PRIVATE_FOLDER_MODE = 0o700
+
+
+@dataclass(frozen=True)
+class Home:
+    root: Path
+
+    @classmethod
+    def from_environment(cls) -> Home:
+        override = os.environ.get("WORDCUT_HOME")
+        return cls(Path(override) if override else Path.home() / ".local/share/wordcut")
+
+    @property
+    def database(self) -> Path:
+        return self.root / "wordcut.db"
+
+    @property
+    def lock_file(self) -> Path:
+        return self.root / "processing.lock"
+
+    def ensure(self) -> None:
+        """Create the data folder, readable only by its owner, if it does not exist."""
+        self.root.mkdir(mode=PRIVATE_FOLDER_MODE, parents=True, exist_ok=True)

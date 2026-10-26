@@ -46,7 +46,7 @@ Depois o servidor e, por fim, a interface, seguindo o protótipo
 
 | # | ID | Item | Cobre | Estado |
 |:-:|---|---|---|---|
-| 1 | 3.1.a.3 | Base: SQLite, contrato da CLI (`--json`, erros, saídas), trava e `status` | 3.1.a.1, 3.1.a.3 | ☐ |
+| 1 | 3.1.a.3 | Base: SQLite, contrato da CLI (`--json`, erros, saídas), trava e `status` | 3.1.a.1, 3.1.a.3 | ☑ |
 | 2 | 1.1.a.1 | `sermon create`, `list`, `show` | 1.1.a.2 | ☐ |
 | 3 | 1.1.b.2 | `sermon trim` | — | ☐ |
 | 4 | 3.1.a.2 | Tarefas: processo destacado, `--wait`, `task list/show/wait` | — | ☐ |
@@ -88,3 +88,4 @@ Depois o servidor e, por fim, a interface, seguindo o protótipo
 | Item | Resultado | Commit | Observações |
 |---|---|---|---|
 | 0 monorepo | PASS na rodada 1 | aafe521 | Mutações fora da barra que sobreviveram (ver qa.md): barra final no `rsync` do worker remoto; `setStatus("ok")` fixo na web. Cobrir quando a web real chegar (fase 3). |
+| 1 3.1.a.3 | PASS na rodada 2 | (ver git log) | Rodada 1 PARCIAL: erro de uso dos comandos antigos passou a seguir o contrato; decisão mantida e documentada na ADR-0012. |

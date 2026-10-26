@@ -1,0 +1,4 @@
+CREATE TABLE app_info (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);

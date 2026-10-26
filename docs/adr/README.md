@@ -15,3 +15,4 @@ Uma decisão por arquivo, no formato de Michael Nygard ([ADR-0001](0001-registra
 | [ADR-0009](0009-identidade-pelo-cloudflare-access.md) | Identidade pelo Cloudflare Access | Aceita |
 | [ADR-0010](0010-llm-pelo-openrouter.md) | LLM pelo OpenRouter com critérios no código | Aceita |
 | [ADR-0011](0011-transcricao-whisperx-local.md) | Transcrição com WhisperX na GPU local | Aceita |
+| [ADR-0012](0012-contrato-da-cli.md) | Contrato de saída e erros da CLI | Aceita |
