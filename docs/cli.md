@@ -225,7 +225,7 @@ Sem `--json`, o `message` vai para o stderr.
 | `internal_error` | 1 | falha não prevista |
 | `interrupted` | 1 | a tarefa parou antes do fim: Ctrl+C durante `--wait` ou processo da tarefa morto (§6.5) |
 | `processing_error` | 1 | o processamento não achou palavra dentro das bordas, ou o vídeo baixado não cobre a pregação; nada é gravado |
-| `invalid_argument` | 2 | argumento inválido; `details.argument` diz qual |
+| `invalid_argument` | 2 | argumento inválido; `details.argument` diz qual opção do comando, quando identificável, com o nome que o parser define, e `details.choices` lista as opções válidas de uma escolha; argumento não reconhecido não traz `details`; a mensagem nunca repete o que foi digitado, nem como nome de opção (ADR-0015) |
 | `not_found` | 3 | ID ou e-mail inexistente |
 | `busy` | 4 | outra tarefa segura a trava; `details` traz a tarefa |
 | `live_not_finished` | 5 | processar uma live que ainda não terminou |
@@ -236,6 +236,7 @@ Sem `--json`, o `message` vai para o stderr.
 | `spelling_too_different` | 5 | correção de grafia barrada pela trava; `details` traz a distância e o limite |
 | `default_preset` | 5 | apagar o preset padrão |
 | `last_admin` | 5 | remover ou rebaixar o último administrador |
+| `config_not_writable` | 5 | gravar um segredo numa pasta de configuração sem escrita (montada só para leitura no contêiner); a mensagem não traz o segredo |
 | `youtube_error` | 6 | falha ao consultar ou baixar do YouTube |
 | `llm_error` | 6 | falha do LLM depois da nova tentativa (constituição §III) |
 | `network_error` | 6 | falha de rede genérica |

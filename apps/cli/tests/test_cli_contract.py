@@ -133,21 +133,23 @@ def test_ctrl_c_exits_with_130_and_prints_no_result(capsys: pytest.CaptureFixtur
     assert (exit_code, capsys.readouterr().out) == (130, "")
 
 
-def test_unknown_option_with_json_is_an_invalid_argument_error_in_portuguese(
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    exit_code = cli_with(answer({}))(["probe", "--bogus", "--json"])
+UNRECOGNIZED = {
+    "code": "invalid_argument",
+    "message": "Argumento não reconhecido; veja wordcut probe --help.",
+}
 
-    assert (exit_code, json.loads(capsys.readouterr().out)) == (
-        2,
-        {
-            "error": {
-                "code": "invalid_argument",
-                "message": "Argumento não reconhecido: --bogus.",
-                "details": {"argument": "--bogus"},
-            }
-        },
-    )
+
+@pytest.mark.parametrize(
+    "stray",
+    ["--bogus", "--bogus=valor-ficticio-9z", "valor-ficticio-9z", "-b", "--BOGUS"],
+    ids=["option", "option=", "positional", "short-option", "uppercase-option"],
+)
+def test_an_unrecognized_argument_is_refused_in_portuguese_without_naming_it(
+    stray: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    exit_code = cli_with(answer({}))(["probe", stray, "--json"])
+
+    assert (exit_code, json.loads(capsys.readouterr().out)) == (2, {"error": UNRECOGNIZED})
 
 
 def test_missing_command_names_the_missing_argument(capsys: pytest.CaptureFixture[str]) -> None:
@@ -159,6 +161,21 @@ def test_missing_command_names_the_missing_argument(capsys: pytest.CaptureFixtur
             "code": "invalid_argument",
             "message": "Argumento obrigatório ausente: command.",
             "details": {"argument": "command"},
+        },
+    )
+
+
+def test_invalid_choice_lists_the_choices_without_repeating_the_typed_value(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    exit_code = cli_with(answer({}))(["--json", "valor-ficticio-9z"])
+
+    assert (exit_code, json.loads(capsys.readouterr().out)["error"]) == (
+        2,
+        {
+            "code": "invalid_argument",
+            "message": "Valor inválido para command; use um de: probe.",
+            "details": {"argument": "command", "choices": ["probe"]},
         },
     )
 
@@ -179,7 +196,7 @@ def test_malformed_value_names_the_argument_it_belongs_to(
         2,
         {
             "code": "invalid_argument",
-            "message": "Valor inválido para --count: 'muitos'.",
+            "message": "Valor inválido para --count.",
             "details": {"argument": "--count"},
         },
     )
@@ -207,8 +224,64 @@ def test_usage_error_without_json_leaves_stdout_empty_and_explains_on_stderr(
     assert (exit_code, captured.out, captured.err) == (
         2,
         "",
-        "erro: Argumento não reconhecido: --bogus.\n",
+        "erro: Argumento não reconhecido; veja wordcut probe --help.\n",
     )
+
+
+TYPED_VALUE = "valor-ficticio-9z"
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["sermon", "show", TYPED_VALUE],
+        ["sermon", "list", TYPED_VALUE],
+        ["sermon", "list", f"--opcao-ficticia={TYPED_VALUE}"],
+        [TYPED_VALUE],
+        [f"x (choose from '{TYPED_VALUE}')"],
+    ],
+    ids=[
+        "malformed-value",
+        "stray-positional",
+        "stray-option=",
+        "invalid-choice",
+        "invalid-choice-imitating-the-list",
+    ],
+)
+@pytest.mark.parametrize("output", [["--json"], []], ids=["json", "text"])
+def test_no_usage_error_repeats_a_value_the_user_typed(
+    argv: list[str], output: list[str], capsys: pytest.CaptureFixture[str]
+) -> None:
+    exit_code = main([*argv, *output])
+
+    printed = capsys.readouterr()
+    assert (exit_code, TYPED_VALUE in printed.out + printed.err) == (2, False)
+
+
+@pytest.mark.parametrize("output", [["--json"], []], ids=["json", "text"])
+def test_a_value_glued_to_a_dash_is_not_taken_for_an_option_name(
+    output: list[str], capsys: pytest.CaptureFixture[str]
+) -> None:
+    exit_code = main(["sermon", "list", "-sk-ficticia", *output])
+
+    printed = capsys.readouterr()
+    assert (exit_code, "sk-ficticia" in printed.out + printed.err) == (2, False)
+
+
+@pytest.mark.parametrize("typed", ["--status", "--stat"], ids=["full", "abbreviated"])
+def test_an_invalid_value_for_an_existing_option_names_it_as_the_parser_defines_it(
+    typed: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    exit_code = main(["sermon", "list", typed, TYPED_VALUE, "--json"])
+
+    printed = capsys.readouterr()
+    error = json.loads(printed.out)["error"]
+    assert (
+        exit_code,
+        error["message"].startswith("Valor inválido para --status;"),
+        error["details"]["argument"],
+        TYPED_VALUE in printed.out + printed.err,
+    ) == (2, True, "--status", False)
 
 
 def test_version_prints_the_installed_cli_version(capsys: pytest.CaptureFixture[str]) -> None:

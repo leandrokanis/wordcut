@@ -55,9 +55,23 @@ Formato de [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões
   antes da extensão, e o nome final só aparece com a cópia completa. Devolve `path`
   (absoluto) e `bytes`; não toma a trava de processamento. Pregação não processada falha
   com `sermon_not_processed`.
+- `wordcut settings show`, `settings set [--model] [--whisper-model]`, `settings set-key` e
+  `settings set-cookies` (administrador): modelos do LLM e do WhisperX no banco (tabela
+  `settings`, migração 0005; o do LLM começa sem valor, o do WhisperX em `large-v3`); a chave
+  do LLM e os cookies do YouTube lidos só do stdin (a chave sem eco no terminal; os cookies,
+  só redirecionados, no formato Netscape) e gravados de uma vez em `WORDCUT_CONFIG` com
+  permissão 600. O `show` traz a chave só mascarada (`••••` e os 4 últimos caracteres) e os
+  cookies só como presentes ou ausentes; argumento a mais nesses comandos é recusado sem
+  ecoar o valor. Código de erro `config_not_writable` (saída 5) para a pasta sem escrita.
 
 ### Alterado
 
+- `sermon process` transcreve com o modelo do WhisperX das configurações
+  (`settings set --whisper-model`), não mais com `large-v3` fixo.
+- Erro de uso da CLI não repete o valor digitado (ADR-0015): escolha inválida lista as
+  opções válidas (`details.choices`), argumento não reconhecido nunca é repetido, nem como
+  nome de opção (a mensagem aponta para o `--help` do comando), e valor de tipo inválido
+  nomeia só a opção, como o parser a define.
 - `overview` passa a quebrar as frases com o mesmo módulo do processamento
   (`wordcut.processing.sentences`), sem mudar a saída.
 - Tempos (`T`) aceitam só dígitos: minutos e segundos depois do primeiro componente ficam

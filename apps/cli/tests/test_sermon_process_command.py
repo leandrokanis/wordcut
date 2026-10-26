@@ -73,7 +73,7 @@ def gateways(monkeypatch: pytest.MonkeyPatch) -> Callable[[type[FakeGateways]], 
     """Process with the given ``FakeGateways`` class; the plain one by default."""
 
     def use(fake: type[FakeGateways]) -> None:
-        monkeypatch.setattr(processing, "default_gateways", fake)
+        monkeypatch.setattr(processing, "default_gateways", lambda whisper_model: fake())
 
     use(FakeGateways)
     return use

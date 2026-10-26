@@ -91,7 +91,7 @@ def home(wordcut_home: Path) -> Home:
 @pytest.fixture
 def gateways(monkeypatch: pytest.MonkeyPatch) -> FakeGateways:
     fake = FakeGateways()
-    monkeypatch.setattr(processing, "default_gateways", lambda: fake)
+    monkeypatch.setattr(processing, "default_gateways", lambda whisper_model: fake)
     return fake
 
 
@@ -227,7 +227,7 @@ def test_a_failure_leaves_the_task_and_the_sermon_failed_with_its_error(
     home: Home,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(processing, "default_gateways", failing)
+    monkeypatch.setattr(processing, "default_gateways", lambda whisper_model: failing())
     sermon_id = trimmed_sermon(home)
 
     with pytest.raises(WordcutError) as raised:
@@ -247,7 +247,7 @@ def test_a_failure_leaves_the_task_and_the_sermon_failed_with_its_error(
 def test_a_sermon_whose_processing_failed_can_be_trimmed_again_at_once(
     failing: type[FakeGateways], home: Home, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(processing, "default_gateways", failing)
+    monkeypatch.setattr(processing, "default_gateways", lambda whisper_model: failing())
     sermon_id = trimmed_sermon(home)
     with pytest.raises(WordcutError):
         process(home, sermon_id)
@@ -261,7 +261,7 @@ def test_a_sermon_whose_processing_failed_can_be_trimmed_again_at_once(
 def test_a_sermon_whose_detached_processing_failed_can_be_trimmed_again_at_once(
     home: Home, harmless_tasks: list[Any], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(processing, "default_gateways", RefusingYouTube)
+    monkeypatch.setattr(processing, "default_gateways", lambda whisper_model: RefusingYouTube())
     sermon_id = trimmed_sermon(home)
     task = start_processing(home, sermon_id, live=FakeLive(), detach=True)
     runner.main([str(task.id)])
@@ -439,7 +439,7 @@ def test_a_failed_sermon_is_processed_again_by_the_same_operation(
     home: Home, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     gateways = FailingOnce()
-    monkeypatch.setattr(processing, "default_gateways", lambda: gateways)
+    monkeypatch.setattr(processing, "default_gateways", lambda whisper_model: gateways)
     sermon_id = trimmed_sermon(home)
     with pytest.raises(WordcutError):
         process(home, sermon_id)
@@ -462,7 +462,7 @@ def test_a_new_processing_downloads_again_instead_of_using_an_earlier_section(
     home: Home, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     gateways = YtDlpLike()
-    monkeypatch.setattr(processing, "default_gateways", lambda: gateways)
+    monkeypatch.setattr(processing, "default_gateways", lambda whisper_model: gateways)
     sermon_id = trimmed_sermon(home)
     stale = home.sermon_media(sermon_id) / "work" / "section.mp4"
     stale.parent.mkdir(parents=True)

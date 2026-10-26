@@ -9,6 +9,7 @@ from wordcut import processing
 from wordcut.db import connect
 from wordcut.home import Home
 from wordcut.service.sermons import create_sermon, show_sermon
+from wordcut.service.settings import update_settings
 from wordcut.tasks import BUILTIN_KIND_MODULES, Progress, Resource, kind
 from wordcut.tasks.execution import start
 from wordcut.transcript import Transcript, Word
@@ -55,7 +56,7 @@ class FakeGateways:
 
 @pytest.fixture
 def home(wordcut_home: Path, monkeypatch: pytest.MonkeyPatch) -> Home:
-    monkeypatch.setattr(processing, "default_gateways", FakeGateways)
+    monkeypatch.setattr(processing, "default_gateways", lambda whisper_model: FakeGateways())
     return Home(wordcut_home)
 
 
@@ -102,3 +103,26 @@ def test_the_task_result_is_the_processed_sermon_as_shown_without_its_last_task(
         shown = show_sermon(connection, sermon_id, home=home)
     del shown["last_task"]
     assert task.result == shown
+
+
+@pytest.mark.parametrize(
+    ("configured", "used"), [(None, "large-v3"), ("medium", "medium")], ids=["default", "set"]
+)
+def test_the_task_transcribes_with_the_configured_whisperx_model(
+    home: Home, monkeypatch: pytest.MonkeyPatch, configured: str | None, used: str
+) -> None:
+    models: list[str] = []
+
+    def gateways(whisper_model: str) -> FakeGateways:
+        models.append(whisper_model)
+        return FakeGateways()
+
+    monkeypatch.setattr(processing, "default_gateways", gateways)
+    sermon_id = trimmed_sermon(home)
+    if configured is not None:
+        with closing(connect(home)) as connection:
+            update_settings(connection, whisper_model=configured)
+
+    run_task(home, sermon_id, detach=False)
+
+    assert models == [used]

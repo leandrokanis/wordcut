@@ -15,6 +15,7 @@ EXIT_CODE_BY_ERROR_CODE = {
     "spelling_too_different": 5,
     "default_preset": 5,
     "last_admin": 5,
+    "config_not_writable": 5,
     "youtube_error": 6,
     "llm_error": 6,
     "network_error": 6,

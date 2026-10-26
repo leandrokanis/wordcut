@@ -18,3 +18,4 @@ Uma decisão por arquivo, no formato de Michael Nygard ([ADR-0001](0001-registra
 | [ADR-0012](0012-contrato-da-cli.md) | Contrato de saída e erros da CLI | Aceita |
 | [ADR-0013](0013-trava-herdada-pelo-processo-da-tarefa.md) | Trava herdada pelo processo da tarefa (complementa a ADR-0007) | Aceita |
 | [ADR-0014](0014-processamento-por-portas-e-estado-na-leitura.md) | Processamento da pregação por portas, com o estado conferido na leitura | Aceita |
+| [ADR-0015](0015-erro-de-uso-nao-repete-valor-digitado.md) | Erro de uso não repete valor digitado (complementa a ADR-0012) | Aceita |
