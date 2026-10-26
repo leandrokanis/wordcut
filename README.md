@@ -96,12 +96,19 @@ antes de cortar e de renderizar.
 ### Estado da máquina (CLI nova)
 
 A CLI nova ([docs/cli.md](docs/cli.md), [ADR-0012](docs/adr/0012-contrato-da-cli.md)) convive
-com os comandos abaixo até a migração. Por enquanto, ela tem o `status`:
+com os comandos abaixo até a migração. Para o estado da máquina e as tarefas, ela tem `status`
+e `task`:
 
 ```sh
-uv run wordcut status          # máquina livre ou qual processamento segura a trava
+uv run wordcut status          # máquina livre ou qual tarefa segura a trava, e as em andamento
 uv run wordcut status --json   # o mesmo em JSON; --json vale antes ou depois do comando
+uv run wordcut task list [--status running]   # tarefas, da mais recente para a mais antiga
+uv run wordcut task wait <id>  # espera a tarefa: progresso no stderr, resultado no stdout
 ```
+
+As operações pesadas rodam como tarefas: sem `--wait`, voltam na hora com o `task_id` e
+seguem num processo destacado que segura a trava (saída em `tasks/<id>.log`); com `--wait`,
+rodam em primeiro plano ([ADR-0013](docs/adr/0013-trava-herdada-pelo-processo-da-tarefa.md)).
 
 Os dados (banco SQLite, criado e migrado na primeira chamada, e a trava `processing.lock`)
 ficam em `~/.local/share/wordcut/`, ou em `WORDCUT_HOME` quando definida. Essa pasta deve

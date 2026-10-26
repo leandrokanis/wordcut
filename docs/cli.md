@@ -189,7 +189,7 @@ Comandos longos escrevem o progresso no stderr, uma linha por etapa ou atualiza�
 | Saída | Nome | Significado |
 |:-:|---|---|
 | 0 | — | sucesso |
-| 1 | `internal_error` | erro interno inesperado |
+| 1 | `internal_error`, `interrupted` | erro interno inesperado; tarefa interrompida |
 | 2 | `invalid_argument` | uso inválido: argumento faltando, mal formado ou fora da faixa |
 | 3 | `not_found` | recurso inexistente |
 | 4 | `busy` | máquina ocupada pela trava de processamento |
@@ -223,6 +223,7 @@ Sem `--json`, o `message` vai para o stderr.
 | `code` | Saída | Quando |
 |---|:-:|---|
 | `internal_error` | 1 | falha não prevista |
+| `interrupted` | 1 | a tarefa parou antes do fim: Ctrl+C durante `--wait` ou processo da tarefa morto (§6.5) |
 | `invalid_argument` | 2 | argumento inválido; `details.argument` diz qual |
 | `not_found` | 3 | ID ou e-mail inexistente |
 | `busy` | 4 | outra tarefa segura a trava; `details` traz a tarefa |
@@ -283,10 +284,10 @@ em sucesso, o código do erro em falha.
 ### 6.5. Interrupção
 
 - Ctrl+C durante `--wait` ou `task wait` de uma tarefa em primeiro plano MUST interromper a
-  tarefa, marcá-la `failed` e sair com 130.
+  tarefa, marcá-la `failed` com o erro `interrupted` e sair com 130.
 - Ctrl+C em `task wait` de uma tarefa destacada só para a espera; a tarefa continua.
 - Uma tarefa encontrada `running` sem processo vivo (reinício da máquina) MUST ser marcada
-  `failed` na próxima leitura (1.1.c).
+  `failed`, com o erro `interrupted`, na próxima leitura (1.1.c).
 
 Não há cancelamento de tarefa nesta versão.
 
@@ -478,9 +479,9 @@ opções (1.1.i).
 
 ## 10. Tarefas (`task`) e estado (`status`)
 
-- `task list [--status S] [--kind K]`: tarefas recentes.
-- `task show <id>`: tipo, estado, recurso, início, fim, progresso, erro e resultado
-  (`sermon_id`, `render_id`).
+- `task list [--status S] [--kind K]`: tarefas, da mais recente para a mais antiga.
+- `task show <id>`: tipo, estado, recurso (`<recurso>_id`, como em §6.2), início, fim,
+  progresso, erro e resultado (`sermon_id`, `render_id`).
 - `task wait <id>`: espera o fim, como `--wait` (§6.3).
 - `status`: estado da máquina (3.1.a.3): se a trava está livre ou quem a segura (tarefa, tipo,
   recurso, há quanto tempo) e as tarefas em andamento.
@@ -550,6 +551,7 @@ A CLI também roda no contêiner: `docker compose run --rm cli <comando>`.
 | O quê | Onde | Observação |
 |---|---|---|
 | Banco (SQLite) e mídias | `~/.local/share/wordcut/` | sobrescrito por `WORDCUT_HOME`; nos contêineres, o volume de dados |
+| Saída dos processos de tarefa | `tasks/<id>.log` na pasta de dados | traz o rastreio de um erro interno; permissão 600 |
 | Segredos (chave do LLM, cookies) | `~/.config/wordcut/` | permissão 600 |
 | Demais configurações, presets e equipe | no SQLite | — |
 

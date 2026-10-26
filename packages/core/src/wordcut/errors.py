@@ -11,6 +11,7 @@ from typing import Any
 # docs/cli.md §5.1 and §5.3: existing codes must never change their exit code.
 EXIT_CODES: dict[str, int] = {
     "internal_error": 1,
+    "interrupted": 1,
     "invalid_argument": 2,
     "not_found": 3,
     "busy": 4,

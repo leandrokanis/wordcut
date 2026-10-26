@@ -24,6 +24,15 @@ Formato de [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões
   `delimitada` e, numa pregação já processada, mantém o estado e avisa que reprocessar exige
   `sermon process --force`. `sermon list` e `sermon show` passam a trazer a duração da
   pregação.
+- Tarefas (`docs/cli.md` §6; ADR-0013): tabela `tasks` (migração 0003), execução em primeiro
+  plano ou em processo destacado em sessão própria que herda a trava, progresso no banco e
+  saída do processo em `tasks/<id>.log`. `wordcut task list [--status] [--kind]`,
+  `task show <id>` e `task wait <id>` (progresso no stderr, resultado no stdout, saída da
+  tarefa; Ctrl+C só para a espera). Os comandos que lançam tarefa ganham `--wait`, que roda
+  em primeiro plano e sai com 130 no Ctrl+C. `wordcut status` traz o `task_id` do dono da
+  trava e as tarefas em andamento, e o `busy` traz o `task_id` nos `details`.
+- Código de erro `interrupted` (saída 1): tarefa interrompida por Ctrl+C ou cujo processo
+  morreu; uma tarefa `running` sem processo vivo vira `failed` na próxima leitura.
 
 ### Alterado
 

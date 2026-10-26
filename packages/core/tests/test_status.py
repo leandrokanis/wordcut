@@ -1,21 +1,29 @@
 import fcntl
 import json
+import socket
 import subprocess
+import time
 from collections.abc import Callable
+from contextlib import closing
 from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
 
+from wordcut.db import connect, tasks
+from wordcut.db.tasks import NewTask
 from wordcut.home import Home
 from wordcut.lock import ProcessingLock
 from wordcut.service.status import machine_status
+from wordcut.service.tasks import show_task
+from wordcut.tasks import Resource
+from wordcut.tasks.execution import start
 
 StartLockOwner = Callable[[str, str], subprocess.Popen[str]]
 
 
 def test_machine_with_no_operation_running_reports_the_lock_free(tmp_path: Path) -> None:
-    assert machine_status(Home(tmp_path)) == {"lock": {"held": False}}
+    assert machine_status(Home(tmp_path)) == {"lock": {"held": False}, "running_tasks": []}
 
 
 def test_machine_busy_elsewhere_reports_the_holder_and_how_long_it_has_run(
@@ -34,8 +42,10 @@ def test_machine_busy_elsewhere_reports_the_holder_and_how_long_it_has_run(
             "resource": "cut 34",
             "pid": owner.pid,
             "started_at": holder.started_at,
+            "task_id": None,
             "elapsed_seconds": 90,
-        }
+        },
+        "running_tasks": [],
     }
 
 
@@ -46,7 +56,7 @@ def test_machine_whose_lock_holder_was_killed_reports_the_lock_free(
     owner.kill()
     owner.wait()
 
-    assert machine_status(Home(wordcut_home)) == {"lock": {"held": False}}
+    assert machine_status(Home(wordcut_home)) == {"lock": {"held": False}, "running_tasks": []}
 
 
 def test_holder_not_yet_described_is_reported_held_with_unknown_fields(tmp_path: Path) -> None:
@@ -64,8 +74,10 @@ def test_holder_not_yet_described_is_reported_held_with_unknown_fields(tmp_path:
             "resource": None,
             "pid": None,
             "started_at": None,
+            "task_id": None,
             "elapsed_seconds": None,
-        }
+        },
+        "running_tasks": [],
     }
 
 
@@ -89,3 +101,45 @@ def test_holder_with_an_unreadable_start_time_has_no_elapsed_time(
         lock = machine_status(home)["lock"]
 
     assert (lock["started_at"], lock["elapsed_seconds"]) == (started_at, None)
+
+
+def test_status_lists_the_running_detached_task_and_names_it_as_the_lock_holder(
+    wordcut_home: Path, detached_tasks: list[subprocess.Popen[bytes]]
+) -> None:
+    home = Home(wordcut_home)
+    task = start(home, "diagnostic", Resource("sermon", 12), {"seconds": 5}, detach=True)
+    while (
+        ProcessingLock(home).holder() is None
+        or show_task(home, task.id)["progress_message"] is None
+    ):
+        time.sleep(0.05)
+
+    status = machine_status(home)
+
+    assert (status["lock"]["task_id"], [item["id"] for item in status["running_tasks"]]) == (
+        task.id,
+        [task.id],
+    )
+
+
+def test_status_shows_no_running_task_whose_process_is_gone(wordcut_home: Path) -> None:
+    home = Home(wordcut_home)
+    process = subprocess.Popen(["true"])
+    process.wait()
+    with closing(connect(home)) as connection:
+        task = tasks.insert(
+            connection,
+            NewTask(
+                "diagnostic",
+                "sermon",
+                12,
+                {},
+                process.pid,
+                socket.gethostname(),
+                datetime.now().astimezone(),
+            ),
+        )
+
+    status = machine_status(home)
+
+    assert (status["running_tasks"], show_task(home, task.id)["status"]) == ([], "failed")

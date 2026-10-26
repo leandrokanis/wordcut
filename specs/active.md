@@ -1,1 +1,1 @@
-active_plan: specs/1.1.b.2-sermon-trim/plan.md
+active_plan: specs/3.1.a.2-background-tasks/plan.md
