@@ -78,6 +78,10 @@ class Context:
     json: bool
     quiet: bool
 
+    def warn(self, message: str) -> None:
+        """Tell the user on stderr; ``--quiet`` silences progress only, never a warning."""
+        print(f"aviso: {message}", file=sys.stderr)
+
 
 Handler = Callable[[argparse.Namespace, Context], Result]
 Renderer = Callable[[Result], str]
@@ -100,6 +104,13 @@ def create_parser() -> tuple[Parser, Commands]:
     _add_global_options(parser, default=False)
     commands = parser.add_subparsers(dest="command", required=True)
     return parser, commands
+
+
+def add_group(commands: Commands, name: str, *, help: str) -> Commands:
+    """A resource whose actions are added with ``add_command`` (``wordcut <name> <ação>``)."""
+    group = commands.add_parser(name, help=help, description=help)
+    _add_global_options(group, default=argparse.SUPPRESS)
+    return group.add_subparsers(dest="action", required=True)
 
 
 def add_command(

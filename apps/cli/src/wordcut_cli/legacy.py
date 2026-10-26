@@ -42,7 +42,7 @@ def _info(args: argparse.Namespace) -> None:
             {
                 "titulo": info.title,
                 "data_culto": info.service_date.isoformat(),
-                "duracao": format_timestamp(info.duration),
+                "duracao": None if info.duration is None else format_timestamp(info.duration),
                 "status": info.live_status,
                 "terminada": info.is_finished,
                 "pasta_sugerida": str(default_root() / folder_name(info.service_date, "Pregação")),
