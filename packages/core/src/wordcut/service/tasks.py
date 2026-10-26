@@ -40,15 +40,15 @@ def launched_task(task: TaskRow) -> dict[str, Any]:
 def list_tasks(home: Home, status: str | None = None, kind: str | None = None) -> dict[str, Any]:
     """Tasks with the latest start first, only those in ``status`` and of ``kind`` when given."""
     with closing(connect(home)) as connection:
-        _reconcile(home, connection, tasks.newest_first(connection, "running"))
+        reconcile(home, connection, tasks.newest_first(connection, "running"))
         found = tasks.newest_first(connection, status, kind)
-    return {"items": [_shown(task) for task in found]}
+    return {"items": [shown_task(task) for task in found]}
 
 
 def show_task(home: Home, task_id: int) -> dict[str, Any]:
     """Kind, status, resource, start, end, progress, error and result of the task."""
     with closing(connect(home)) as connection:
-        return _shown(_existing(home, connection, task_id))
+        return shown_task(_existing(home, connection, task_id))
 
 
 def wait_task(
@@ -80,7 +80,7 @@ def wait_task(
 
 def _existing(home: Home, connection: sqlite3.Connection, task_id: int) -> TaskRow:
     task = _found(connection, task_id)
-    if _reconcile(home, connection, [task]):
+    if reconcile(home, connection, [task]):
         task = _found(connection, task_id)
     return task
 
@@ -92,8 +92,9 @@ def _found(connection: sqlite3.Connection, task_id: int) -> TaskRow:
     return task
 
 
-def _reconcile(home: Home, connection: sqlite3.Connection, found: list[TaskRow]) -> bool:
-    """Mark ``failed`` the running tasks whose process is gone; true if there was one."""
+def reconcile(home: Home, connection: sqlite3.Connection, found: list[TaskRow]) -> bool:
+    """Mark ``failed`` (``interrupted``) the tasks of ``found`` still recorded running whose
+    process is gone; true if there was one."""
     holder = ProcessingLock(home).holder()
     orphans = [task for task in found if task.status == "running" and _is_orphan(task, holder)]
     for task in orphans:
@@ -108,7 +109,8 @@ def _is_orphan(task: TaskRow, holder: LockHolder | None) -> bool:
     return task.host == this_host() and not is_running(task.pid)
 
 
-def _shown(task: TaskRow) -> dict[str, Any]:
+def shown_task(task: TaskRow) -> dict[str, Any]:
+    """The task as ``show_task`` gives it."""
     return {
         "id": task.id,
         "kind": task.kind,

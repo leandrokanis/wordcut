@@ -73,6 +73,17 @@ def test_section_args_limit_resolution_and_use_seconds() -> None:
     assert args[-1] == "URL"
 
 
+def test_audio_window_args_ask_only_the_audio_of_the_section_in_seconds() -> None:
+    args = YouTube.audio_window_args("URL", 950.0, 1040.5, Path("janela.m4a"))
+
+    assert (
+        args[args.index("-f") + 1],
+        args[args.index("--download-sections") + 1],
+        args[args.index("-o") + 1],
+        args[-1],
+    ) == ("ba[ext=m4a]/ba", "*950.000-1040.500", "janela.m4a", "URL")
+
+
 def test_missing_cookies_file_is_a_youtube_error_explained_without_its_path(
     tmp_path: Path,
 ) -> None:

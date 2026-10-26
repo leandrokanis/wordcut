@@ -133,6 +133,18 @@ def newest_first(
     return [_row(values) for values in found]
 
 
+def of_resource(
+    connection: sqlite3.Connection, resource_type: str, resource_id: int
+) -> list[TaskRow]:
+    """The tasks of the resource, with the latest start first."""
+    found = connection.execute(
+        f"SELECT {COLUMNS} FROM tasks WHERE resource_type = ? AND resource_id = ?"
+        " ORDER BY started_at DESC, id DESC",
+        (resource_type, resource_id),
+    ).fetchall()
+    return [_row(values) for values in found]
+
+
 def _row(values: tuple[Any, ...]) -> TaskRow:
     (
         task_id,

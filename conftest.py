@@ -23,10 +23,24 @@ with ProcessingLock(Home.from_environment()).acquire(sys.argv[1], sys.argv[2]):
     time.sleep(600)
 """
 
+# Stands in for a detached task process: holds what it inherits (the lock) and does nothing.
+HARMLESS_TASK = [sys.executable, "-c", "import time; time.sleep(60)"]
+
 # A test that waits on another process fails instead of hanging the whole suite.
 TIME_LIMIT_SECONDS = 20
 
 StartLockOwner = Callable[[str, str], "subprocess.Popen[str]"]
+
+
+@pytest.fixture(autouse=True)
+def no_real_processing(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Fail a test that would process with YouTube, WhisperX and ffmpeg for real."""
+    from wordcut import processing
+
+    def refuse() -> processing.ProcessingGateways:
+        raise AssertionError("test reached real processing; replace processing.default_gateways")
+
+    monkeypatch.setattr(processing, "default_gateways", refuse)
 
 
 @pytest.fixture
@@ -95,6 +109,33 @@ def detached_tasks(
     finally:
         for process in launched:
             # The task process leads its own session, so its group id is its PID.
+            with contextlib.suppress(ProcessLookupError):
+                os.killpg(process.pid, signal.SIGKILL)
+            process.wait()
+
+
+@pytest.fixture
+def harmless_tasks(
+    wordcut_home: Path, time_limit: None, monkeypatch: pytest.MonkeyPatch
+) -> Iterator[list[subprocess.Popen[bytes]]]:
+    """Tasks launched detached run a harmless process instead, killed and reaped at the end.
+
+    The task stays ``running`` and its lock held, and nothing of the task's kind runs.
+    """
+    from wordcut.tasks import execution
+
+    launched: list[subprocess.Popen[bytes]] = []
+
+    def launch(command: list[str], **kwargs: Any) -> subprocess.Popen[bytes]:
+        process = subprocess.Popen(HARMLESS_TASK, **kwargs)
+        launched.append(process)
+        return process
+
+    monkeypatch.setattr(execution, "Popen", launch)
+    try:
+        yield launched
+    finally:
+        for process in launched:
             with contextlib.suppress(ProcessLookupError):
                 os.killpg(process.pid, signal.SIGKILL)
             process.wait()

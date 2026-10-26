@@ -1,4 +1,4 @@
-"""SQL access to the ``sermons`` table (migration 0002)."""
+"""SQL access to the ``sermons`` table (migrations 0002 and 0004)."""
 
 from __future__ import annotations
 
@@ -9,7 +9,8 @@ from typing import Any
 
 COLUMNS = (
     "id, youtube_id, url, title, service_date, live_duration, live_finished, status,"
-    " live_start, live_end, created_at, updated_at"
+    " live_start, live_end, created_at, updated_at, sermon_start, sermon_end, video_path,"
+    " processed_at"
 )
 
 
@@ -38,6 +39,10 @@ class SermonRow:
     live_end: float | None
     created_at: datetime
     updated_at: datetime
+    sermon_start: float | None = None
+    sermon_end: float | None = None
+    video_path: str | None = None
+    processed_at: datetime | None = None
 
 
 def insert(connection: sqlite3.Connection, sermon: NewSermon) -> SermonRow:
@@ -77,6 +82,54 @@ def update_range(
             " WHERE id = ?",
             (live_start, live_end, status, updated_at.isoformat(), sermon_id),
         )
+
+
+def set_status(
+    connection: sqlite3.Connection, sermon_id: int, status: str, updated_at: datetime
+) -> None:
+    """Change the status of the sermon, in the caller's transaction."""
+    connection.execute(
+        "UPDATE sermons SET status = ?, updated_at = ? WHERE id = ?",
+        (status, updated_at.isoformat(), sermon_id),
+    )
+
+
+def update_live(
+    connection: sqlite3.Connection,
+    sermon_id: int,
+    live_duration: float | None,
+    live_finished: bool,
+    updated_at: datetime,
+) -> None:
+    with connection:
+        connection.execute(
+            "UPDATE sermons SET live_duration = ?, live_finished = ?, updated_at = ? WHERE id = ?",
+            (live_duration, live_finished, updated_at.isoformat(), sermon_id),
+        )
+
+
+def record_processed(
+    connection: sqlite3.Connection,
+    sermon_id: int,
+    sermon_start: float,
+    sermon_end: float,
+    video_path: str,
+    processed_at: datetime,
+) -> None:
+    """Mark the sermon ``processed``, in the caller's transaction, with its borders fitted to
+    the words (live time) and its video (``video_path``, relative to the data folder)."""
+    connection.execute(
+        "UPDATE sermons SET status = 'processed', sermon_start = ?, sermon_end = ?,"
+        " video_path = ?, processed_at = ?, updated_at = ? WHERE id = ?",
+        (
+            sermon_start,
+            sermon_end,
+            video_path,
+            processed_at.isoformat(),
+            processed_at.isoformat(),
+            sermon_id,
+        ),
+    )
 
 
 def by_id(connection: sqlite3.Connection, sermon_id: int) -> SermonRow | None:
@@ -122,6 +175,10 @@ def _row(values: tuple[Any, ...]) -> SermonRow:
         live_end,
         created_at,
         updated_at,
+        sermon_start,
+        sermon_end,
+        video_path,
+        processed_at,
     ) = values
     return SermonRow(
         id=sermon_id,
@@ -136,4 +193,8 @@ def _row(values: tuple[Any, ...]) -> SermonRow:
         live_end=live_end,
         created_at=datetime.fromisoformat(created_at),
         updated_at=datetime.fromisoformat(updated_at),
+        sermon_start=sermon_start,
+        sermon_end=sermon_end,
+        video_path=video_path,
+        processed_at=None if processed_at is None else datetime.fromisoformat(processed_at),
     )

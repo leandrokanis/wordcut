@@ -1,13 +1,16 @@
-"""``wordcut sermon <action>``: create, list and show sermons (docs/cli.md §7)."""
+"""``wordcut sermon <action>``: create, list, show, trim and process sermons (docs/cli.md §7)."""
 
 from __future__ import annotations
 
 import argparse
 from contextlib import closing
 from datetime import date
+from functools import partial
 from typing import TYPE_CHECKING, Any
 
 from wordcut.errors import WordcutError
+from wordcut.home import Home
+from wordcut.service.processing import start_processing
 from wordcut.service.sermons import (
     SERMON_STATES,
     create_sermon,
@@ -15,9 +18,10 @@ from wordcut.service.sermons import (
     show_sermon,
     trim_sermon,
 )
-from wordcut.timefmt import parse_timestamp
+from wordcut.timefmt import format_timestamp, parse_timestamp
 from wordcut_cli import deps
 from wordcut_cli.contract import Context, add_command, add_group
+from wordcut_cli.tasks_support import add_wait_option, launch
 
 if TYPE_CHECKING:
     from wordcut_cli.contract import Commands
@@ -39,14 +43,20 @@ def register(commands: Commands) -> None:
         "create",
         help=(
             "cria a pregação a partir do link da live e mostra título, data e duração;"
-            " com --start e --end, já a delimita"
+            " com --start e --end, já a delimita; com --process, em seguida a processa"
         ),
         run=_create,
-        render=_render_created,
+        render=_render_created_or_processing,
         example="wordcut sermon create https://youtu.be/Ab3_x-9QzLk --json",
     )
     create.add_argument("link", help="link do vídeo da live no YouTube")
     _add_borders(create, required=False)
+    create.add_argument(
+        "--process",
+        action="store_true",
+        help="em seguida processa a pregação, como sermon process; exige --start e --end",
+    )
+    add_wait_option(create)
     listing = add_command(
         actions,
         "list",
@@ -65,6 +75,14 @@ def register(commands: Commands) -> None:
         example="wordcut sermon show 12 --json",
     )
     show.add_argument("id", type=int, help="ID da pregação")
+    show.add_argument(
+        "--transcript",
+        action="store_true",
+        help=(
+            "acrescenta a transcrição: uma frase por linha, com ID, tempo da pregação e IDs da"
+            " primeira e da última palavra"
+        ),
+    )
     trim = add_command(
         actions,
         "trim",
@@ -75,6 +93,24 @@ def register(commands: Commands) -> None:
     )
     trim.add_argument("id", type=int, help="ID da pregação")
     _add_borders(trim, required=True)
+    process = add_command(
+        actions,
+        "process",
+        help=(
+            "processa a pregação delimitada: baixa só a faixa, transcreve, corta em 16:9 e"
+            " grava palavras e frases"
+        ),
+        run=_process,
+        render=_render_processing,
+        example="wordcut sermon process 12 --wait --json",
+    )
+    process.add_argument("id", type=int, help="ID da pregação")
+    process.add_argument(
+        "--force",
+        action="store_true",
+        help="processa de novo uma pregação já processada, descartando palavras, frases e cortes",
+    )
+    add_wait_option(process)
 
 
 def _add_borders(command: argparse.ArgumentParser, *, required: bool) -> None:
@@ -86,6 +122,7 @@ def _add_borders(command: argparse.ArgumentParser, *, required: bool) -> None:
 
 def _create(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:
     _require_both_borders(args)
+    _require_what_processing_needs(args)
     with closing(deps.connection()) as connection:
         sermon = create_sermon(
             connection, deps.live_source(), args.link, start=args.start, end=args.end
@@ -93,7 +130,9 @@ def _create(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:
     _warn_if_reprocess_needed(sermon, ctx)
     if not sermon["live_finished"]:
         ctx.warn("A live ainda não terminou; a pregação foi criada mesmo assim.")
-    return sermon
+    if not args.process:
+        return sermon
+    return _processing(ctx, sermon["id"], force=False, wait=args.wait)
 
 
 def _require_both_borders(args: argparse.Namespace) -> None:
@@ -103,14 +142,28 @@ def _require_both_borders(args: argparse.Namespace) -> None:
         raise WordcutError("invalid_argument", f"{given} exige {missing}.", {"argument": missing})
 
 
+def _require_what_processing_needs(args: argparse.Namespace) -> None:
+    """``--process`` needs the borders, and ``--wait`` waits only for the processing."""
+    if args.wait and not args.process:
+        raise WordcutError("invalid_argument", "--wait exige --process.", {"argument": "--process"})
+    if args.process and args.start is None:
+        raise WordcutError(
+            "invalid_argument",
+            "--process exige --start e --end.",
+            {"argument": "--start"},
+        )
+
+
 def _list(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:
     with closing(deps.connection()) as connection:
-        return list_sermons(connection, args.status)
+        return list_sermons(connection, args.status, home=Home.from_environment())
 
 
 def _show(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:
     with closing(deps.connection()) as connection:
-        return show_sermon(connection, args.id)
+        return show_sermon(
+            connection, args.id, home=Home.from_environment(), transcript=args.transcript
+        )
 
 
 def _trim(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:
@@ -118,6 +171,21 @@ def _trim(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:
         sermon = trim_sermon(connection, args.id, args.start, args.end)
     _warn_if_reprocess_needed(sermon, ctx)
     return sermon
+
+
+def _process(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:
+    return _processing(ctx, args.id, force=args.force, wait=args.wait)
+
+
+def _processing(ctx: Context, sermon_id: int, *, force: bool, wait: bool) -> dict[str, Any]:
+    """The launched task, or with ``wait`` the processed sermon as ``show`` gives it."""
+    home = Home.from_environment()
+    start = partial(start_processing, home, sermon_id, live=deps.live_source(), force=force)
+    launched = launch(ctx, wait, start)
+    if not wait:
+        return launched
+    with closing(deps.connection()) as connection:
+        return show_sermon(connection, sermon_id, home=home)
 
 
 def _warn_if_reprocess_needed(sermon: dict[str, Any], ctx: Context) -> None:
@@ -129,11 +197,24 @@ def _warn_if_reprocess_needed(sermon: dict[str, Any], ctx: Context) -> None:
         )
 
 
+def _render_created_or_processing(result: dict[str, Any]) -> str:
+    return _render_created(result) if "created" in result else _render_processing(result)
+
+
 def _render_created(result: dict[str, Any]) -> str:
     outcome = "criada" if result["created"] else "já existia"
     return (
         f"Pregação {result['id']} {outcome}: {result['title']},"
         f" culto de {_service_date(result)}, live de {_live_duration(result)}."
+    )
+
+
+def _render_processing(result: dict[str, Any]) -> str:
+    if "task_id" not in result:
+        return _render_shown(result)
+    return (
+        f"Tarefa {result['task_id']} iniciada: processamento da pregação {result['sermon_id']}."
+        f" Acompanhe com wordcut task wait {result['task_id']}."
     )
 
 
@@ -147,15 +228,23 @@ def _render_listed(result: dict[str, Any]) -> str:
 
 def _render_shown(result: dict[str, Any]) -> str:
     situation = "terminada" if result["live_finished"] else "ainda no ar"
-    return "\n".join(
-        [
-            f"Pregação {result['id']}: {result['title']}",
-            f"Culto: {_service_date(result)}",
-            f"Live: {_live_duration(result)}, {situation}",
-            f"Estado: {STATE_NAMES[result['status']]}",
-            f"Bordas: {_borders(result)}",
-            f"Cortes: {len(result['cuts']) or 'nenhum'}",
-        ]
+    lines = [
+        f"Pregação {result['id']}: {result['title']}",
+        f"Culto: {_service_date(result)}",
+        f"Live: {_live_duration(result)}, {situation}",
+        f"Estado: {STATE_NAMES[result['status']]}",
+        f"Bordas: {_borders(result)}",
+        f"Cortes: {len(result['cuts']) or 'nenhum'}",
+    ]
+    if "sentences" in result:
+        lines += ["Transcrição:", *(_sentence_line(item) for item in result["sentences"])]
+    return "\n".join(lines)
+
+
+def _sentence_line(sentence: dict[str, Any]) -> str:
+    return (
+        f"{sentence['id']}  {format_timestamp(sentence['start'])}  {sentence['text']}"
+        f"  (palavras {sentence['first_word_id']}–{sentence['last_word_id']})"
     )
 
 

@@ -30,6 +30,10 @@ class Home:
         """The output of the detached process of task ``task_id``."""
         return self.root / "tasks" / f"{task_id}.log"
 
+    def sermon_media(self, sermon_id: int) -> Path:
+        """The folder of the media files of sermon ``sermon_id``."""
+        return self.root / "media" / "sermons" / str(sermon_id)
+
     def ensure(self) -> None:
         """Create the data folder, readable only by its owner, if it does not exist."""
         self.root.mkdir(mode=PRIVATE_FOLDER_MODE, parents=True, exist_ok=True)

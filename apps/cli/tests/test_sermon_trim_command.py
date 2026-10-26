@@ -1,11 +1,13 @@
 import json
-from contextlib import closing
+from contextlib import AbstractContextManager, closing, nullcontext
 from datetime import date
 from pathlib import Path
 from typing import Any
 
 import pytest
 
+from wordcut.home import Home
+from wordcut.lock import ProcessingLock
 from wordcut.youtube import LiveInfo
 from wordcut_cli import deps, main
 
@@ -159,6 +161,13 @@ def test_trim_without_both_borders_is_an_invalid_argument_naming_the_missing_one
     )
 
 
+def held_while(status: str, sermon_id: str) -> AbstractContextManager[object]:
+    """The lock held for a ``processing`` sermon, as its task holds it."""
+    if status != "processing":
+        return nullcontext()
+    return ProcessingLock(Home.from_environment()).acquire("process", f"sermon {sermon_id}")
+
+
 @pytest.mark.parametrize(
     ("status", "target", "end", "exit_code", "code"),
     [
@@ -177,14 +186,15 @@ def test_refused_trim_exits_with_the_contract_code_and_leaves_the_sermon_as_it_w
     code: str,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    put_in_state(sermon_id, status)
-    before = run_json(["sermon", "show", sermon_id, "--json"], capsys)[1]
+    with held_while(status, sermon_id):
+        put_in_state(sermon_id, status)
+        before = run_json(["sermon", "show", sermon_id, "--json"], capsys)[1]
 
-    refused = run_json(
-        ["sermon", "trim", target, "--start", "1:02:10", "--end", end, "--json"], capsys
-    )
+        refused = run_json(
+            ["sermon", "trim", target, "--start", "1:02:10", "--end", end, "--json"], capsys
+        )
 
-    after = run_json(["sermon", "show", sermon_id, "--json"], capsys)[1]
+        after = run_json(["sermon", "show", sermon_id, "--json"], capsys)[1]
     assert (refused[0], refused[1]["error"]["code"], after) == (exit_code, code, before)
 
 

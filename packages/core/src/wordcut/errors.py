@@ -12,6 +12,7 @@ from typing import Any
 EXIT_CODES: dict[str, int] = {
     "internal_error": 1,
     "interrupted": 1,
+    "processing_error": 1,
     "invalid_argument": 2,
     "not_found": 3,
     "busy": 4,
@@ -26,6 +27,7 @@ EXIT_CODES: dict[str, int] = {
     "youtube_error": 6,
     "llm_error": 6,
     "network_error": 6,
+    "transcription_error": 6,
 }
 
 

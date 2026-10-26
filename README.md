@@ -104,11 +104,17 @@ uv run wordcut status          # máquina livre ou qual tarefa segura a trava, e
 uv run wordcut status --json   # o mesmo em JSON; --json vale antes ou depois do comando
 uv run wordcut task list [--status running]   # tarefas, da mais recente para a mais antiga
 uv run wordcut task wait <id>  # espera a tarefa: progresso no stderr, resultado no stdout
+uv run wordcut sermon process <id> [--force] [--wait]   # baixa a faixa, transcreve e corta
+uv run wordcut sermon show <id> --transcript            # a pregação e suas frases
 ```
 
 As operações pesadas rodam como tarefas: sem `--wait`, voltam na hora com o `task_id` e
 seguem num processo destacado que segura a trava (saída em `tasks/<id>.log`); com `--wait`,
 rodam em primeiro plano ([ADR-0013](docs/adr/0013-trava-herdada-pelo-processo-da-tarefa.md)).
+O processamento (`sermon process`) usa o mundo externo por uma porta e deixa a pregação
+`failed` na leitura se o processo morrer
+([ADR-0014](docs/adr/0014-processamento-por-portas-e-estado-na-leitura.md)); as mídias ficam
+em `media/sermons/<id>/` na pasta de dados.
 
 Os dados (banco SQLite, criado e migrado na primeira chamada, e a trava `processing.lock`)
 ficam em `~/.local/share/wordcut/`, ou em `WORDCUT_HOME` quando definida. Essa pasta deve

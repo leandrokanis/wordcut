@@ -52,6 +52,12 @@ class FakeLive:
         return self.answer
 
 
+def home_of(connection: sqlite3.Connection) -> Home:
+    """The data folder of the database ``connection`` is open on."""
+    [(_, _, database)] = connection.execute("PRAGMA database_list").fetchall()
+    return Home(Path(database).parent)
+
+
 @pytest.fixture
 def connection(tmp_path: Path) -> Iterator[sqlite3.Connection]:
     with closing(connect(Home(tmp_path))) as opened:
@@ -128,7 +134,7 @@ def test_sermons_are_listed_newest_service_first_with_zeroed_cut_counts(
     older = create_sermon(connection, FakeLive(live_on(date(2026, 10, 11))), link("Aaaaaaaaaa1"))
     newer = create_sermon(connection, FakeLive(live_on(date(2026, 10, 18))), link("Aaaaaaaaaa2"))
 
-    assert list_sermons(connection) == {
+    assert list_sermons(connection, home=home_of(connection)) == {
         "items": [listed(newer), listed(older)],
     }
 
@@ -139,8 +145,8 @@ def test_listing_by_status_keeps_only_the_sermons_in_that_state(
     create_sermon(connection, FakeLive(), LINK, now=NOW)
 
     assert (
-        list_sermons(connection, "trimmed"),
-        len(list_sermons(connection, "created")["items"]),
+        list_sermons(connection, "trimmed", home=home_of(connection)),
+        len(list_sermons(connection, "created", home=home_of(connection))["items"]),
     ) == (
         {"items": []},
         1,
@@ -158,7 +164,11 @@ def test_youtube_failure_is_a_youtube_error_and_creates_nothing(
     with pytest.raises(WordcutError) as raised:
         create_sermon(connection, UnreachableYouTube(), LINK, now=NOW)
 
-    assert (raised.value.code, raised.value.exit_code, list_sermons(connection)) == (
+    assert (
+        raised.value.code,
+        raised.value.exit_code,
+        list_sermons(connection, home=home_of(connection)),
+    ) == (
         "youtube_error",
         6,
         {"items": []},
@@ -193,10 +203,13 @@ def test_shown_sermon_has_empty_borders_no_task_and_no_cuts(
 ) -> None:
     created = create_sermon(connection, FakeLive(), LINK, now=NOW)
 
-    assert show_sermon(connection, created["id"]) == {
+    assert show_sermon(connection, created["id"], home=home_of(connection)) == {
         **listed(created),
         "live_start": None,
         "live_end": None,
+        "sermon_start": None,
+        "sermon_end": None,
+        "processed_at": None,
         "last_task": None,
         "cuts": [],
     }
@@ -204,7 +217,7 @@ def test_shown_sermon_has_empty_borders_no_task_and_no_cuts(
 
 def test_showing_an_unknown_sermon_is_not_found(connection: sqlite3.Connection) -> None:
     with pytest.raises(WordcutError) as raised:
-        show_sermon(connection, 999)
+        show_sermon(connection, 999, home=home_of(connection))
 
     assert (raised.value.code, raised.value.exit_code, raised.value.details) == (
         "not_found",

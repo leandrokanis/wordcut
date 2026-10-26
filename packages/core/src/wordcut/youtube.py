@@ -19,6 +19,7 @@ CHURCH_TIMEZONE = ZoneInfo("America/Sao_Paulo")
 # yt-dlp's static ffmpeg build; Ubuntu's ffmpeg 6.1 segfaults on section downloads.
 DEFAULT_FFMPEG_DIR = Path.home() / ".local/share/wordcut/ffmpeg/bin"
 MAX_HEIGHT = 1080
+AUDIO_FORMAT = "ba[ext=m4a]/ba"
 
 VIDEO_ID = re.compile(r"[A-Za-z0-9_-]{11}")
 YOUTUBE_HOSTS = frozenset({"youtube.com", "www.youtube.com", "m.youtube.com"})
@@ -124,8 +125,25 @@ class YouTube:
 
     def download_audio(self, url: str, output: Path) -> Path:
         """Whole audio track as m4a; ``output`` must end in ``.m4a``."""
-        self._run(["-f", "ba[ext=m4a]/ba", "-o", str(output), url])
+        self._run(["-f", AUDIO_FORMAT, "-o", str(output), url])
         return output
+
+    def download_audio_window(self, url: str, start: float, end: float, output: Path) -> Path:
+        """Audio only between ``start`` and ``end`` (seconds), as m4a.
+
+        Unlike :meth:`download_section`, an audio section starts exactly at ``start``.
+        """
+        self._run(self.audio_window_args(url, start, end, output))
+        return output
+
+    @staticmethod
+    def audio_window_args(url: str, start: float, end: float, output: Path) -> list[str]:
+        return [
+            "-f", AUDIO_FORMAT,
+            "--download-sections", f"*{start:.3f}-{end:.3f}",
+            "-o", str(output),
+            url,
+        ]  # fmt: skip
 
     def download_section(self, url: str, start: float, end: float, output: Path) -> Path:
         """Video+audio between ``start`` and ``end`` (seconds), up to 1080p, as mp4.

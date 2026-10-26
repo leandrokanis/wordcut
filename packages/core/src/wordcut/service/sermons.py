@@ -6,9 +6,14 @@ import sqlite3
 from datetime import datetime
 from typing import Any
 
-from wordcut.db import sermons
+from wordcut.db import sermons, tasks, transcripts
 from wordcut.db.sermons import NewSermon, SermonRow
+from wordcut.db.transcripts import SentenceRow
 from wordcut.errors import WordcutError
+from wordcut.home import Home
+from wordcut.lock import ProcessingLock
+from wordcut.service.tasks import reconcile, shown_task
+from wordcut.tasks import Resource
 from wordcut.youtube import LiveInfo, LiveSource, YouTubeError, video_id
 
 # docs/cli.md §7; the CHECK of migration 0002 lists the same states.
@@ -112,14 +117,72 @@ def _new_sermon(youtube_id: str, url: str, info: LiveInfo, now: datetime) -> New
     )
 
 
-def list_sermons(connection: sqlite3.Connection, status: str | None = None) -> dict[str, Any]:
+def list_sermons(
+    connection: sqlite3.Connection, status: str | None = None, *, home: Home
+) -> dict[str, Any]:
     """Sermons with the latest service first, only those in ``status`` when given."""
+    for row in sermons.newest_first(connection, "processing"):
+        _reconciled(home, connection, row)
     return {"items": [_listed(row) for row in sermons.newest_first(connection, status)]}
 
 
-def show_sermon(connection: sqlite3.Connection, sermon_id: int) -> dict[str, Any]:
-    """The sermon with its borders in the live, its last task and its cuts."""
-    return _shown(_existing(connection, sermon_id))
+def show_sermon(
+    connection: sqlite3.Connection, sermon_id: int, *, home: Home, transcript: bool = False
+) -> dict[str, Any]:
+    """The sermon with its borders in the live, its last task and its cuts.
+
+    With ``transcript``, also its ``sentences`` in order, in sermon time.
+    """
+    row = _reconciled(home, connection, _existing(connection, sermon_id))
+    shown = _shown(connection, row)
+    if transcript:
+        shown["sentences"] = [
+            _sentence(row) for row in transcripts.sentences_of(connection, sermon_id)
+        ]
+    return shown
+
+
+def _sentence(row: SentenceRow) -> dict[str, Any]:
+    return {
+        "id": row.id,
+        "start": row.start,
+        "end": row.end,
+        "text": row.text,
+        "first_word_id": row.first_word_id,
+        "last_word_id": row.last_word_id,
+    }
+
+
+def processed_sermon(connection: sqlite3.Connection, sermon_id: int) -> dict[str, Any]:
+    """The sermon as ``show_sermon`` gives it, without ``last_task``: what processing made."""
+    shown = _shown(connection, _existing(connection, sermon_id))
+    del shown["last_task"]
+    return shown
+
+
+def _reconciled(home: Home, connection: sqlite3.Connection, row: SermonRow) -> SermonRow:
+    """The sermon, read ``failed`` if it is ``processing`` but nothing processes it anymore.
+
+    A machine restart or a killed task process leaves the sermon ``processing`` (FR-005).
+    """
+    if row.status != "processing" or _is_being_processed(home, connection, row.id):
+        return row
+    with connection:
+        sermons.set_status(connection, row.id, "failed", datetime.now().astimezone())
+    return _existing(connection, row.id)
+
+
+def _is_being_processed(home: Home, connection: sqlite3.Connection, sermon_id: int) -> bool:
+    """True while the lock is held for the sermon or one of its tasks still runs."""
+    holder = ProcessingLock(home).holder()
+    # A holder that has not described itself yet may be this sermon's processing.
+    if holder is not None and holder.resource in (None, str(Resource("sermon", sermon_id))):
+        return True
+    found = tasks.of_resource(connection, "sermon", sermon_id)
+    reconcile(home, connection, found)
+    return any(
+        task.status == "running" for task in tasks.of_resource(connection, "sermon", sermon_id)
+    )
 
 
 def _existing(connection: sqlite3.Connection, sermon_id: int) -> SermonRow:
@@ -145,7 +208,7 @@ def trim_sermon(
     """
     row = _existing(connection, sermon_id)
     trimmed = _record_range(connection, row, start, end, now or datetime.now().astimezone())
-    return {**_shown(trimmed), "needs_reprocess": _needs_reprocess(row)}
+    return {**_shown(connection, trimmed), "needs_reprocess": _needs_reprocess(row)}
 
 
 def _record_range(
@@ -194,14 +257,22 @@ def _to_millisecond(seconds: float) -> float:
     return round(seconds, MILLISECOND_DIGITS)
 
 
-def _shown(row: SermonRow) -> dict[str, Any]:
+def _shown(connection: sqlite3.Connection, row: SermonRow) -> dict[str, Any]:
     return {
         **_listed(row),
         "live_start": row.live_start,
         "live_end": row.live_end,
-        "last_task": None,
+        "sermon_start": row.sermon_start,
+        "sermon_end": row.sermon_end,
+        "processed_at": None if row.processed_at is None else row.processed_at.isoformat(),
+        "last_task": _last_task(connection, row.id),
         "cuts": [],
     }
+
+
+def _last_task(connection: sqlite3.Connection, sermon_id: int) -> dict[str, Any] | None:
+    found = tasks.of_resource(connection, "sermon", sermon_id)
+    return shown_task(found[0]) if found else None
 
 
 def _listed(row: SermonRow) -> dict[str, Any]:
