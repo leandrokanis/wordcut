@@ -640,11 +640,20 @@ Apaga o corte e suas exportações (1.2.b).
 Uma exportação é o arquivo renderizado de um corte, registrado nele com data, duração e
 opções (1.1.i).
 
-- `render list --cut <id>`: histórico de exportações do corte.
+- `render list --cut <id>`: histórico de exportações do corte, `{"items": [...]}`, da mais
+  recente para a mais antiga (no mesmo segundo, a gravada por último primeiro); cada item no
+  formato de `render show`.
 - `render show <id>`: `{id, cut_id, path, duration, created_at, options}`. `path` é o caminho
-  local, já que a CLI roda no servidor (1.1.h.2).
+  local absoluto, já que a CLI roda no servidor (1.1.h.2); `options` é o resumo gravado na
+  exportação (§8.7). Não abre o arquivo.
 - `render download <id> [-o caminho]`: copia o arquivo para `caminho`, ou para a pasta atual
-  com um nome legível. Devolve o destino.
+  com o nome legível `AAAA-MM-DD - Título do corte.mp4` (data do culto da pregação do corte),
+  com as regras de `caminho` e de não sobrescrever do `sermon download` (§7.5). Saída:
+  `{"path": "<caminho absoluto>", "bytes": N}`; em texto, só o caminho. Arquivo da
+  exportação ausente no disco dá `internal_error` com `details.render_id`, sem caminho
+  interno.
+- Corte ou exportação inexistente dá `not_found`. Nenhum dos três toma a trava de
+  processamento.
 
 ## 10. Tarefas (`task`) e estado (`status`)
 

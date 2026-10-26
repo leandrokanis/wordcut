@@ -164,12 +164,25 @@ Formato de [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões
   traz `result.render_id`. A exportação fica na tabela `renders` (migração 0009) e o arquivo
   em `media/cuts/<cut_id>/<render_id>.mp4`; uma falha ou um Ctrl+C não deixam linha nem
   arquivo.
+- `wordcut render list --cut <id>`, `render show <id>` e `render download <id> [-o caminho]`
+  (item 1.1.i.1): o `list` traz `{"items": [...]}` com as exportações do corte, da mais
+  recente para a mais antiga (no mesmo segundo, a gravada por último primeiro), cada uma como
+  o `show` a dá: `{id, cut_id, path, duration, created_at, options}`, com `path` absoluto e as
+  opções como foram gravadas. O `show` não abre o arquivo. O `download` copia o vídeo da
+  exportação com as regras do `sermon download` (`-o` com arquivo ou pasta, sem
+  sobrescrever, ` (2)`, ` (3)`…) e o nome legível `AAAA-MM-DD - Título do corte.mp4`, com a
+  data do culto da pregação do corte; devolve `path` (absoluto) e `bytes`. Corte ou
+  exportação inexistente dá `not_found`; arquivo da exportação ausente no disco,
+  `internal_error` com `details.render_id`, sem caminho interno. Nenhum dos três toma a trava
+  de processamento.
 
 ### Alterado
 
 - `cut show` traz em `render_options` as opções efetivas da próxima exportação (padrões mais
   as salvas, com `caption` igual ao estado da legenda), não mais o JSON gravado ou `{}`, e em
   `renders` as exportações do corte, da mais antiga para a mais nova, com `path` absoluto.
+- O `path` das exportações (`cut show`, `cut render --wait`, `render list` e `render show`) é
+  absoluto mesmo com `WORDCUT_HOME` relativo.
 - `cut show` traz em `caption` o estilo efetivo da legenda (o padrão completo quando o corte
   não tem estilo), não mais `{}`.
 - O comando `cut` da CLI anterior passa a se chamar `cut-sermon`, com os mesmos argumentos e

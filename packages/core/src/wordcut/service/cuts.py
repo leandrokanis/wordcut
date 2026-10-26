@@ -282,7 +282,7 @@ def shown_render(row: RenderRow, home: Home) -> dict[str, Any]:
     return {
         "id": row.id,
         "cut_id": row.cut_id,
-        "path": str(home.root / row.path),
+        "path": str((home.root / row.path).absolute()),
         "duration": row.duration,
         "created_at": row.created_at.isoformat(),
         "options": row.options,

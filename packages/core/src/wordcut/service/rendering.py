@@ -11,14 +11,14 @@ from typing import Any
 
 from wordcut.cuts.assembly import assemble
 from wordcut.cuts.caption import stored_caption
-from wordcut.db import connect, cuts, renders, transcripts, word_fixes
+from wordcut.db import connect, cuts, transcripts, word_fixes
 from wordcut.db.cuts import CutRow
 from wordcut.db.tasks import TaskRow
-from wordcut.errors import WordcutError
 from wordcut.home import Home
 from wordcut.rendering.estimate import estimated_duration
 from wordcut.rendering.options import merged, validated
 from wordcut.service.cuts import existing_cut, shown_render, update_caption
+from wordcut.service.renders import existing_render
 from wordcut.service.sermons import sermon_video
 from wordcut.tasks import ProgressListener, Resource, execution
 
@@ -83,13 +83,8 @@ def estimate_render(
 
 
 def show_render(connection: sqlite3.Connection, home: Home, render_id: int) -> dict[str, Any]:
-    """The export ``render_id`` (docs/cli.md §9)."""
-    row = renders.by_id(connection, render_id)
-    if row is None:
-        raise WordcutError(
-            "not_found", f"Exportação {render_id} não existe.", {"render_id": render_id}
-        )
-    return shown_render(row, home)
+    """The export ``render_id`` (docs/cli.md §9), without opening its file."""
+    return shown_render(existing_render(connection, render_id), home)
 
 
 def _exportable(connection: sqlite3.Connection, home: Home, cut_id: int) -> CutRow:

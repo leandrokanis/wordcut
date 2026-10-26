@@ -255,11 +255,16 @@ def _render_export(result: dict[str, Any]) -> str:
         return "\n".join(
             [f"Duração estimada: {_seconds(result['duration'])}", *_option_lines(result)]
         )
+    return describe_export(result)
+
+
+def describe_export(export: dict[str, Any]) -> str:
+    """The export as ``render show`` gives it, in readable text (docs/cli.md §9)."""
     return "\n".join(
         [
-            f"Exportação {result['id']} do corte {result['cut_id']}: {result['path']}",
-            f"Duração: {_seconds(result['duration'])}",
-            *_option_lines(result),
+            f"Exportação {export['id']} do corte {export['cut_id']}: {export['path']}",
+            f"Duração: {_seconds(export['duration'])}",
+            *_option_lines(export),
         ]
     )
 
