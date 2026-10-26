@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from wordcut.config import config_dir, youtube_cookies
+from wordcut.config import config_dir, llm_key_file, youtube_cookies
 
 
 def test_secrets_folder_is_wordcut_config_when_it_is_set(
@@ -28,3 +28,11 @@ def test_youtube_cookies_file_is_in_the_secrets_folder(
     monkeypatch.setenv("WORDCUT_CONFIG", str(tmp_path))
 
     assert youtube_cookies() == tmp_path / "youtube-cookies.txt"
+
+
+def test_llm_key_file_is_in_the_secrets_folder(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("WORDCUT_CONFIG", str(tmp_path))
+
+    assert llm_key_file() == tmp_path / "openrouter-key"

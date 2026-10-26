@@ -70,6 +70,6 @@ class LocalGateways:
         return cut_with_fades(source, start, end, output)
 
 
-def default_gateways() -> ProcessingGateways:
-    """The gateways of a real processing; the WhisperX model is ``large-v3`` (plan of 1.1.c.1)."""
-    return LocalGateways(YouTube(), LocalTranscriber())
+def default_gateways(whisper_model: str) -> ProcessingGateways:
+    """The gateways of a real processing, transcribing with the WhisperX ``whisper_model``."""
+    return LocalGateways(YouTube(), LocalTranscriber(whisper_model))

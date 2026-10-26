@@ -37,10 +37,18 @@ def no_real_processing(monkeypatch: pytest.MonkeyPatch) -> None:
     """Fail a test that would process with YouTube, WhisperX and ffmpeg for real."""
     from wordcut import processing
 
-    def refuse() -> processing.ProcessingGateways:
+    def refuse(whisper_model: str) -> processing.ProcessingGateways:
         raise AssertionError("test reached real processing; replace processing.default_gateways")
 
     monkeypatch.setattr(processing, "default_gateways", refuse)
+
+
+@pytest.fixture(autouse=True)
+def wordcut_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """The secrets folder of the test; a test never reaches the real ``~/.config/wordcut``."""
+    folder = tmp_path / "config"
+    monkeypatch.setenv("WORDCUT_CONFIG", str(folder))
+    return folder
 
 
 @pytest.fixture

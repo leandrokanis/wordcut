@@ -41,20 +41,21 @@ if TYPE_CHECKING:
 
 # CPython's argparse reports usage errors only as English text; these patterns follow the
 # messages of Lib/argparse.py and name the offending argument in the group "argument".
+# None of them keeps the value the user typed: it may be a secret (ADR-0015).
+_INVALID_CHOICE = re.compile(
+    # The list is argparse's last parenthesized group: "[^()]*" and "$" keep a typed value
+    # that imitates "(choose from ...)" out of it.
+    r"argument (?P<argument>[^:]+): invalid choice: .*\(choose from (?P<choices>[^()]*)\)$",
+    re.DOTALL,
+)
 _USAGE_ERRORS: tuple[tuple[re.Pattern[str], str], ...] = (
     (
         re.compile(r"the following arguments are required: (?P<argument>[^,]+)"),
         "Argumento obrigatório ausente: {argument}.",
     ),
     (
-        re.compile(r"unrecognized arguments: (?P<argument>\S+)"),
-        "Argumento não reconhecido: {argument}.",
-    ),
-    (
-        re.compile(
-            r"argument (?P<argument>[^:]+): invalid (?:choice|\S+ value): (?P<value>'[^']*')"
-        ),
-        "Valor inválido para {argument}: {value}.",
+        re.compile(r"argument (?P<argument>[^:]+): invalid (?:choice|\S+ value): "),
+        "Valor inválido para {argument}.",
     ),
     (re.compile(r"argument (?P<argument>[^:]+): "), "Uso inválido de {argument}."),
 )
@@ -62,6 +63,9 @@ _USAGE_ERRORS: tuple[tuple[re.Pattern[str], str], ...] = (
 
 def _usage_error(message: str) -> WordcutError:
     """Translate an argparse usage message into the ``invalid_argument`` error."""
+    choice = _INVALID_CHOICE.match(message)
+    if choice:
+        return _invalid_choice_error(choice["argument"], choice["choices"])
     for pattern, template in _USAGE_ERRORS:
         match = pattern.match(message)
         if match:
@@ -71,6 +75,26 @@ def _usage_error(message: str) -> WordcutError:
                 {"argument": match["argument"]},
             )
     return WordcutError("invalid_argument", "Uso inválido; veja wordcut --help.")
+
+
+def _invalid_choice_error(argument: str, listed: str) -> WordcutError:
+    choices = [choice.strip("'") for choice in listed.split(", ")]
+    return WordcutError(
+        "invalid_argument",
+        f"Valor inválido para {argument}; use um de: {', '.join(choices)}.",
+        {"argument": argument, "choices": choices},
+    )
+
+
+def _stray_arguments_error(args: argparse.Namespace) -> WordcutError:
+    """Refuse arguments no parser took without repeating any of them, not even as an option.
+
+    A stray argument is text the user typed and may be a secret shaped like an option
+    (``--sk-or-v1-...``); only the command's own name, taken from the parser, is named back.
+    """
+    names = [getattr(args, dest, None) for dest in ("command", "action")]
+    command = " ".join(["wordcut", *(name for name in names if isinstance(name, str))])
+    return WordcutError("invalid_argument", f"Argumento não reconhecido; veja {command} --help.")
 
 
 @dataclass(frozen=True)
@@ -146,12 +170,14 @@ def _add_global_options(parser: argparse.ArgumentParser, default: Any) -> None:
 def execute(parser: argparse.ArgumentParser, argv: list[str]) -> int:
     """Parse ``argv``, run the chosen command and return the process exit code."""
     try:
-        args = parser.parse_args(argv)
+        args, stray = parser.parse_known_args(argv)
+        command: Command | None = getattr(args, "contract", None)
+        if stray:
+            raise _stray_arguments_error(args)
     except SystemExit as stop:
         return int(stop.code or 0)
     except WordcutError as error:
         return _report(error, as_json=JSON_OPTION in argv)
-    command: Command | None = getattr(args, "contract", None)
     if command is None:
         # Commands of the previous CLI (wordcut_cli.legacy) keep their own output and runtime
         # errors until the cli-migration roadmap item; their usage errors follow the contract.

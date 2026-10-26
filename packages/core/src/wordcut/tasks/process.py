@@ -2,7 +2,8 @@
 
 Parameters: ``force`` true to redo a processed sermon. The sermon is ``processing`` while
 the task runs and ends ``processed`` or ``failed``. ``service.processing.start_processing``
-checks, under the lock, that the sermon can be processed before the task is recorded.
+checks, under the lock, that the sermon can be processed before the task is recorded. The
+transcription uses the WhisperX model of the settings (``service.settings.whisper_model``).
 """
 
 from __future__ import annotations
@@ -20,6 +21,7 @@ from wordcut.db.sermons import SermonRow
 from wordcut.processing import pipeline
 from wordcut.processing.pipeline import Processed
 from wordcut.service.sermons import processed_sermon
+from wordcut.service.settings import whisper_model
 from wordcut.tasks import Result, TaskContext, TaskKind, register
 
 SAVING = (0.95, "gravando")
@@ -33,24 +35,25 @@ def _run(ctx: TaskContext) -> Result:
     with closing(connect(ctx.home)) as connection:
         sermon = sermons.by_id(connection, sermon_id)
         assert sermon is not None, "start_processing admits only an existing sermon"
+        model = whisper_model(connection)
         with connection:
             if force:
                 transcripts.delete_of(connection, sermon_id)
             sermons.set_status(connection, sermon_id, "processing", _now())
     try:
-        return _processed(ctx, sermon)
+        return _processed(ctx, sermon, model)
     except BaseException:
         with closing(connect(ctx.home)) as connection, connection:
             sermons.set_status(connection, sermon_id, "failed", _now())
         raise
 
 
-def _processed(ctx: TaskContext, sermon: SermonRow) -> Result:
+def _processed(ctx: TaskContext, sermon: SermonRow, transcription_model: str) -> Result:
     assert sermon.live_start is not None and sermon.live_end is not None
     media = ctx.home.sermon_media(sermon.id)
     work = _fresh_folder(media / WORK_FOLDER)
     made = pipeline.process(
-        processing.default_gateways(),
+        processing.default_gateways(transcription_model),
         work,
         sermon.url,
         sermon.live_start,

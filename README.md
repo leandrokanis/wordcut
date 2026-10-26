@@ -96,8 +96,9 @@ antes de cortar e de renderizar.
 ### Estado da máquina (CLI nova)
 
 A CLI nova ([docs/cli.md](docs/cli.md), [ADR-0012](docs/adr/0012-contrato-da-cli.md)) convive
-com os comandos abaixo até a migração. Para o estado da máquina e as tarefas, ela tem `status`
-e `task`:
+com os comandos abaixo até a migração. Erro de uso nunca repete o valor digitado
+([ADR-0015](docs/adr/0015-erro-de-uso-nao-repete-valor-digitado.md)). Para o estado da
+máquina e as tarefas, ela tem `status` e `task`:
 
 ```sh
 uv run wordcut status          # máquina livre ou qual tarefa segura a trava, e as em andamento
