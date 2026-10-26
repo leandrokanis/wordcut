@@ -7,12 +7,15 @@ from contextlib import closing
 from datetime import date
 from typing import TYPE_CHECKING, Any
 
+from wordcut.errors import WordcutError
 from wordcut.service.sermons import (
     SERMON_STATES,
     create_sermon,
     list_sermons,
     show_sermon,
+    trim_sermon,
 )
+from wordcut.timefmt import parse_timestamp
 from wordcut_cli import deps
 from wordcut_cli.contract import Context, add_command, add_group
 
@@ -26,6 +29,7 @@ STATE_NAMES = {
     "processed": "processada",
     "failed": "falhou",
 }
+TIME_HELP = "em tempo da live: HH:MM:SS[.mmm], MM:SS[.mmm] ou segundos"
 
 
 def register(commands: Commands) -> None:
@@ -33,12 +37,16 @@ def register(commands: Commands) -> None:
     create = add_command(
         actions,
         "create",
-        help="cria a pregação a partir do link da live e mostra título, data e duração",
+        help=(
+            "cria a pregação a partir do link da live e mostra título, data e duração;"
+            " com --start e --end, já a delimita"
+        ),
         run=_create,
         render=_render_created,
         example="wordcut sermon create https://youtu.be/Ab3_x-9QzLk --json",
     )
     create.add_argument("link", help="link do vídeo da live no YouTube")
+    _add_borders(create, required=False)
     listing = add_command(
         actions,
         "list",
@@ -57,14 +65,42 @@ def register(commands: Commands) -> None:
         example="wordcut sermon show 12 --json",
     )
     show.add_argument("id", type=int, help="ID da pregação")
+    trim = add_command(
+        actions,
+        "trim",
+        help="define as bordas da pregação, em tempo da live",
+        run=_trim,
+        render=_render_shown,
+        example="wordcut sermon trim 12 --start 1:02:10 --end 1:48:30 --json",
+    )
+    trim.add_argument("id", type=int, help="ID da pregação")
+    _add_borders(trim, required=True)
+
+
+def _add_borders(command: argparse.ArgumentParser, *, required: bool) -> None:
+    command.add_argument(
+        "--start", type=parse_timestamp, required=required, help=f"início, {TIME_HELP}"
+    )
+    command.add_argument("--end", type=parse_timestamp, required=required, help=f"fim, {TIME_HELP}")
 
 
 def _create(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:
+    _require_both_borders(args)
     with closing(deps.connection()) as connection:
-        sermon = create_sermon(connection, deps.live_source(), args.link)
+        sermon = create_sermon(
+            connection, deps.live_source(), args.link, start=args.start, end=args.end
+        )
+    _warn_if_reprocess_needed(sermon, ctx)
     if not sermon["live_finished"]:
         ctx.warn("A live ainda não terminou; a pregação foi criada mesmo assim.")
     return sermon
+
+
+def _require_both_borders(args: argparse.Namespace) -> None:
+    """Name the missing option as the other usage errors do (docs/cli.md §5.2)."""
+    if (args.start is None) != (args.end is None):
+        given, missing = ("--end", "--start") if args.start is None else ("--start", "--end")
+        raise WordcutError("invalid_argument", f"{given} exige {missing}.", {"argument": missing})
 
 
 def _list(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:
@@ -75,6 +111,22 @@ def _list(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:
 def _show(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:
     with closing(deps.connection()) as connection:
         return show_sermon(connection, args.id)
+
+
+def _trim(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:
+    with closing(deps.connection()) as connection:
+        sermon = trim_sermon(connection, args.id, args.start, args.end)
+    _warn_if_reprocess_needed(sermon, ctx)
+    return sermon
+
+
+def _warn_if_reprocess_needed(sermon: dict[str, Any], ctx: Context) -> None:
+    """Take the service's ``needs_reprocess`` out of the answer, which keeps show's format."""
+    if sermon.pop("needs_reprocess", False):
+        ctx.warn(
+            "A pregação já foi processada; as bordas novas valem depois de"
+            " wordcut sermon process --force."
+        )
 
 
 def _render_created(result: dict[str, Any]) -> str:

@@ -62,6 +62,23 @@ def insert(connection: sqlite3.Connection, sermon: NewSermon) -> SermonRow:
     return row
 
 
+def update_range(
+    connection: sqlite3.Connection,
+    sermon_id: int,
+    live_start: float,
+    live_end: float,
+    status: str,
+    updated_at: datetime,
+) -> None:
+    """Record the borders of the sermon in the live and the status they lead to."""
+    with connection:
+        connection.execute(
+            "UPDATE sermons SET live_start = ?, live_end = ?, status = ?, updated_at = ?"
+            " WHERE id = ?",
+            (live_start, live_end, status, updated_at.isoformat(), sermon_id),
+        )
+
+
 def by_id(connection: sqlite3.Connection, sermon_id: int) -> SermonRow | None:
     return _one(connection, "id = ?", sermon_id)
 
