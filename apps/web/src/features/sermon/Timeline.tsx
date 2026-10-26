@@ -143,13 +143,14 @@ function LiveTimeline({
   );
 }
 
-function rulerMarks(liveDuration: number): { seconds: number; labelled: boolean }[] {
+/** The ruler's marks over ``duration`` seconds: about 8 labelled ones. */
+export function rulerMarks(duration: number): { seconds: number; labelled: boolean }[] {
   const step =
-    RULER_STEPS.find((candidate) => candidate >= liveDuration / LABELLED_MARKS) ??
+    RULER_STEPS.find((candidate) => candidate >= duration / LABELLED_MARKS) ??
     RULER_STEPS[RULER_STEPS.length - 1];
   const minor = step / MARKS_PER_STEP;
   const marks = [];
-  for (let index = 0; index * minor <= liveDuration; index++) {
+  for (let index = 0; index * minor <= duration; index++) {
     marks.push({ seconds: index * minor, labelled: index % MARKS_PER_STEP === 0 });
   }
   return marks;

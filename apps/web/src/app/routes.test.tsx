@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach } from "vitest";
 
 import { fakeShellApi } from "../test/shellApi";
-import { listedSermon } from "../test/fixtures";
+import { cutPreview, listedSermon, processedSermon, shownCut } from "../test/fixtures";
 import { renderRoute } from "../test/renderRoute";
 
 afterEach(() => {
@@ -39,8 +39,9 @@ test("shows the sermon's title from the API after Pregações inside a sermon", 
 
 function cutOfSermon() {
   return {
-    "GET /api/cuts/34": { body: { id: 34, sermon_id: 12, title: "Fé no deserto", status: "chosen" } },
-    "GET /api/sermons/12": { body: listedSermon({ id: 12, title: "Culto de domingo" }) },
+    "GET /api/cuts/34": { body: shownCut({ title: "Fé no deserto" }) },
+    "GET /api/cuts/34/preview": { body: cutPreview() },
+    "GET /api/sermons/12": { body: processedSermon({ title: "Culto de domingo" }) },
   };
 }
 
@@ -85,6 +86,24 @@ test("does not make the current level a link", async () => {
   await within(path()).findByText("Fé no deserto");
 
   expect(within(path()).queryByRole("link", { name: "Fé no deserto" })).toBeNull();
+});
+
+test("opens the cut's level, with its 9:16 preview, inside a cut", async () => {
+  fakeShellApi(cutOfSermon());
+
+  renderRoute("/cuts/34");
+
+  expect(await screen.findByLabelText("Prévia do corte")).toBeInTheDocument();
+});
+
+test("tells a missing cut apart without losing the path", async () => {
+  fakeShellApi({});
+
+  renderRoute("/cuts/99");
+  await screen.findByRole("navigation", { name: "Caminho" });
+
+  expect(await screen.findByText("Corte não encontrado.")).toBeInTheDocument();
+  expect(within(path()).getByRole("link", { name: "Pregações" })).toBeInTheDocument();
 });
 
 test("tells a missing sermon apart without losing the path", async () => {

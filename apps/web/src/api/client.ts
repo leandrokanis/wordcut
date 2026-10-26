@@ -1,6 +1,9 @@
 import type {
+  CaptionStyle,
   Cut,
+  CutPreview,
   ErrorBody,
+  FixedWord,
   ListedCut,
   MachineStatus,
   Me,
@@ -46,7 +49,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   throw new ApiError(response.status, { code: "unavailable", message: UNAVAILABLE_MESSAGE });
 }
 
-function send<T>(method: "POST" | "PATCH", path: string, body: object): Promise<T> {
+function send<T>(method: "POST" | "PATCH" | "PUT", path: string, body: object): Promise<T> {
   return request(path, {
     method,
     headers: { "Content-Type": "application/json" },
@@ -115,6 +118,26 @@ export function restoreCut(id: number): Promise<Cut> {
 
 export function getCut(id: number): Promise<Cut> {
   return request(`/api/cuts/${id}`);
+}
+
+/** The sequence the level 3 preview plays; never waits for the processing lock. */
+export function previewCut(id: number): Promise<CutPreview> {
+  return request(`/api/cuts/${id}/preview`);
+}
+
+/** Changes only the given fields of the cut's caption style; answers the whole style. */
+export function patchCaption(id: number, fields: Partial<CaptionStyle>): Promise<CaptionStyle> {
+  return send("PATCH", `/api/cuts/${id}/caption`, fields);
+}
+
+/** Brings the cut's caption back to the church's style, switched on. */
+export function resetCaption(id: number): Promise<CaptionStyle> {
+  return request(`/api/cuts/${id}/caption`, { method: "DELETE" });
+}
+
+/** Fixes the spelling of one word of the cut; the original text removes the fix. */
+export function fixWord(id: number, wordId: number, text: string): Promise<FixedWord> {
+  return send("PUT", `/api/cuts/${id}/words/${wordId}`, { text });
 }
 
 export function createSermon(url: string): Promise<SermonCreated> {
