@@ -50,7 +50,11 @@ def run_json(argv: list[str], capsys: pytest.CaptureFixture[str]) -> tuple[int, 
     return exit_code, json.loads(capsys.readouterr().out)
 
 
-def test_show_of_a_new_installation_has_only_the_whisperx_model_set(
+# Migration 0006 seeds the factory preset as the first row of a new database.
+FACTORY_PRESET_ID = 1
+
+
+def test_show_of_a_new_installation_has_only_the_whisperx_model_and_the_factory_preset_set(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     assert run_json(["settings", "show", "--json"], capsys) == (
@@ -60,7 +64,7 @@ def test_show_of_a_new_installation_has_only_the_whisperx_model_set(
             "whisper_model": "large-v3",
             "llm_key": None,
             "youtube_cookies": False,
-            "default_preset_id": None,
+            "default_preset_id": FACTORY_PRESET_ID,
         },
     )
 
@@ -131,7 +135,7 @@ def test_show_without_json_describes_a_new_installation_in_portuguese(
         "Modelo do WhisperX: large-v3\n"
         "Chave do LLM: não gravada\n"
         "Cookies do YouTube: não gravados\n"
-        "Preset padrão: nenhum\n",
+        f"Preset padrão: {FACTORY_PRESET_ID}\n",
     )
 
 

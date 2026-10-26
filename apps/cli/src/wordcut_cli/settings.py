@@ -100,13 +100,12 @@ def _set_cookies(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:
 
 
 def _render(result: dict[str, Any]) -> str:
-    preset = result["default_preset_id"]
     return "\n".join(
         [
             f"Modelo do LLM: {result['llm_model'] or 'não escolhido'}",
             f"Modelo do WhisperX: {result['whisper_model']}",
             f"Chave do LLM: {result['llm_key'] or 'não gravada'}",
             f"Cookies do YouTube: {'gravados' if result['youtube_cookies'] else 'não gravados'}",
-            f"Preset padrão: {'nenhum' if preset is None else preset}",
+            f"Preset padrão: {result['default_preset_id']}",
         ]
     )

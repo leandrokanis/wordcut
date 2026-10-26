@@ -8,6 +8,7 @@ import pytest
 from wordcut.db import connect
 from wordcut.errors import WordcutError
 from wordcut.home import Home
+from wordcut.service.presets import create_preset, default_preset, set_default
 from wordcut.service.settings import (
     show_settings,
     store_llm_key,
@@ -26,7 +27,7 @@ def connection(wordcut_home: Path) -> Iterator[sqlite3.Connection]:
         yield opened
 
 
-def test_a_new_installation_has_only_the_whisperx_model_set(
+def test_a_new_installation_has_only_the_whisperx_model_and_the_factory_preset_set(
     connection: sqlite3.Connection,
 ) -> None:
     assert show_settings(connection) == {
@@ -34,8 +35,16 @@ def test_a_new_installation_has_only_the_whisperx_model_set(
         "whisper_model": "large-v3",
         "llm_key": None,
         "youtube_cookies": False,
-        "default_preset_id": None,
+        "default_preset_id": default_preset(connection)["id"],
     }
+
+
+def test_the_default_preset_shown_follows_set_default(connection: sqlite3.Connection) -> None:
+    created = create_preset(connection, "Estudo bíblico")
+
+    set_default(connection, created["id"])
+
+    assert show_settings(connection)["default_preset_id"] == created["id"]
 
 
 def test_a_changed_model_is_kept_after_reopening_and_the_other_stays(wordcut_home: Path) -> None:

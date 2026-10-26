@@ -63,11 +63,27 @@ Formato de [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões
   permissão 600. O `show` traz a chave só mascarada (`••••` e os 4 últimos caracteres) e os
   cookies só como presentes ou ausentes; argumento a mais nesses comandos é recusado sem
   ecoar o valor. Código de erro `config_not_writable` (saída 5) para a pasta sem escrita.
+- `wordcut criteria list` (administrador): os 8 filtros e os 3 valores da sugestão, com ID,
+  nome, tipo e nível padrão, sem o texto do prompt. Os textos ficam em
+  `packages/core/src/wordcut/criteria/texts/` (prompt base, um arquivo por critério com os
+  três níveis e os textos das opções de edição), carregados e validados por
+  `wordcut.criteria`. O conteúdo foi tirado literalmente de
+  `skills/video-corte-vertical/sugerir-cortes.md` e das frases de nível do protótipo, e
+  **precisa de revisão humana por pessoa qualificada antes de valer** (constituição §I).
+- `wordcut preset list`, `show`, `create <nome> [--from]`, `update`, `set-default` e
+  `delete` (administrador): presets no banco (tabela `presets`, migração 0006) com o nível
+  de cada critério, as durações permitida e ideal, reordenar, palavras protegidas e
+  instruções adicionais (até 4000 caracteres, de arquivo ou do stdin). Instalação nova traz
+  o preset "Padrão"; sempre há exatamente um padrão, que não pode ser apagado
+  (`default_preset`, saída 5). Critério novo no código entra com o nível padrão e critério
+  removido é ignorado na leitura. O serviço monta o prompt de um preset para a sugestão
+  (item 9).
 
 ### Alterado
 
 - `sermon process` transcreve com o modelo do WhisperX das configurações
   (`settings set --whisper-model`), não mais com `large-v3` fixo.
+- `settings show` traz o ID do preset padrão em `default_preset_id` (antes sempre `null`).
 - Erro de uso da CLI não repete o valor digitado (ADR-0015): escolha inválida lista as
   opções válidas (`details.choices`), argumento não reconhecido nunca é repetido, nem como
   nome de opção (a mensagem aponta para o `--help` do comando), e valor de tipo inválido

@@ -13,6 +13,7 @@ from typing import Any
 from wordcut import config
 from wordcut.db import settings
 from wordcut.errors import WordcutError
+from wordcut.service.presets import default_preset
 
 DEFAULT_WHISPER_MODEL = "large-v3"
 NETSCAPE_COOKIE_FIELDS = 7
@@ -24,8 +25,7 @@ def show_settings(connection: sqlite3.Connection) -> dict[str, Any]:
         "whisper_model": whisper_model(connection),
         "llm_key": config.masked_llm_key(),
         "youtube_cookies": config.has_youtube_cookies(),
-        # Presets arrive with item 2.1.a.2; until then no preset is the default.
-        "default_preset_id": None,
+        "default_preset_id": default_preset(connection)["id"],
     }
 
 

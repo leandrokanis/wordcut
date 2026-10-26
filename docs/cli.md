@@ -536,6 +536,10 @@ wordcut settings set-key < chave.txt
 Lista os filtros e valores definidos no código: ID, nome, tipo (filtro ou valor) e nível
 padrão. O texto dos prompts MUST NOT aparecer (constituição §I; 2.1.a).
 
+```json
+{"items": [{"id": "triumphalism", "name": "Triunfalismo", "type": "filter", "default_level": "strict"}]}
+```
+
 ### 11.3. `preset`
 
 - `preset list` · `preset show <id>`.
@@ -550,10 +554,34 @@ padrão. O texto dos prompts MUST NOT aparecer (constituição §I; 2.1.a).
 | `--duration-allowed <min>-<max>` | duração permitida, em segundos |
 | `--reorder` · `--no-reorder` | permite reordenar trechos |
 | `--protected-words "<a,b>"` | palavras protegidas |
-| `--instructions-file <arquivo\|->` | instruções adicionais (texto livre) |
+| `--instructions-file <arquivo\|->` | instruções adicionais (texto livre, até 4000 caracteres sem os brancos das pontas) |
 
+- `preset update` sem nenhuma opção, nome vazio ou repetido, critério ou nível inexistente,
+  duração fora do formato `<min>-<max>` em segundos inteiros, mínimo maior que o máximo,
+  duração ideal fora da permitida (mesmo quando só uma das faixas muda) e arquivo de
+  instruções que não pode ser lido dão `invalid_argument`, sem repetir o valor digitado
+  (ADR-0015). `--level` repetido para o mesmo critério: vale o último.
 - `preset set-default <id>`.
-- `preset delete <id>`: o preset padrão não pode ser apagado (`default_preset`).
+- `preset delete <id>`: o preset padrão não pode ser apagado (`default_preset`). Devolve
+  `{"id": 2, "deleted": true}`.
+
+`show`, `create`, `update` e `set-default` devolvem o preset; `list` devolve
+`{"items": [ … ]}` com os presets. O preset nunca traz texto de prompt; `levels` traz todos
+os critérios do código, com o nível padrão para os que o preset não gravou:
+
+```json
+{
+  "id": 1, "name": "Padrão", "is_default": true,
+  "levels": {"triumphalism": "strict", "allegory": "moderate", "…": "…"},
+  "duration_allowed": {"min": 40, "max": 75},
+  "duration_ideal": {"min": 55, "max": 65},
+  "reorder": true,
+  "protected_words": ["não", "mas", "se"],
+  "instructions": "",
+  "created_at": "2026-10-26T19:40:00+00:00",
+  "updated_at": "2026-10-26T19:40:00+00:00"
+}
+```
 
 ## 12. Equipe (`member`)
 

@@ -29,6 +29,10 @@ Definidas pelo administrador em 2026-10-26:
 - Instalar o NVIDIA Container Toolkit no host, para a GPU aparecer nos contêineres
   (ADR-0003, ADR-0011). Sem ele, a transcrição só roda pela CLI no host.
 
+- Revisar, por pessoa qualificada, o texto dos critérios em
+  `packages/core/src/wordcut/criteria/texts/` (item 8) antes de usar as sugestões em produção
+  (constituição §I).
+
 ## Ordem
 
 CLI primeiro (constituição §II): ela cobre o fluxo inteiro e é a base que a web reaproveita.
@@ -53,7 +57,7 @@ Depois o servidor e, por fim, a interface, seguindo o protótipo
 | 5 | 1.1.c.1 | `sermon process`: baixar a faixa, transcrever, cortar em 16:9, palavras no SQLite | 1.1.c.2, 1.1.c.3, 1.1.b.3 | ☑ |
 | 6 | 1.1.d.1 | `sermon download` | — | ☑ |
 | 7 | 2.1.a.1 | `settings`: modelo, chave e cookies pelo stdin, modelo do WhisperX | — | ☑ |
-| 8 | 2.1.a.2 | Critérios no pacote, `criteria list` e `preset` | 2.1.a.3 | ☐ |
+| 8 | 2.1.a.2 | Critérios no pacote, `criteria list` e `preset` | 2.1.a.3 | ☑ |
 | 9 | 2.1.b.1 | Sugestão de cortes pelo LLM ao fim do processamento | 2.1.b.3 | ☐ |
 | 10 | 2.1.b.2 | `sermon suggest` | — | ☐ |
 | 11 | 1.1.e.1 | `cut list/show/choose/discard/restore` | 1.1.e.2 | ☐ |
@@ -95,3 +99,4 @@ Depois o servidor e, por fim, a interface, seguindo o protótipo
 | 5 1.1.c.1 | PASS na rodada 3 | (ver git log) | ADR-0014. Rodadas 1–2 PARCIAL: revalidação no `admit` e `failed` gravado no erro (inclusive exceção inesperada). Processamento real (YouTube + WhisperX) ainda não exercitado fora dos dublês. |
 | 6 1.1.d.1 | PASS na rodada 2 | (ver git log) | Cópia sem sobrescrever por hard link, com queda para `open("x")` em sistemas sem link (nome final existe pela metade durante a cópia nesse caso). |
 | 7 2.1.a.1 | PASS na rodada 3 | (ver git log) | ADR-0015: erro de uso nunca repete valor digitado (rodadas 1–2 acharam eco da chave). Mutações fora da barra: fallback "Uso inválido" e legado ignorando sobra (sem eco hoje). |
+| 8 2.1.a.2 | PASS na rodada 2 | (ver git log) | Texto dos critérios tirado de `sugerir-cortes.md` e do protótipo; duas linhas de opção não literais (reordenar). Revisão humana pendente. |
