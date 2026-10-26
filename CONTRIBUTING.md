@@ -48,14 +48,21 @@ nenhuma app; apps não dependem umas das outras. Regra de negócio vive só no `
 
 ### 3.2. Quality gates
 
-Antes de integrar, tudo limpo:
+Antes de integrar, tudo limpo, da raiz (depois de `uv sync --all-packages` e
+`npm --prefix apps/web ci`):
 
 ```sh
 uv run pytest
 uv run ruff check . && uv run ruff format --check .
-uv run mypy packages/core/src apps/cli/src apps/api/src
+uv run mypy
+npm --prefix apps/web test
 npm --prefix apps/web run typecheck && npm --prefix apps/web run lint
+npm --prefix apps/web run build
 ```
+
+`uv run mypy` verifica `packages/core/src`, `apps/cli/src` e `apps/api/src` (lista em
+`pyproject.toml`). Mudança em `compose.yaml` ou num `Dockerfile` também passa por
+`docker compose config -q` e `docker compose build api web cli`.
 
 ### 3.3. Commits
 

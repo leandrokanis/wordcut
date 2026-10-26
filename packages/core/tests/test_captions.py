@@ -2,6 +2,7 @@ import pytest
 
 from wordcut.transcript import Word
 from wordcut.vertical.captions import (
+    DEFAULT_FONT,
     LINGER_S,
     CaptionRenderer,
     CaptionStyle,
@@ -52,6 +53,10 @@ def test_consecutive_blocks_hand_over_without_gap() -> None:
     first, second = build_captions(spoken("Ele", "é", "bom.", "Sempre"), measure, STYLE)
 
     assert first.end == second.start
+
+
+def test_default_font_ships_with_the_package() -> None:
+    assert DEFAULT_FONT.is_file()
 
 
 def test_renderer_centres_caption_on_frame() -> None:

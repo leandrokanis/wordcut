@@ -87,3 +87,4 @@ Depois o servidor e, por fim, a interface, seguindo o protótipo
 
 | Item | Resultado | Commit | Observações |
 |---|---|---|---|
+| 0 monorepo | PASS na rodada 1 | (este commit) | Mutações fora da barra que sobreviveram (ver qa.md): barra final no `rsync` do worker remoto; `setStatus("ok")` fixo na web. Cobrir quando a web real chegar (fase 3). |

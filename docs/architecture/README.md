@@ -86,11 +86,13 @@ flowchart LR
 
 | Peça | Estado |
 |---|---|
-| Domínio (`youtube`, `asr`, `edit`, `vertical`) | existe, herdado da CLI anterior |
+| Monorepo (workspace `uv` com lock único; `apps/web` com npm) | existe |
+| Docker Compose (`api`, `web`, `cli` no perfil `tools`; portas só em `127.0.0.1`) | existe; sem GPU e sem WhisperX na imagem (roadmap, item 5) |
+| Domínio (`youtube`, `asr`, `edit`, `vertical`) | existe em `packages/core`, herdado da CLI anterior |
 | Camada de serviço, banco, trava, tarefas | em construção (roadmap, fase 1) |
-| CLI nova (`docs/cli.md`) | em construção (roadmap, fase 1) |
-| API | planejada (roadmap, fase 2) |
-| Web | protótipo em `docs/prototype/wordcut.html`; app planejada (roadmap, fase 3) |
+| CLI | a anterior, movida para `apps/cli`; a nova (`docs/cli.md`) em construção (roadmap, fase 1) |
+| API | esqueleto em `apps/api` com `GET /api/health`; rotas planejadas (roadmap, fase 2) |
+| Web | esqueleto em `apps/web` que mostra o estado da API; protótipo em `docs/prototype/wordcut.html`; interface planejada (roadmap, fase 3) |
 
 ## 5. Fluxos
 

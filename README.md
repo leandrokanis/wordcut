@@ -20,7 +20,8 @@ Ferramentas para transformar a transmissão de um culto em:
 - [Roadmap do MVP](specs/roadmap.md).
 
 A aplicação web está em construção como monorepo orquestrado por Docker Compose
-(ADR-0002, ADR-0003). As seções abaixo descrevem o fluxo atual, pela CLI anterior.
+(ADR-0002, ADR-0003); a API e a web ainda são esqueletos. As seções de uso descrevem o fluxo
+atual, pela CLI anterior.
 
 ## Arquitetura atual
 
@@ -39,12 +40,28 @@ host com GPU ("leitao")
 A transcrição (WhisperX large-v3 + alinhamento wav2vec2 pt) também pode ser delegada por SSH
 a partir de outra máquina: só o áudio 16 kHz mono trafega, e só pela rede local.
 
+## Estrutura
+
+Monorepo com um projeto por aplicação ([ADR-0002](docs/adr/0002-monorepo.md)), orquestrado por
+Docker Compose ([ADR-0003](docs/adr/0003-docker-compose.md)):
+
+```
+packages/core/       domínio (pacote Python `wordcut`)
+apps/cli/            CLI `wordcut` (pacote `wordcut_cli`)
+apps/api/            API HTTP, FastAPI (pacote `wordcut_api`)
+apps/web/            interface, React + Vite + TypeScript
+docker/python/       imagem das apps Python (alvos `api` e `cli`)
+compose.yaml         serviços `api`, `web` e `cli`
+```
+
+Os três projetos Python formam um workspace `uv` com um único `uv.lock` na raiz.
+
 ## Instalação
 
-Máquina principal:
+Máquina principal, da raiz do repositório:
 
 ```sh
-uv sync
+uv sync --all-packages
 ```
 
 Host com GPU (CUDA), uma vez:
@@ -113,13 +130,57 @@ uv run wordcut transcribe pregacao.mp4 -o palavras.json --host leitao  # por SSH
 
 ## Desenvolvimento
 
+Python, da raiz (testes de `packages/core`, `apps/cli` e `apps/api`):
+
 ```sh
+uv sync --all-packages
 uv run pytest
 uv run ruff check . && uv run ruff format --check .
-uv run mypy src
+uv run mypy
 ```
+
+Web:
+
+```sh
+npm --prefix apps/web ci
+npm --prefix apps/web test
+npm --prefix apps/web run typecheck && npm --prefix apps/web run lint
+npm --prefix apps/web run build
+```
+
+Em desenvolvimento, `npm --prefix apps/web run dev` serve a web e repassa `/api` para a API
+local em `127.0.0.1:8781`:
+
+```sh
+uv run uvicorn wordcut_api.app:create_app --factory --host 127.0.0.1 --port 8781
+```
+
+## Docker Compose
+
+O projeto Compose se chama `wordcut`. A `web` responde em `http://127.0.0.1:8780/` e repassa
+`/api` para a `api`, que também fica em `127.0.0.1:8781`; nenhuma porta escuta fora do
+`localhost`.
+
+```sh
+docker compose up -d --build api web
+curl http://127.0.0.1:8780/api/health          # {"status":"ok"}
+docker compose run --rm cli --help             # a CLI, sem subir com `up`
+docker compose down
+```
+
+Os contêineres Python rodam com o usuário do host (`UID`/`GID`, padrão `1000`) e montam:
+
+- `${WORDCUT_DATA:-~/.local/share/wordcut}` em `/data` (`WORDCUT_HOME`), o estado compartilhado
+  com a CLI do host;
+- `~/.config/wordcut` em `/config` (`WORDCUT_CONFIG`), só leitura. Segredos nunca entram na
+  imagem nem no contexto de build (`.dockerignore`).
+
+Crie os dois diretórios antes do primeiro `up`; se não existirem, o Docker os cria como
+`root`. Portas e usuário mudam por variável de ambiente: `WORDCUT_WEB_PORT`,
+`WORDCUT_API_PORT`, `UID`, `GID`. A imagem sai sem WhisperX; o argumento de build `WITH_ASR`
+(`WORDCUT_WITH_ASR=1`) fica para o item de processamento do roadmap, junto com a GPU.
 
 ## Licença
 
-MIT. A fonte Open Sans incluída em `src/wordcut/assets/fonts/` é distribuída sob a
+MIT. A fonte Open Sans incluída em `packages/core/src/wordcut/assets/fonts/` é distribuída sob a
 SIL Open Font License 1.1 (`OFL.txt`).

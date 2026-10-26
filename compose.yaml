@@ -1,0 +1,43 @@
+name: wordcut
+
+x-python-build: &python-build
+  context: .
+  dockerfile: docker/python/Dockerfile
+  args:
+    WITH_ASR: ${WORDCUT_WITH_ASR:-0}
+
+# Shared data and read-only secrets, see ADR-0003 and docs/constitution.md §VI.
+x-python-runtime: &python-runtime
+  user: "${UID:-1000}:${GID:-1000}"
+  environment:
+    WORDCUT_HOME: /data
+    WORDCUT_CONFIG: /config
+  volumes:
+    - ${WORDCUT_DATA:-${HOME}/.local/share/wordcut}:/data
+    - ${HOME}/.config/wordcut:/config:ro
+
+services:
+  api:
+    <<: *python-runtime
+    build:
+      <<: *python-build
+      target: api
+    ports:
+      - "127.0.0.1:${WORDCUT_API_PORT:-8781}:8000"
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    ports:
+      - "127.0.0.1:${WORDCUT_WEB_PORT:-8780}:80"
+    depends_on:
+      - api
+
+  cli:
+    <<: *python-runtime
+    build:
+      <<: *python-build
+      target: cli
+    profiles: [tools]
+    entrypoint: ["wordcut"]
