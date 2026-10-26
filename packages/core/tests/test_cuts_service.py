@@ -146,7 +146,9 @@ def test_shown_cut_has_the_sermon_cut_fields_plus_assembly_and_default_style_and
             {"word_id": word[0], "text": "Irmãos,", "start": 0.3, "end": 0.8, "corrected": None},
         ],
         "caption": DEFAULT_CAPTION.as_dict(),
-        "render_options": {},
+        "render_options": {"fillers": "remove", "stammers": "remove", "pauses": "natural",
+                           "smooth_joins": True, "fade": True, "normalize": True,
+                           "caption": True, "resolution": "1080x1920", "quality": "high"},
         "renders": [],
     }  # fmt: skip
 
@@ -166,8 +168,10 @@ def test_shown_cut_keeps_the_caption_style_and_export_options_stored_with_it(
 
     assert (shown["caption"], shown["render_options"]) == (
         DEFAULT_CAPTION.as_dict(),
-        {"quality": "high"},
-    )
+        {"fillers": "remove", "stammers": "remove", "pauses": "natural", "smooth_joins": True,
+         "fade": True, "normalize": True, "caption": True, "resolution": "1080x1920",
+         "quality": "high"},
+    )  # fmt: skip
 
 
 def test_showing_a_cut_that_does_not_exist_is_not_found(connection: sqlite3.Connection) -> None:

@@ -34,6 +34,10 @@ class Home:
         """The folder of the media files of sermon ``sermon_id``."""
         return self.root / "media" / "sermons" / str(sermon_id)
 
+    def cut_media(self, cut_id: int) -> Path:
+        """The folder of the exports of cut ``cut_id``."""
+        return self.root / "media" / "cuts" / str(cut_id)
+
     def ensure(self) -> None:
         """Create the data folder, readable only by its owner, if it does not exist."""
         self.root.mkdir(mode=PRIVATE_FOLDER_MODE, parents=True, exist_ok=True)

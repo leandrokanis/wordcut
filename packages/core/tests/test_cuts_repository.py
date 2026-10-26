@@ -106,6 +106,22 @@ def test_stored_cuts_are_read_back_with_every_field_in_insertion_order(
     ]
 
 
+def test_the_export_options_stored_on_a_cut_are_read_back_and_nothing_else_changes(
+    connection: sqlite3.Connection,
+) -> None:
+    sermon = sermons.insert(connection, new_sermon())
+    store(connection, sermon.id, new_cut())
+    [before] = cuts.of_sermon(connection, sermon.id)
+    later = datetime(2026, 10, 27, 9, 0, tzinfo=timezone.utc)
+
+    with connection:
+        cuts.set_render_options(connection, before.id, {"pauses": "short"}, later)
+
+    assert cuts.by_id(connection, before.id) == replace(
+        before, render_options={"pauses": "short"}, updated_at=later
+    )
+
+
 def test_counts_tell_how_many_cuts_of_the_sermon_are_in_each_state(
     connection: sqlite3.Connection,
 ) -> None:

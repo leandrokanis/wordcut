@@ -1,6 +1,6 @@
 """``wordcut cut <action>``: see and preview the suggested cuts of a sermon, choose, discard
-or restore them, fix the spelling of their caption words and set their caption style
-(docs/cli.md §8.1–§8.6)."""
+or restore them, fix the spelling of their caption words, set their caption style and export
+them (docs/cli.md §8.1–§8.7)."""
 
 from __future__ import annotations
 
@@ -14,6 +14,8 @@ from typing import TYPE_CHECKING, Any
 
 from wordcut.cuts.caption import POSITIONS, RANGES, SHADOWS, CaptionSettings
 from wordcut.errors import WordcutError
+from wordcut.home import Home
+from wordcut.rendering.options import CHOICES
 from wordcut.service.cuts import (
     caption_of,
     choose_cut,
@@ -26,10 +28,12 @@ from wordcut.service.cuts import (
     show_cut,
     update_caption,
 )
+from wordcut.service.rendering import estimate_render, show_render, start_render
 from wordcut.service.sermons import CUT_STATES
 from wordcut.timefmt import format_timestamp
 from wordcut_cli import deps
 from wordcut_cli.contract import Context, add_command, add_group
+from wordcut_cli.tasks_support import add_wait_option, launch
 
 if TYPE_CHECKING:
     from wordcut_cli.contract import Commands
@@ -44,8 +48,8 @@ def register(commands: Commands) -> None:
     actions = add_group(
         commands,
         "cut",
-        help="cortes: ver, escolher, descartar, restaurar, corrigir a grafia e ajustar o estilo"
-        " da legenda",
+        help="cortes: ver, escolher, descartar, restaurar, corrigir a grafia, ajustar o estilo"
+        " da legenda e exportar",
     )
     listing = add_command(
         actions,
@@ -119,6 +123,17 @@ def register(commands: Commands) -> None:
     )
     caption.add_argument("id", type=int, help="ID do corte")
     _add_caption_options(caption)
+    export = add_command(
+        actions,
+        "render",
+        help="exporta o corte em 9:16 (tarefa com trava); as opções ficam salvas no corte, e a"
+        " omitida usa a última salva",
+        run=_render,
+        render=_render_export,
+        example="wordcut cut render 34 --pauses short --no-fade --wait --json",
+    )
+    export.add_argument("id", type=int, help="ID do corte")
+    _add_render_options(export)
 
 
 def _add_caption_options(caption: argparse.ArgumentParser) -> None:
@@ -150,6 +165,116 @@ def _add_caption_options(caption: argparse.ArgumentParser) -> None:
     caption.add_argument(
         "--reset", action="store_true", help="volta ao estilo da igreja; não aceita outra opção"
     )
+
+
+# docs/cli.md §8.7: each switch, its help when on and its help when off.
+RENDER_SWITCHES = {
+    "smooth_joins": ("suaviza as emendas", "emendas secas"),
+    "fade": ("fade no início e no fim", "sem fade"),
+    "normalize": ("áudio normalizado a -14 LUFS", "áudio sem normalizar"),
+    "caption": ("com legenda, como cut caption --on", "sem legenda, como cut caption --off"),
+}
+RENDER_CHOICE_HELP = {
+    "fillers": "hesitações (hã, né)",
+    "stammers": "gaguejos e frases recomeçadas",
+    "pauses": "pausas",
+    "resolution": "resolução do vídeo",
+    "quality": "qualidade: alta ou arquivo menor",
+}
+RENDER_OPTIONS = (*RENDER_CHOICE_HELP, *RENDER_SWITCHES)
+
+
+def _add_render_options(export: argparse.ArgumentParser) -> None:
+    for name, help_text in RENDER_CHOICE_HELP.items():
+        export.add_argument(f"--{name}", choices=CHOICES[name], help=help_text)
+    for name, (on, off) in RENDER_SWITCHES.items():
+        flag = name.replace("_", "-")
+        switch = export.add_mutually_exclusive_group()
+        switch.add_argument(f"--{flag}", dest=name, action="store_const", const=True, help=on)
+        switch.add_argument(f"--no-{flag}", dest=name, action="store_const", const=False, help=off)
+    export.add_argument(
+        "--estimate",
+        action="store_true",
+        help="só calcula a duração e mostra as opções, sem exportar, sem salvar e sem a trava",
+    )
+    add_wait_option(export)
+
+
+def _render(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:
+    """The launched task; with ``--wait``, the export (docs/cli.md §9); with ``--estimate``, the
+    estimated duration and the options, outside the lock."""
+    changes = {
+        name: getattr(args, name) for name in RENDER_OPTIONS if getattr(args, name) is not None
+    }
+    if args.estimate:
+        if args.wait:
+            raise WordcutError(
+                "invalid_argument",
+                "--estimate não cria tarefa; não use --wait com ele.",
+                {"argument": "--wait"},
+            )
+        with closing(deps.connection()) as connection:
+            return estimate_render(connection, args.id, changes)
+    home = Home.from_environment()
+    launched = launch(ctx, args.wait, partial(start_render, home, args.id, changes))
+    if not args.wait:
+        return launched
+    with closing(deps.connection()) as connection:
+        return show_render(connection, home, launched["render_id"])
+
+
+RENDER_CHOICE_NAMES = {
+    "remove": "remover",
+    "keep": "manter",
+    "original": "originais",
+    "natural": "naturais",
+    "short": "curtas",
+    "high": "alta",
+    "small": "arquivo menor",
+}
+RENDER_OPTION_NAMES = {
+    "fillers": "Hesitações",
+    "stammers": "Gaguejos",
+    "pauses": "Pausas",
+    "smooth_joins": "Emendas suavizadas",
+    "fade": "Fade",
+    "normalize": "Normalizar áudio",
+    "caption": "Legenda",
+    "resolution": "Resolução",
+    "quality": "Qualidade",
+}
+
+
+def _render_export(result: dict[str, Any]) -> str:
+    if "task_id" in result:
+        return (
+            f"Tarefa {result['task_id']} iniciada: exportação do corte {result['cut_id']}."
+            f" Acompanhe com wordcut task wait {result['task_id']}."
+        )
+    if "id" not in result:
+        return "\n".join(
+            [f"Duração estimada: {_seconds(result['duration'])}", *_option_lines(result)]
+        )
+    return "\n".join(
+        [
+            f"Exportação {result['id']} do corte {result['cut_id']}: {result['path']}",
+            f"Duração: {_seconds(result['duration'])}",
+            *_option_lines(result),
+        ]
+    )
+
+
+def _option_lines(result: dict[str, Any]) -> list[str]:
+    return [
+        f"{RENDER_OPTION_NAMES[name]}: {_option_value(value)}"
+        for name, value in result["options"].items()
+    ]
+
+
+def _option_value(value: Any) -> str:
+    if isinstance(value, bool):
+        return "sim" if value else "não"
+    return RENDER_CHOICE_NAMES.get(value, str(value))
 
 
 def _range(field: str) -> str:
@@ -195,7 +320,7 @@ def _list(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:
 
 def _show(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:
     with closing(deps.connection()) as connection:
-        return show_cut(connection, args.id)
+        return show_cut(connection, args.id, home=Home.from_environment())
 
 
 def _preview(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:

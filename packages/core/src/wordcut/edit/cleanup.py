@@ -37,8 +37,11 @@ class CleanupResult:
     removed: tuple[Word, ...]
 
 
-def remove_hesitations(words: Sequence[Word]) -> CleanupResult:
-    dropped = _hesitation_indexes(words)
+def remove_hesitations(
+    words: Sequence[Word], *, fillers: bool = True, stammers: bool = True
+) -> CleanupResult:
+    """Drop the fillers and the stammers of ``words``, each kind only when asked."""
+    dropped = _hesitation_indexes(words, fillers=fillers, stammers=stammers)
     kept: list[Word] = []
     removed: list[Word] = []
     for index, word in enumerate(words):
@@ -55,10 +58,13 @@ def normalize(text: str) -> str:
     return re.sub(r"[^\w]", "", text.lower())
 
 
-def _hesitation_indexes(words: Sequence[Word]) -> set[int]:
-    dropped = {i for i, word in enumerate(words) if _is_filler(word)}
-    dropped |= {i for i in range(len(words) - 1) if _is_word_stammer(words[i], words[i + 1])}
-    dropped |= _phrase_stammers(words)
+def _hesitation_indexes(words: Sequence[Word], *, fillers: bool, stammers: bool) -> set[int]:
+    dropped: set[int] = set()
+    if fillers:
+        dropped |= {i for i, word in enumerate(words) if _is_filler(word)}
+    if stammers:
+        dropped |= {i for i in range(len(words) - 1) if _is_word_stammer(words[i], words[i + 1])}
+        dropped |= _phrase_stammers(words)
     return dropped
 
 

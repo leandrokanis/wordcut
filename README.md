@@ -107,6 +107,8 @@ uv run wordcut task list [--status running]   # tarefas, da mais recente para a 
 uv run wordcut task wait <id>  # espera a tarefa: progresso no stderr, resultado no stdout
 uv run wordcut sermon process <id> [--force] [--wait]   # baixa a faixa, transcreve e corta
 uv run wordcut sermon show <id> --transcript            # a pregação e suas frases
+uv run wordcut cut render <id> [opções] [--wait]       # exporta o corte em 9:16
+uv run wordcut cut render <id> [opções] --estimate     # só a duração, sem exportar
 ```
 
 As operações pesadas rodam como tarefas: sem `--wait`, voltam na hora com o `task_id` e
@@ -118,7 +120,10 @@ O processamento (`sermon process`) usa o mundo externo por uma porta e deixa a p
 em `media/sermons/<id>/` na pasta de dados. Ao fim, ele pede os cortes ao LLM com o preset
 padrão; sem modelo ou chave configurados, ou com o OpenRouter falhando, a pregação fica
 processada sem cortes e o erro aparece no `sermon show`
-([ADR-0016](docs/adr/0016-sugestao-por-porta-com-falha-na-pregacao.md)).
+([ADR-0016](docs/adr/0016-sugestao-por-porta-com-falha-na-pregacao.md)). A exportação
+(`cut render`) também usa uma porta, grava as opções no corte e só deixa o arquivo em
+`media/cuts/<corte>/<exportação>.mp4` quando termina bem
+([ADR-0018](docs/adr/0018-exportacao-por-portas-sem-arquivo-parcial.md)).
 
 Os dados (banco SQLite, criado e migrado na primeira chamada, e a trava `processing.lock`)
 ficam em `~/.local/share/wordcut/`, ou em `WORDCUT_HOME` quando definida. Essa pasta deve

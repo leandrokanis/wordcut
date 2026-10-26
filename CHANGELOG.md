@@ -149,9 +149,27 @@ Formato de [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões
   níveis (nenhuma, suave com alpha 140, forte com alpha 220), arquivo da fonte e altura do
   quadro; a imagem encosta na borda em vez de sair do quadro. O estilo padrão desenha igual
   ao de antes, pixel a pixel.
+- `wordcut cut render <id> [opções] [--estimate] [--wait]` (item 1.1.h.1; ADR-0018): tarefa
+  `render`, com trava, que exporta o corte em 9:16 do estado atual (trechos na ordem do corte,
+  correções de grafia só na legenda, estilo da legenda). Opções `--fillers` e `--stammers`
+  (`remove|keep`), `--pauses original|natural|short` (sem encurtar, 0,15/0,40 s ou
+  0,08/0,20 s), `--[no-]smooth-joins` (fade de 15 ms nas emendas), `--[no-]fade` (0,5 s de
+  vídeo e áudio no início e no fim, até a metade da duração), `--[no-]normalize` (−14 LUFS),
+  `--[no-]caption` (o mesmo estado de `cut caption --on/--off`), `--resolution
+  1080x1920|720x1280` (legenda escalada junto) e `--quality high|small` (CRF 18 ou 26). As
+  opções ficam salvas no corte ao iniciar, sob a trava, e a omitida usa a última salva.
+  `--estimate` devolve a duração estimada e o resumo das opções sem renderizar, sem salvar e
+  sem a trava; com `--wait`, é erro de uso. Com `--wait`, devolve a exportação
+  `{id, cut_id, path, duration, created_at, options}`; sem ele, a tarefa, e o `task show`
+  traz `result.render_id`. A exportação fica na tabela `renders` (migração 0009) e o arquivo
+  em `media/cuts/<cut_id>/<render_id>.mp4`; uma falha ou um Ctrl+C não deixam linha nem
+  arquivo.
 
 ### Alterado
 
+- `cut show` traz em `render_options` as opções efetivas da próxima exportação (padrões mais
+  as salvas, com `caption` igual ao estado da legenda), não mais o JSON gravado ou `{}`, e em
+  `renders` as exportações do corte, da mais antiga para a mais nova, com `path` absoluto.
 - `cut show` traz em `caption` o estilo efetivo da legenda (o padrão completo quando o corte
   não tem estilo), não mais `{}`.
 - O comando `cut` da CLI anterior passa a se chamar `cut-sermon`, com os mesmos argumentos e

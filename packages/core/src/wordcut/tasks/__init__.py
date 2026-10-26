@@ -17,6 +17,7 @@ from wordcut.home import Home
 BUILTIN_KIND_MODULES = (
     "wordcut.tasks.diagnostic",
     "wordcut.tasks.process",
+    "wordcut.tasks.render",
     "wordcut.tasks.suggest",
 )
 

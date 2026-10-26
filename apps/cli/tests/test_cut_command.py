@@ -281,7 +281,8 @@ def test_cut_help_lists_its_actions(capsys: pytest.CaptureFixture[str]) -> None:
 
     assert (
         exit_code,
-        "{list,show,preview,choose,discard,restore,fix-word,caption}" in capsys.readouterr().out,
+        "{list,show,preview,choose,discard,restore,fix-word,caption,render}"
+        in capsys.readouterr().out,
     ) == (
         0,
         True,
@@ -289,7 +290,8 @@ def test_cut_help_lists_its_actions(capsys: pytest.CaptureFixture[str]) -> None:
 
 
 @pytest.mark.parametrize(
-    "action", ["list", "show", "preview", "choose", "discard", "restore", "fix-word", "caption"]
+    "action",
+    ["list", "show", "preview", "choose", "discard", "restore", "fix-word", "caption", "render"],
 )
 def test_each_cut_action_help_shows_an_example_ready_to_copy(
     action: str, capsys: pytest.CaptureFixture[str]

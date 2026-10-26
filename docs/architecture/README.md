@@ -73,6 +73,7 @@ flowchart LR
     TASK["tasks<br/>processo destacado"]
     PROC["processing<br/>pipeline + ProcessingGateways"]
     SUG["suggestion<br/>SuggestionModel + OpenRouterModel"]
+    REND["rendering<br/>pipeline + RenderGateways"]
     DOM["domínio<br/>youtube, asr, edit, vertical"]
   end
   CLI --> SVC
@@ -84,6 +85,8 @@ flowchart LR
   SVC --> ERR
   TASK --> PROC
   TASK --> SUG
+  TASK --> REND
+  REND --> DOM
   SUG --> DB
   PROC --> DOM
 ```
@@ -99,11 +102,12 @@ flowchart LR
 | Tabela `sermons` (migração 0002, repositório `db.sermons`) e pasta de segredos (`config`, `WORDCUT_CONFIG`) | existe em `packages/core` (item 1.1.a.1) |
 | Configurações | tabela `settings` chave-valor (migração 0005, repositório `db.settings`) com o modelo do LLM (sem padrão) e o do WhisperX (`large-v3` por padrão); segredos em arquivos de `WORDCUT_CONFIG` com permissão 600 (`openrouter-key` e `youtube-cookies.txt`), gravados de uma vez por `config.write_secret` (temporário na mesma pasta + `os.replace`); a chave só sai mascarada (`••••` e os 4 últimos), os cookies só como presentes ou ausentes; pasta somente leitura dá `config_not_writable` (item 2.1.a.1) |
 | Critérios e presets | `wordcut.criteria`: textos do prompt no pacote (`criteria/texts/`: `base.md` com vagas para os critérios e as durações, um arquivo por critério com os três níveis, `options/` com reordenar, palavras protegidas e instruções), carregados e validados no primeiro uso (`CatalogError` é erro de programação); tabela `presets` (migração 0006, repositório `db.presets`) com os níveis em JSON por ID de critério, índice único parcial para um só padrão e o "Padrão" semeado com `levels '{}'`; `service.presets` lista, mostra, cria, altera, troca o padrão, apaga (o padrão não), completa critérios novos e ignora removidos na leitura e monta o prompt (`build_prompt`) que a sugestão usa (item 2.1.b.1); o texto dos critérios aguarda revisão humana qualificada (item 2.1.a.2) |
-| Camada de serviço | `service.status` (trava e tarefas em andamento), `service.sermons` (criar a pregação pelo link, listar, detalhar com a última tarefa e a transcrição, delimitar e reconciliar a pregação `processing` órfã; itens 1.1.a.1, 1.1.b, 1.1.c.1), `service.processing` (lançar o processamento; item 1.1.c.1), `service.settings` (ver e trocar os modelos, gravar a chave do LLM e os cookies; item 2.1.a.1), `service.presets` (critérios e presets; item 2.1.a.2), `service.cuts` (listar os cortes da pregação com os descartados por último, detalhar e escolher, descartar ou restaurar, gravando só o estado; o texto montado e a duração vêm de `wordcut.cuts.assembly`, que resolve os trechos pela posição das palavras e aplica as correções de grafia do corte; item 1.1.e.1; corrigir a grafia de uma palavra só no corte, com a trava de `wordcut.cuts.spelling` (núcleo da palavra, Levenshtein e limite do protótipo, sempre contra o original), gravando na tabela `word_fixes` (migração 0008, repositório `db.word_fixes`; as duas chaves com `ON DELETE CASCADE`) e marcando o corte como editado; item 1.1.f.2) e `service.tasks` (listar, detalhar e esperar tarefas; item 3.1.a.2) existem; as demais operações em construção (roadmap, fase 1) |
-| Tarefas | tabela `tasks` (migração 0003) e `wordcut.tasks`: registro de tipos, execução em primeiro plano ou em processo destacado que herda a trava (`wordcut.tasks.runner`, saída em `tasks/<id>.log`), gancho `admit` sob a trava antes de gravar a tarefa, progresso no banco e tarefa órfã marcada `interrupted` na leitura; o tipo interno `diagnostic` exercita o mecanismo; o tipo `process` existe (item 1.1.c.1); o tipo `suggest`, sem trava, existe (item 2.1.b.2); `render` chega com a operação (item 3.1.a.2; ADR-0007, ADR-0013, ADR-0014) |
+| Camada de serviço | `service.status` (trava e tarefas em andamento), `service.sermons` (criar a pregação pelo link, listar, detalhar com a última tarefa e a transcrição, delimitar e reconciliar a pregação `processing` órfã; itens 1.1.a.1, 1.1.b, 1.1.c.1), `service.processing` (lançar o processamento; item 1.1.c.1), `service.settings` (ver e trocar os modelos, gravar a chave do LLM e os cookies; item 2.1.a.1), `service.presets` (critérios e presets; item 2.1.a.2), `service.cuts` (listar os cortes da pregação com os descartados por último, detalhar e escolher, descartar ou restaurar, gravando só o estado; o texto montado e a duração vêm de `wordcut.cuts.assembly`, que resolve os trechos pela posição das palavras e aplica as correções de grafia do corte; item 1.1.e.1; corrigir a grafia de uma palavra só no corte, com a trava de `wordcut.cuts.spelling` (núcleo da palavra, Levenshtein e limite do protótipo, sempre contra o original), gravando na tabela `word_fixes` (migração 0008, repositório `db.word_fixes`; as duas chaves com `ON DELETE CASCADE`) e marcando o corte como editado; item 1.1.f.2; `show_cut` traz as opções efetivas da próxima exportação e as exportações do corte, com o caminho absoluto; item 1.1.h.1), `service.rendering` (lançar a exportação, estimar a duração sem renderizar e mostrar uma exportação; item 1.1.h.1) e `service.tasks` (listar, detalhar e esperar tarefas; item 3.1.a.2) existem; as demais operações em construção (roadmap, fase 1) |
+| Tarefas | tabela `tasks` (migração 0003) e `wordcut.tasks`: registro de tipos, execução em primeiro plano ou em processo destacado que herda a trava (`wordcut.tasks.runner`, saída em `tasks/<id>.log`), gancho `admit` sob a trava antes de gravar a tarefa, progresso no banco e tarefa órfã marcada `interrupted` na leitura; o tipo interno `diagnostic` exercita o mecanismo; o tipo `process` existe (item 1.1.c.1); o tipo `suggest`, sem trava, existe (item 2.1.b.2); o tipo `render`, com trava, existe e devolve `result.render_id` (item 1.1.h.1; ADR-0007, ADR-0013, ADR-0014, ADR-0018) |
 | Processamento da pregação | `wordcut.processing`: `pipeline.process` (baixa só a faixa e uma janela de áudio, sincroniza, transcreve, ajusta as bordas às palavras e corta com fades), frases (`processing.sentences`, reaproveitadas por `overview`) e a porta `ProcessingGateways` com `LocalGateways`/`default_gateways(whisper_model)`, que transcreve com o modelo do WhisperX das configurações (item 2.1.a.1); tabelas `words` e `sentences` e colunas `sermon_start`, `sermon_end`, `video_path`, `processed_at` em `sermons` (migração 0004, repositório `db.transcripts`); mídias em `media/sermons/<id>/` na pasta de dados; ao fim, a sugestão de cortes pelo LLM com o preset padrão, cuja falha não desfaz o processamento (item 1.1.c.1; ADR-0014, ADR-0016) |
 | Sugestão de cortes | `wordcut.suggestion`: entrada (`request`: prompt do preset + formato da resposta; frases numeradas de 1 em diante, sem tempos), validação estrita do esquema (`response`), porta `SuggestionModel` com `OpenRouterModel` (`httpx`, toda falha vira `llm_error`) e `default_model(llm_model, key)`, que os testes substituem e que, como `processing.default_gateways`, recusa com `network_error` enquanto `WORDCUT_FORBID_NETWORK` estiver definida (`wordcut.network`; o `conftest.py` da raiz a define e a tarefa destacada a herda; ADR-0017); `suggest` confere modelo e chave (`llm_not_configured`), pede uma vez e mais uma em resposta fora do esquema, monta trechos e faixa contínua, descarta por duração estimada (×0,82) com aviso e grava os cortes `suggested`; tabela `cuts` (migração 0007, repositório `db.cuts`; `preset_id` com `ON DELETE SET NULL`) e `suggestion_error_code`/`suggestion_error_message` em `sermons`; `sermon show` e `list` trazem cortes e contagens reais (item 2.1.b.1; ADR-0010, ADR-0016); `service.suggestion.start_suggestion` lança a tarefa `suggest` (`wordcut.tasks.suggest`) depois de conferir pregação processada, preset, modelo e chave e a ausência de outra sugestão da pregação em andamento, e `suggest(..., replace_suggested=True)` troca, só no sucesso e numa transação, os `suggested` não editados pelos novos, recusando a gravação se a pregação foi reprocessada no meio (item 2.1.b.2) |
-| CLI | contrato de saída e erros (ADR-0012), erro de uso sem repetir valor digitado (ADR-0015), `wordcut status`, `wordcut sermon create` (com `--process`), `list`, `show` (com `--transcript`), `trim` e `process`, `wordcut task list`, `show` e `wait`, `wordcut settings show`, `set`, `set-key` e `set-cookies` (segredo só pelo stdin; argumento sobrando recusado sem eco), `wordcut criteria list`, `wordcut preset list`, `show`, `create`, `update`, `set-default` e `delete`, `wordcut cut list`, `show`, `preview`, `choose`, `discard`, `restore` e `fix-word` e o auxiliar de `--wait` dos comandos que lançam tarefa existem; os comandos da CLI anterior seguem no mesmo executável, com saída e erros de execução fora do contrato (o erro de uso segue o contrato), até o item `cli-migration`; o `cut` antigo se chama `cut-sermon`, porque `cut` é o grupo dos cortes; os demais comandos de `docs/cli.md` em construção (roadmap, fase 1) |
+| Exportação do corte | `wordcut.rendering`: `options` (as escolhas de docs/cli.md §8.7, os padrões, a validação e a mescla informado > salvo > padrão), `timeline` (os trechos pela posição das palavras, de `cuts.assembly`, limpos com `edit.timeline.Cleanup`: hesitações, gaguejos e pausas `original`, `natural` ou `short`), `estimate` (a duração sem abrir mídia, à taxa nominal de 30 quadros/s), `pipeline.render_cut` (montagem com ou sem emendas suavizadas, câmera, legendas com as correções por `word_id` e o estilo do corte escalado para 720×1280, codificação com resolução, CRF, normalização e fade, num temporário movido só no sucesso) e a porta `RenderGateways` com `LocalGateways`/`default_gateways()`, que os testes substituem (fixture `no_real_rendering`); tabela `renders` (migração 0009, repositório `db.renders`; `cut_id` com `ON DELETE CASCADE`) e `db.cuts.set_render_options`; arquivos em `media/cuts/<cut_id>/<render_id>.mp4` na pasta de dados (item 1.1.h.1; ADR-0018) |
+| CLI | contrato de saída e erros (ADR-0012), erro de uso sem repetir valor digitado (ADR-0015), `wordcut status`, `wordcut sermon create` (com `--process`), `list`, `show` (com `--transcript`), `trim` e `process`, `wordcut task list`, `show` e `wait`, `wordcut settings show`, `set`, `set-key` e `set-cookies` (segredo só pelo stdin; argumento sobrando recusado sem eco), `wordcut criteria list`, `wordcut preset list`, `show`, `create`, `update`, `set-default` e `delete`, `wordcut cut list`, `show`, `preview`, `choose`, `discard`, `restore`, `fix-word`, `caption` e `render` (com `--estimate` e `--wait`) e o auxiliar de `--wait` dos comandos que lançam tarefa existem; os comandos da CLI anterior seguem no mesmo executável, com saída e erros de execução fora do contrato (o erro de uso segue o contrato), até o item `cli-migration`; o `cut` antigo se chama `cut-sermon`, porque `cut` é o grupo dos cortes; os demais comandos de `docs/cli.md` em construção (roadmap, fase 1) |
 | API | esqueleto em `apps/api` com `GET /api/health`; rotas planejadas (roadmap, fase 2) |
 | Web | esqueleto em `apps/web` que mostra o estado da API; protótipo em `docs/prototype/wordcut.html`; interface planejada (roadmap, fase 3) |
 
@@ -167,7 +171,49 @@ gravar o fim, para que `task wait` termine com a máquina livre
 `processing` desde o lançamento; se o processo morrer, a próxima leitura a deixa `failed`
 ([ADR-0014](../adr/0014-processamento-por-portas-e-estado-na-leitura.md)).
 
-### 5.2. Exportar um corte pela web
+### 5.2. Exportar um corte pela CLI
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor A as Assistente
+  participant CLI as wordcut (cli)
+  participant SVC as core.service
+  participant Lock as processing.lock
+  participant DB as SQLite
+  participant Task as tarefa render
+  participant GW as RenderGateways (ffmpeg + OpenCV)
+
+  A->>CLI: cut render <id> [opções] --wait
+  CLI->>SVC: start_render(cut_id, opções)
+  SVC->>SVC: valida as opções
+  SVC->>DB: corte existe; pregação processed com o vídeo
+  SVC->>Lock: flock exclusivo (não bloqueante)
+  alt trava ocupada
+    SVC-->>CLI: WordcutError busy
+    CLI-->>A: saída 4, nada gravado
+  else livre
+    SVC->>DB: revalida; grava as opções e a legenda no corte (gancho admit)
+    SVC->>DB: tarefa running
+    Task->>DB: lê trechos, correções e estilo da legenda
+    Task->>GW: montagem, detecção, codificação (temporário em media/cuts/<id>/)
+    alt falha ou Ctrl+C
+      Task->>Task: apaga o temporário e a pasta de trabalho
+      Task->>DB: tarefa failed (internal_error ou interrupted)
+    else sucesso
+      Task->>DB: linha em renders e os.replace para <render_id>.mp4 (uma transação)
+      Task->>DB: tarefa succeeded, result.render_id
+      CLI->>SVC: show_render(render_id)
+      CLI-->>A: {id, cut_id, path, duration, created_at, options}
+    end
+  end
+```
+
+`--estimate` não passa pela trava nem pela tarefa: `estimate_render` lê o corte e as palavras
+e calcula a duração da timeline, sem abrir mídia e sem gravar nada
+([ADR-0018](../adr/0018-exportacao-por-portas-sem-arquivo-parcial.md)).
+
+### 5.3. Exportar um corte pela web
 
 ```mermaid
 sequenceDiagram

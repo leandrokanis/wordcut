@@ -121,6 +121,16 @@ def set_caption(
     )
 
 
+def set_render_options(
+    connection: sqlite3.Connection, cut_id: int, options: dict[str, Any], updated_at: datetime
+) -> None:
+    """Store the options of the cut's last export, in the caller's transaction."""
+    connection.execute(
+        "UPDATE cuts SET render_options = ?, updated_at = ? WHERE id = ?",
+        (json.dumps(options), updated_at.isoformat(), cut_id),
+    )
+
+
 def mark_edited(connection: sqlite3.Connection, cut_id: int, updated_at: datetime) -> None:
     """Record that someone changed the cut, which ``delete_unedited_suggestions`` then
     keeps, in the caller's transaction."""
