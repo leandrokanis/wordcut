@@ -2,7 +2,7 @@ import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach } from "vitest";
 
-import { apiError } from "../../test/fakeApi";
+import { apiError, type RecordedCall, type Reply } from "../../test/fakeApi";
 import { fakeIntersectionObserver } from "../../test/fakeIntersectionObserver";
 import { settings } from "../../test/fixtures";
 import { renderRoute } from "../../test/renderRoute";
@@ -109,6 +109,47 @@ test("sends a pasted key with Enter and shows only the mask the API answers", as
   ]).toEqual([[["PUT /api/settings/llm-key", { value: KEY }]], "", false, false]);
 });
 
+/** Everything the browser storage holds, keys and values. */
+function stored(): string {
+  return JSON.stringify([{ ...localStorage }, { ...sessionStorage }]);
+}
+
+test("sends a pasted key when the field loses focus and says Salvo", async () => {
+  const spies = spyConsole();
+  const calls = fakeSettingsApi({
+    "PUT /api/settings/llm-key": { body: settings({ llm_key: "••••9f3a" }) },
+  });
+  const { container } = renderRoute("/settings");
+  const field = await screen.findByLabelText("Nova chave");
+
+  await userEvent.type(field, KEY);
+  await userEvent.tab();
+
+  await screen.findByText("Atual: ••••9f3a");
+  expect([
+    writes(calls),
+    await screen.findByText("Salvo").then((saved) => saved.textContent),
+    (field as HTMLInputElement).value,
+    container.innerHTML.includes(KEY),
+    logged(spies).includes(KEY),
+    stored().includes(KEY),
+  ]).toEqual([[["PUT /api/settings/llm-key", { value: KEY }]], "Salvo", "", false, false, false]);
+});
+
+test("sends a key confirmed with Enter only once when the field then loses focus", async () => {
+  const calls = fakeSettingsApi({
+    "PUT /api/settings/llm-key": { body: settings({ llm_key: "••••9f3a" }) },
+  });
+  renderRoute("/settings");
+  const field = await screen.findByLabelText("Nova chave");
+
+  await userEvent.type(field, `${KEY}{Enter}`);
+  await userEvent.tab();
+
+  await screen.findByText("Atual: ••••9f3a");
+  expect(writes(calls)).toEqual([["PUT /api/settings/llm-key", { value: KEY }]]);
+});
+
 test("sends no key when Enter finds the field blank", async () => {
   const calls = fakeSettingsApi();
   renderRoute("/settings");
@@ -117,6 +158,36 @@ test("sends no key when Enter finds the field blank", async () => {
   await userEvent.type(field, "   {Enter}");
 
   expect(writes(calls)).toEqual([]);
+});
+
+test("keeps a key typed while another is being sent in the field, without sending it", async () => {
+  let release: (reply: Reply) => void = () => {};
+  const calls = fakeSettingsApi({
+    "PUT /api/settings/llm-key": () => new Promise<Reply>((resolve) => (release = resolve)),
+  });
+  renderRoute("/settings");
+  const field = await screen.findByLabelText("Nova chave");
+
+  await userEvent.type(field, KEY);
+  await userEvent.tab();
+  await userEvent.type(field, "sk-outra-1234");
+  await userEvent.tab();
+
+  expect([writes(calls), (field as HTMLInputElement).value])
+    .toEqual([[["PUT /api/settings/llm-key", { value: KEY }]], "sk-outra-1234"]);
+  release({ body: settings({ llm_key: "••••9f3a" }) });
+  await screen.findByText("Atual: ••••9f3a");
+});
+
+test.each(["", "   "])("sends no key when the field loses focus blank (%j)", async (text) => {
+  const calls = fakeSettingsApi();
+  renderRoute("/settings");
+  const field = await screen.findByLabelText("Nova chave");
+
+  await userEvent.type(field, `${text}{Tab}`);
+
+  expect([writes(calls), screen.getByText("Atual: ••••7a2c").textContent])
+    .toEqual([[], "Atual: ••••7a2c"]);
 });
 
 test.each([
@@ -145,6 +216,54 @@ test.each([
     container.innerHTML.includes(KEY),
     logged(spies).includes(KEY),
   ]).toEqual([reason, "", "Atual: ••••7a2c", false, false]);
+});
+
+test.each([
+  [
+    apiError(409, "config_not_writable", "A configuração não pode ser gravada por aqui."),
+    "A configuração não pode ser gravada por aqui. Grave pela CLI no host: " +
+      "wordcut settings set-key < chave.txt",
+  ],
+  [
+    apiError(400, "invalid_argument", "A chave não pode ser gravada."),
+    "A chave não pode ser gravada.",
+  ],
+])("tells why a key sent on leaving the field was refused, never keeping it", async (reply, reason) => {
+  const spies = spyConsole();
+  fakeSettingsApi({ "PUT /api/settings/llm-key": reply });
+  const { container } = renderRoute("/settings");
+  const field = await screen.findByLabelText("Nova chave");
+
+  await userEvent.type(field, KEY);
+  await userEvent.tab();
+
+  const alert = await screen.findByRole("alert");
+  expect([
+    alert.textContent,
+    (field as HTMLInputElement).value,
+    screen.getByText("Atual: ••••7a2c").textContent,
+    screen.queryByText("Salvo"),
+    container.innerHTML.includes(KEY),
+    logged(spies).includes(KEY),
+    stored().includes(KEY),
+  ]).toEqual([reason, "", "Atual: ••••7a2c", null, false, false, false]);
+});
+
+test("sends the key again after a refusal and clears the reason once it is saved", async () => {
+  const refusal = apiError(400, "invalid_argument", "A chave não pode ser gravada.");
+  const saved = { body: settings({ llm_key: "••••9f3a" }) };
+  const calls: RecordedCall[] = fakeSettingsApi({
+    "PUT /api/settings/llm-key": () => (writes(calls).length === 1 ? refusal : saved),
+  });
+  renderRoute("/settings");
+  const field = await screen.findByLabelText("Nova chave");
+
+  await userEvent.type(field, `${KEY}{Tab}`);
+  await screen.findByRole("alert");
+  await userEvent.type(field, `${KEY}{Tab}`);
+
+  await screen.findByText("Atual: ••••9f3a");
+  expect([writes(calls).length, screen.queryByRole("alert")]).toEqual([2, null]);
 });
 
 const COOKIES = "# Netscape HTTP Cookie File\n.exemplo.org\tTRUE\t/\tTRUE\t0\tSID\tficticio-4b1e\n";

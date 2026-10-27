@@ -90,12 +90,18 @@ function secretRefusal(refusal: ApiError, hostCommand: string): ReactNode {
  * holds the key only in the DOM input, never in React state. */
 function KeyForm({ store }: { store: (key: string) => Promise<void> }) {
   const field = useRef<HTMLInputElement>(null);
+  const sending = useRef(false);
   const [error, setError] = useState<ReactNode>();
 
-  function send(event: FormEvent) {
+  function submit(event: FormEvent) {
     event.preventDefault();
+    send();
+  }
+
+  function send() {
     const input = field.current;
-    if (!input) {
+    // Checked before the field is read: a key typed meanwhile stays there for the next send.
+    if (!input || sending.current) {
       return;
     }
     const key = input.value;
@@ -103,14 +109,17 @@ function KeyForm({ store }: { store: (key: string) => Promise<void> }) {
     if (!key.trim()) {
       return;
     }
+    sending.current = true;
     setError(undefined);
-    store(key).catch((refusal: ApiError) =>
-      setError(secretRefusal(refusal, "wordcut settings set-key < chave.txt")),
-    );
+    store(key)
+      .catch((refusal: ApiError) =>
+        setError(secretRefusal(refusal, "wordcut settings set-key < chave.txt")),
+      )
+      .finally(() => (sending.current = false));
   }
 
   return (
-    <form className="field" onSubmit={send}>
+    <form className="field" onSubmit={submit}>
       <input
         ref={field}
         className="input mono"
@@ -120,6 +129,7 @@ function KeyForm({ store }: { store: (key: string) => Promise<void> }) {
         placeholder="Cole a nova chave"
         aria-label="Nova chave"
         aria-invalid={error ? true : undefined}
+        onBlur={send}
       />
       {error && (
         <p className="ferr" role="alert">

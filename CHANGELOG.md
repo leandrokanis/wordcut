@@ -331,3 +331,10 @@ Formato de [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões
   comportamento.
 - `skills/video-corte-vertical/sugerir-cortes.md` e `exemplos.md`: os critérios da sugestão
   vivem no pacote (`criteria list`, presets).
+
+### Corrigido
+
+- Web: a chave da API do LLM nas configurações passa a ser gravada também ao sair do campo,
+  não só com Enter, com uma gravação só por envio, o "Salvo" e "••••" com os 4 últimos
+  caracteres na confirmação, e o erro ao lado do campo na falha
+  ([#1](https://github.com/leandrokanis/wordcut/issues/1)).
