@@ -155,6 +155,15 @@ export function previewCut(id: number): Promise<CutPreview> {
   return request(`/api/cuts/${id}/preview`);
 }
 
+/** Makes ``segments`` what the cut plays, in that order (docs/cli.md §8.10); administrator
+ * only. Answers the cut as ``getCut``. */
+export function putCutSegments(
+  id: number,
+  segments: { from_word: number; to_word: number }[],
+): Promise<Cut> {
+  return send("PUT", `/api/cuts/${id}/segments`, { segments });
+}
+
 /** Changes only the given fields of the cut's caption style; answers the whole style. */
 export function patchCaption(id: number, fields: Partial<CaptionStyle>): Promise<CaptionStyle> {
   return send("PATCH", `/api/cuts/${id}/caption`, fields);

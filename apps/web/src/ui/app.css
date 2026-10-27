@@ -267,6 +267,9 @@ video.frame { object-fit: contain; }
 .sent { display: grid; grid-template-columns: 40px 1fr; gap: 8px; align-items: baseline; margin: 0; padding: 6px 8px; border-radius: 6px; font-size: 13.5px; line-height: 1.5; }
 .sent.in { background: color-mix(in srgb, #7b93ff 12%, transparent); }
 .sent .tm { font: 11px var(--font-mono); color: var(--faint); }
+.sents.choose .sent { grid-template-columns: auto 40px 1fr; cursor: pointer; }
+.sent.out { color: var(--faint); }
+.sent input { accent-color: #7b93ff; margin: 0; transform: translateY(2px); }
 .sgroup { display: grid; gap: 0; }
 .sgroup + .sgroup { border-top: 1px solid var(--line); padding-top: 14px; }
 .sgroup h3 { margin: 0; font-size: 14px; font-weight: 600; }

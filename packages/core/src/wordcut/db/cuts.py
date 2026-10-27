@@ -107,6 +107,19 @@ def set_status(
     )
 
 
+def set_segments(
+    connection: sqlite3.Connection,
+    cut_id: int,
+    segments: Sequence[Segment],
+    updated_at: datetime,
+) -> None:
+    """Store what the cut plays, in the order given, in the caller's transaction."""
+    connection.execute(
+        "UPDATE cuts SET segments = ?, updated_at = ? WHERE id = ?",
+        (_segments_json(segments), updated_at.isoformat(), cut_id),
+    )
+
+
 def set_caption(
     connection: sqlite3.Connection,
     cut_id: int,

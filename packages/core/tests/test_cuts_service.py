@@ -137,6 +137,7 @@ def test_shown_cut_has_the_sermon_cut_fields_plus_assembly_and_default_style_and
             {"from_word": word[0], "to_word": word[0], "start": 0.3, "end": 0.8,
              "text": "Irmãos,"},
         ],
+        "range_sentences": [],
         "range_start_word": word[0],
         "range_end_word": word[4],
         "source": "llm",

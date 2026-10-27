@@ -432,3 +432,78 @@ def test_the_assistant_changes_a_cut_while_the_machine_is_busy(
     response = assistant.request(method, f"/api/cuts/{cut_id}/{action}", json=body)
 
     assert response.status_code == 200
+
+
+def test_showing_a_cut_gives_the_sentences_of_its_range_with_how_much_it_plays(
+    assistant: TestClient, cut_id: int
+) -> None:
+    response = assistant.get(f"/api/cuts/{cut_id}")
+
+    assert [
+        (sentence["text"], sentence["included"]) for sentence in response.json()["range_sentences"]
+    ] == [("Irmãos, graça e paz.", "all")]
+
+
+def test_an_admin_sets_the_segments_and_gets_the_cut_as_get_shows_it(
+    admin: TestClient, home: Home, cut_id: int
+) -> None:
+    with closing(connect(home)) as connection:
+        [*_, last] = [word["word_id"] for word in show_cut(connection, cut_id)["words"]]
+
+    response = admin.put(
+        f"/api/cuts/{cut_id}/segments", json={"segments": [{"from_word": last, "to_word": last}]}
+    )
+
+    assert (response.status_code, response.json(), response.json()["text"]) == (
+        200,
+        admin.get(f"/api/cuts/{cut_id}").json(),
+        "paz.",
+    )
+
+
+def test_an_assistant_is_forbidden_to_set_the_segments_and_nothing_changes(
+    assistant: TestClient, cut_id: int
+) -> None:
+    before = assistant.get(f"/api/cuts/{cut_id}").json()
+
+    response = assistant.put(f"/api/cuts/{cut_id}/segments", json={"segments": []})
+
+    assert (
+        response.status_code,
+        response.json()["error"]["code"],
+        assistant.get(f"/api/cuts/{cut_id}").json(),
+    ) == (403, "forbidden", before)
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"segments": []},
+        {"segments": [{"from_word": 1}]},
+        {"segments": [{"from_word": "1", "to_word": 2}]},
+        {"segments": "segredo-digitado"},
+        {"trechos": []},
+    ],
+    ids=["empty", "without to_word", "text for a word", "not a list", "misspelt field"],
+)
+def test_segments_that_break_a_rule_are_400_invalid_argument_and_change_nothing(
+    body: dict[str, Any], admin: TestClient, cut_id: int
+) -> None:
+    before = admin.get(f"/api/cuts/{cut_id}").json()
+
+    response = admin.put(f"/api/cuts/{cut_id}/segments", json=body)
+
+    assert (
+        response.status_code,
+        response.json()["error"]["code"],
+        "segredo-digitado" in response.text,
+        admin.get(f"/api/cuts/{cut_id}").json(),
+    ) == (400, "invalid_argument", False, before)
+
+
+def test_setting_the_segments_of_a_missing_cut_is_not_found(admin: TestClient) -> None:
+    response = admin.put(
+        "/api/cuts/99/segments", json={"segments": [{"from_word": 1, "to_word": 1}]}
+    )
+
+    assert (response.status_code, response.json()["error"]["details"]) == (404, {"cut_id": 99})

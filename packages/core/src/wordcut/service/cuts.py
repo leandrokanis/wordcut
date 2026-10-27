@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import sqlite3
 import unicodedata
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import datetime
 from typing import Any
 
@@ -13,7 +13,7 @@ from wordcut.cuts.assembly import MILLISECOND_DIGITS, AssembledCut, AssembledSeg
 from wordcut.cuts.caption import DEFAULT_CAPTION, stored_caption, validated
 from wordcut.cuts.spelling import check_spelling
 from wordcut.db import cuts, renders, transcripts, word_fixes
-from wordcut.db.cuts import CutRow
+from wordcut.db.cuts import CutRow, Segment
 from wordcut.db.renders import RenderRow
 from wordcut.db.transcripts import WordRow
 from wordcut.errors import WordcutError
@@ -47,11 +47,14 @@ def show_cut(
     its effective caption style, the options its next export uses and its exports, each with
     its file in ``home`` (by default the one of the environment) (docs/cli.md §8.2)."""
     row = existing_cut(connection, cut_id)
-    assembled = _assembled(connection, row)
+    words = transcripts.words_of(connection, row.sermon_id)
+    fixes = word_fixes.of_cut(connection, row.id)
+    assembled = assemble(row.segments, words, fixes)
     caption = stored_caption(row.caption)
     return {
         **_listed(row, assembled),
         "segments": [_segment(segment) for segment in assembled.segments],
+        "range_sentences": _range_sentences(connection, row, words, fixes),
         "words": [
             _word(word, segment.fixes) for segment in assembled.segments for word in segment.words
         ],
@@ -138,6 +141,64 @@ def fix_word(
             word_fixes.put(connection, row.id, word.id, proposed, moment)
         cuts.mark_edited(connection, row.id, moment)
     return {"cut_id": row.id, **_word(word, word_fixes.of_cut(connection, row.id))}
+
+
+def set_segments(
+    connection: sqlite3.Connection,
+    cut_id: int,
+    segments: Sequence[Mapping[str, Any]],
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """Make ``segments``, ranges of words ``{"from_word", "to_word"}`` in the order the cut
+    plays them, what the cut plays, and give it as ``show_cut`` does; ``now`` defaults to
+    the clock (docs/cli.md §8.10)."""
+    row = existing_cut(connection, cut_id)
+    wanted = _valid_segments(connection, row, segments)
+    moment = now or datetime.now().astimezone()
+    with connection:
+        cuts.set_segments(connection, row.id, wanted, moment)
+        cuts.mark_edited(connection, row.id, moment)
+    return show_cut(connection, row.id)
+
+
+def _valid_segments(
+    connection: sqlite3.Connection, row: CutRow, segments: Sequence[Mapping[str, Any]]
+) -> tuple[Segment, ...]:
+    """``segments`` as ranges of words of the cut's range that share no word, or
+    ``invalid_argument``; no message repeats what was given (ADR-0015)."""
+    if not segments:
+        raise _invalid_segments("O corte precisa de ao menos um trecho.")
+    words = transcripts.words_of(connection, row.sermon_id)
+    place = {word.id: index for index, word in enumerate(words)}
+    first, last = place[row.range_start_word], place[row.range_end_word]
+    wanted = tuple(_segment_of(item) for item in segments)
+    played: set[int] = set()
+    for segment in wanted:
+        if segment.from_word not in place or segment.to_word not in place:
+            raise _invalid_segments("Um trecho cita uma palavra que não é desta pregação.")
+        start, end = place[segment.from_word], place[segment.to_word]
+        if start > end:
+            raise _invalid_segments("Um trecho termina antes de começar.")
+        if start < first or end > last:
+            raise _invalid_segments("Um trecho sai da faixa do corte.")
+        spoken = set(range(start, end + 1))
+        if spoken & played:
+            raise _invalid_segments("Dois trechos tocam a mesma palavra.")
+        played |= spoken
+    return wanted
+
+
+def _segment_of(item: object) -> Segment:
+    if not isinstance(item, Mapping):
+        raise _invalid_segments("Cada trecho é um objeto com from_word e to_word.")
+    bounds = (item.get("from_word"), item.get("to_word"))
+    if not all(type(bound) is int for bound in bounds):
+        raise _invalid_segments("from_word e to_word são IDs de palavra, números inteiros.")
+    return Segment(item["from_word"], item["to_word"])
+
+
+def _invalid_segments(message: str) -> WordcutError:
+    return WordcutError("invalid_argument", message, {"argument": "segments"})
 
 
 def caption_of(connection: sqlite3.Connection, cut_id: int) -> dict[str, Any]:
@@ -246,6 +307,49 @@ def _spanned(row: CutRow, assembled: AssembledCut) -> dict[str, Any]:
         **_listed(row, assembled),
         "start": round(min(segment.start for segment in assembled.segments), MILLISECOND_DIGITS),
         "end": round(max(segment.end for segment in assembled.segments), MILLISECOND_DIGITS),
+    }
+
+
+def _range_sentences(
+    connection: sqlite3.Connection,
+    row: CutRow,
+    words: Sequence[WordRow],
+    fixes: Mapping[int, str],
+) -> list[dict[str, Any]]:
+    """The sentences of the sermon inside the cut's range, in spoken order, each cut down to
+    the range when it crosses its border, with how much of it the cut plays."""
+    place = {word.id: index for index, word in enumerate(words)}
+    first, last = place[row.range_start_word], place[row.range_end_word]
+    played = {
+        index
+        for segment in row.segments
+        for index in range(place[segment.from_word], place[segment.to_word] + 1)
+    }
+    found = []
+    for sentence in transcripts.sentences_of(connection, row.sermon_id):
+        start = max(place[sentence.first_word_id], first)
+        end = min(place[sentence.last_word_id], last)
+        if start <= end:
+            found.append(_range_sentence(sentence.id, words[start : end + 1], fixes, played, start))
+    return found
+
+
+def _range_sentence(
+    sentence_id: int,
+    spoken: Sequence[WordRow],
+    fixes: Mapping[int, str],
+    played: set[int],
+    position: int,
+) -> dict[str, Any]:
+    inside = sum(index in played for index in range(position, position + len(spoken)))
+    return {
+        "id": sentence_id,
+        "start": spoken[0].start,
+        "end": spoken[-1].end,
+        "text": " ".join(fixes.get(word.id, word.text) for word in spoken),
+        "first_word": spoken[0].id,
+        "last_word": spoken[-1].id,
+        "included": "none" if inside == 0 else "all" if inside == len(spoken) else "part",
     }
 
 

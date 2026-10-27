@@ -43,7 +43,10 @@ export function timedWords(cut: Pick<Cut, "segments" | "words">): TimedWord[] {
 }
 
 /** The cut's words that ``segment`` plays. */
-export function wordsOf(words: CutWord[], segment: CutSegment): CutWord[] {
+export function wordsOf(
+  words: CutWord[],
+  segment: Pick<CutSegment, "from_word" | "to_word">,
+): CutWord[] {
   return words.filter(({ word_id }) => word_id >= segment.from_word && word_id <= segment.to_word);
 }
 

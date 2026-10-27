@@ -14,6 +14,7 @@ import { CutTransport } from "./CutTransport";
 import { ExportButton } from "./ExportButton";
 import { TextTab } from "./TextTab";
 import { useCaptionStyle } from "./useCaptionStyle";
+import { useSentenceChoice } from "./useSentenceChoice";
 import { useWordFixes } from "./useWordFixes";
 import { WordEditor } from "./WordEditor";
 
@@ -32,6 +33,7 @@ async function loadCut(id: number): Promise<Loaded> {
 export function CutPage() {
   const id = Number(useParams().id);
   const loaded = useResource(() => loadCut(id), `cut:${id}`);
+  const [changed, setChanged] = useState<Loaded>();
 
   if (loaded.error) {
     return (
@@ -40,14 +42,30 @@ export function CutPage() {
       </Note>
     );
   }
-  if (!loaded.data) {
+  const current = changed?.cut.id === id ? changed : loaded.data;
+  if (!current) {
     return null;
   }
-  const { cut, sequence, sermon } = loaded.data;
+  const { cut, sequence, sermon } = current;
   if (sermon.sermon_start === null) {
     return <Note>A prévia do corte precisa da pregação processada.</Note>;
   }
-  return <CutLevel key={cut.id} cut={cut} sequence={sequence} sermonStart={sermon.sermon_start} />;
+
+  /** Shows the cut the API answered after a change of its content, with its new sequence. */
+  async function showChanged(saved: Cut) {
+    setChanged({ cut: saved, sequence: await previewCut(saved.id), sermon });
+  }
+
+  return (
+    <CutLevel
+      key={cut.id}
+      cut={cut}
+      sequence={sequence}
+      sermonStart={sermon.sermon_start}
+      processing={sermon.status === "processing"}
+      onChanged={showChanged}
+    />
+  );
 }
 
 function Note({ children }: { children: string }) {
@@ -65,9 +83,13 @@ interface CutLevelProps {
   sequence: Sequence;
   /** Where the processed video starts in the live. */
   sermonStart: number;
+  /** The sermon is being processed again, which remakes its cuts. */
+  processing: boolean;
+  /** Shows the cut the API answered after a change of what it plays. */
+  onChanged: (cut: Cut) => Promise<void>;
 }
 
-function CutLevel({ cut, sequence, sermonStart }: CutLevelProps) {
+function CutLevel({ cut, sequence, sermonStart, processing, onChanged }: CutLevelProps) {
   const preview = useRef<CutPreviewHandle>(null);
   const [cursor, setCursor] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -79,6 +101,14 @@ function CutLevel({ cut, sequence, sermonStart }: CutLevelProps) {
   const [editing, setEditing] = useState<TimedWord>();
   const [fixError, setFixError] = useState<string>();
   const fixed = useMemo(() => ({ ...cut, words: fixes.words }), [cut, fixes.words]);
+  const choice = useSentenceChoice(
+    cut,
+    async (saved) => {
+      await onChanged(saved);
+      markSaved();
+    },
+    processing,
+  );
   const size = caption.style.size;
   const blocks = useMemo(() => captionBlocks(timedWords(fixed), size), [fixed, size]);
 
@@ -124,7 +154,7 @@ function CutLevel({ cut, sequence, sermonStart }: CutLevelProps) {
     <div className="l3" onPointerDown={followClick}>
       <CutSide tab={tab} onTab={setTab} savedAt={savedAt}>
         {tab === "text" ? (
-          <TextTab cut={fixed} />
+          <TextTab cut={fixed} choice={choice} />
         ) : (
           <CaptionTab
             caption={caption}

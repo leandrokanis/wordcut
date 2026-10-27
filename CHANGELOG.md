@@ -306,6 +306,16 @@ Formato de [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões
   2 ganha as faixas "Vídeo" (miniaturas) e "Áudio" (onda), esmaecidas fora das bordas, o
   aviso "Preparando a timeline…" que some quando a tarefa termina e, na falha, "Tentar de
   novo" ([#9](https://github.com/leandrokanis/wordcut/issues/9)).
+- Escolher as frases do corte no texto da faixa (2.1.c.1, antecipada): `wordcut cut segments
+  <id> --file <arquivo|->` e `PUT /api/cuts/{id}/segments` (só administrador) trocam a lista
+  de trechos do corte, recusando com `invalid_argument`, sem gravar, lista vazia, palavra fora
+  da faixa ou de outra pregação, trecho invertido e sobreposição; o corte passa a editado.
+  `cut show` e o `GET` do corte trazem `range_sentences`, as frases da faixa com `included`
+  (`all`, `part`, `none`). Na web, a aba Texto do administrador lista essas frases com uma
+  caixa (marcada, parcial ou vazia): desmarcar divide ou encurta o trecho, marcar junta aos
+  vizinhos ou cria o trecho na ordem da pregação, e a prévia, a trilha e a duração se
+  remontam; a última frase não sai, e as caixas travam enquanto grava ou a pregação processa.
+  O assistente vê o texto como antes ([#5](https://github.com/leandrokanis/wordcut/issues/5)).
 
 ### Alterado
 

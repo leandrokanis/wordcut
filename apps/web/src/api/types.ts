@@ -117,6 +117,18 @@ export interface CutSegment {
   text: string;
 }
 
+/** A sentence of the cut's range, docs/cli.md §8.2: cut down to the range when it crosses
+ * its border, times in sermon time; ``included`` says how much of it the cut plays. */
+export interface RangeSentence {
+  id: number;
+  start: number;
+  end: number;
+  text: string;
+  first_word: number;
+  last_word: number;
+  included: "all" | "part" | "none";
+}
+
 /** A word of the cut: ``text`` is the original, ``corrected`` the cut's spelling fix. */
 export interface CutWord {
   word_id: number;
@@ -177,6 +189,7 @@ export interface RenderEstimate {
 /** ``GET /api/cuts/{id}``, service/cuts.py ``show_cut``: ``renders`` oldest first. */
 export interface Cut extends Omit<ListedCut, "start" | "end" | "segments"> {
   segments: CutSegment[];
+  range_sentences: RangeSentence[];
   words: CutWord[];
   caption: CaptionStyle;
   render_options: RenderOptions;

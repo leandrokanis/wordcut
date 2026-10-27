@@ -48,6 +48,7 @@ PERMISSIONS: dict[tuple[str, str], str] = {
     ("POST", "/api/cuts/{cut_id}/discard"): ASSISTANT,
     ("POST", "/api/cuts/{cut_id}/restore"): ASSISTANT,
     ("PUT", "/api/cuts/{cut_id}/words/{word_id}"): ASSISTANT,
+    ("PUT", "/api/cuts/{cut_id}/segments"): ADMIN,
     ("GET", "/api/cuts/{cut_id}/caption"): ASSISTANT,
     ("PATCH", "/api/cuts/{cut_id}/caption"): ASSISTANT,
     ("DELETE", "/api/cuts/{cut_id}/caption"): ASSISTANT,
@@ -118,12 +119,6 @@ def call(
 
 def test_the_table_has_every_route_of_the_app_and_nothing_more() -> None:
     assert app_routes() == set(PERMISSIONS)
-
-
-def test_there_is_no_route_to_edit_the_content_of_a_cut(assistant: TestClient) -> None:
-    response = assistant.put("/api/cuts/1/segments", json=[])
-
-    assert (response.status_code, response.json()["error"]["code"]) == (404, "not_found")
 
 
 def test_every_route_in_the_table_requires_someone_identified(wordcut_home: Path) -> None:

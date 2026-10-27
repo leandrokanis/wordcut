@@ -25,13 +25,13 @@ function captionLayer(): HTMLElement {
   });
 }
 
-test("opens on Texto, with the cut's assembled text", async () => {
+test("opens on Texto, with the sentences of the cut's range for the administrator", async () => {
   await openTabs();
 
   const panel = screen.getByRole("tabpanel");
   expect([selectedTab(), panel.textContent]).toEqual([
     "Texto",
-    expect.stringMatching(/Deus governa\..*Irmãos, graça.*paz\./),
+    expect.stringMatching(/Irmãos, graça paz\..*Então Deus governa\..*Amém, igreja\./),
   ]);
 });
 

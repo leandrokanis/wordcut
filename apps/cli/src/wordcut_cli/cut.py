@@ -1,15 +1,18 @@
 """``wordcut cut <action>``: see and preview the suggested cuts of a sermon, choose, discard
-or restore them, fix the spelling of their caption words, set their caption style and export
-them (docs/cli.md §8.1–§8.7)."""
+or restore them, fix the spelling of their caption words, set their caption style, set what
+they play and export them (docs/cli.md §8.1–§8.7, §8.10)."""
 
 from __future__ import annotations
 
 import argparse
+import json
 import sqlite3
+import sys
 from collections.abc import Callable
 from contextlib import closing
 from dataclasses import fields
 from functools import partial
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from wordcut.cuts.caption import POSITIONS, RANGES, SHADOWS, CaptionSettings
@@ -25,6 +28,7 @@ from wordcut.service.cuts import (
     preview_cut,
     reset_caption,
     restore_cut,
+    set_segments,
     show_cut,
     update_caption,
 )
@@ -41,6 +45,7 @@ if TYPE_CHECKING:
 CAPTION_FIELDS = tuple(field.name for field in fields(CaptionSettings))
 POSITION_NAMES = {"top": "topo", "center": "centro", "bottom": "base"}
 SHADOW_NAMES = {"none": "nenhuma", "soft": "suave", "strong": "forte"}
+STDIN = "-"
 STATE_NAMES = {"suggested": "sugerido", "chosen": "escolhido", "discarded": "descartado"}
 
 
@@ -48,8 +53,8 @@ def register(commands: Commands) -> None:
     actions = add_group(
         commands,
         "cut",
-        help="cortes: ver, escolher, descartar, restaurar, corrigir a grafia, ajustar o estilo"
-        " da legenda e exportar",
+        help="cortes: ver, escolher, descartar, restaurar, corrigir a grafia, definir os"
+        " trechos, ajustar o estilo da legenda e exportar",
     )
     listing = add_command(
         actions,
@@ -112,6 +117,19 @@ def register(commands: Commands) -> None:
     fix.add_argument("id", type=int, help="ID do corte")
     fix.add_argument("word_id", type=int, help="ID da palavra, como no cut show")
     fix.add_argument("text", help="a palavra com a grafia corrigida")
+    segments = add_command(
+        actions,
+        "segments",
+        help="define o que entra no corte e em que ordem: uma lista JSON de trechos"
+        ' [{"from_word", "to_word"}], dentro da faixa e sem sobreposição — administrador',
+        run=_segments,
+        render=_render_cut,
+        example="wordcut cut segments 34 --file - --json < trechos.json",
+    )
+    segments.add_argument("id", type=int, help="ID do corte")
+    segments.add_argument(
+        "--file", required=True, help="arquivo com a lista de trechos, em JSON; - lê do stdin"
+    )
     caption = add_command(
         actions,
         "caption",
@@ -336,6 +354,39 @@ def _preview(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:
 def _fix_word(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:
     with closing(deps.connection()) as connection:
         return fix_word(connection, args.id, args.word_id, args.text)
+
+
+def _segments(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:
+    wanted = _segments_file(args.file)
+    with closing(deps.connection()) as connection:
+        try:
+            return set_segments(connection, args.id, wanted)
+        except WordcutError as error:
+            if (error.details or {}).get("argument") != "segments":
+                raise
+            raise WordcutError(error.code, error.message, {"argument": "file"}) from error
+
+
+def _segments_file(source: str) -> list[Any]:
+    """The list of segments in ``source``, a path or ``-`` for the standard input."""
+    # ADR-0015: neither the path nor the content the user gave is repeated.
+    try:
+        text = sys.stdin.read() if source == STDIN else Path(source).read_text(encoding="utf-8")
+        wanted = json.loads(text)
+    except (OSError, UnicodeDecodeError, ValueError) as error:
+        raise _unreadable_segments() from error
+    if not isinstance(wanted, list):
+        raise _unreadable_segments()
+    return wanted
+
+
+def _unreadable_segments() -> WordcutError:
+    return WordcutError(
+        "invalid_argument",
+        "Não foi possível ler os trechos; use um arquivo JSON com uma lista de"
+        ' {"from_word", "to_word"}.',
+        {"argument": "file"},
+    )
 
 
 def _render_fixed_word(word: dict[str, Any]) -> str:

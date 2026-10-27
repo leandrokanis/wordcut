@@ -1,5 +1,5 @@
 """Cuts: list, show and preview them, choose, discard or restore them, fix the spelling of
-their words and set their caption style (docs/api.md)."""
+their words, set what they play and set their caption style (docs/api.md)."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from collections.abc import Callable
 from contextlib import closing
 from typing import Any, Literal
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import StrictBool, StrictInt
 
 from wordcut import db
@@ -22,10 +22,12 @@ from wordcut.service.cuts import (
     preview_cut,
     reset_caption,
     restore_cut,
+    set_segments,
     show_cut,
     update_caption,
 )
 from wordcut_api import deps
+from wordcut_api.auth import require
 from wordcut_api.bodies import Body, Changes
 
 router = APIRouter(prefix="/api")
@@ -38,6 +40,19 @@ class FixedWord(Body):
     """The word with its spelling fixed (docs/cli.md §8.5)."""
 
     text: str
+
+
+class WordRange(Body):
+    """Words ``from_word`` to ``to_word`` of the sermon, by word ID (docs/cli.md §8.10)."""
+
+    from_word: StrictInt
+    to_word: StrictInt
+
+
+class Segments(Body):
+    """What the cut plays, in the order it plays it (docs/cli.md §8.10)."""
+
+    segments: list[WordRange]
 
 
 class CaptionChanges(Changes):
@@ -102,6 +117,13 @@ def _transition(
 def fix(cut_id: int, word_id: int, body: FixedWord) -> dict[str, Any]:
     with closing(db.connect(deps.home())) as connection:
         return fix_word(connection, cut_id, word_id, body.text)
+
+
+@router.put("/cuts/{cut_id}/segments", dependencies=[Depends(require("admin"))])
+def change_segments(cut_id: int, body: Segments) -> dict[str, Any]:
+    wanted = [segment.model_dump() for segment in body.segments]
+    with closing(db.connect(deps.home())) as connection:
+        return without_paths(set_segments(connection, cut_id, wanted))
 
 
 @router.get("/cuts/{cut_id}/caption")

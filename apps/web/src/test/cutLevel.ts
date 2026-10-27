@@ -1,6 +1,7 @@
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
+import type { Me } from "../api/types";
 import type { RecordedCall } from "./fakeApi";
 import { fakePlayers, type FakePlayers } from "./fakePlayers";
 import { cutPreview, defaultRenderOptions, processedSermon, shownCut } from "./fixtures";
@@ -19,14 +20,21 @@ export interface OpenedCut {
   video: HTMLElement;
 }
 
-/** Opens the level of cut 34 (``shownCut``) with doubles of the API and the players. */
-export async function openCut(routes: Parameters<typeof fakeShellApi>[0] = {}): Promise<OpenedCut> {
-  const calls = fakeShellApi({
-    "GET /api/cuts/34": { body: shownCut() },
-    "GET /api/cuts/34/preview": { body: cutPreview() },
-    "GET /api/sermons/12": { body: processedSermon({ sermon_start: SERMON_START }) },
-    ...routes,
-  });
+/** Opens the level of cut 34 (``shownCut``) with doubles of the API and the players, for the
+ * administrator unless ``me`` says otherwise. */
+export async function openCut(
+  routes: Parameters<typeof fakeShellApi>[0] = {},
+  me?: Me,
+): Promise<OpenedCut> {
+  const calls = fakeShellApi(
+    {
+      "GET /api/cuts/34": { body: shownCut() },
+      "GET /api/cuts/34/preview": { body: cutPreview() },
+      "GET /api/sermons/12": { body: processedSermon({ sermon_start: SERMON_START }) },
+      ...routes,
+    },
+    me,
+  );
   const players = fakePlayers();
   renderRoute("/cuts/34", players);
   const video = await screen.findByLabelText("Prévia do corte");

@@ -519,6 +519,12 @@ Devolve o corte completo:
 
 - texto montado, duração, estado e faixa na pregação;
 - `segments`: trechos em ordem, no formato de `cut segments` (§8.10), com tempos e texto;
+- `range_sentences`: as frases da faixa do corte, na ordem da pregação, cada uma com `id`,
+  `start` e `end` (tempo da pregação), `text` (com as correções de grafia do corte),
+  `first_word` e `last_word` e `included`: `all` quando o corte toca todas as suas palavras,
+  `part` quando toca algumas e `none` quando não toca nenhuma. A frase que cruza a borda da
+  faixa vem recortada a ela: `first_word`, `last_word`, tempos e texto são os da parte dentro
+  da faixa. Sem `--json`, não aparece;
 - `words`: palavras do corte com `word_id`, `text` (o original), tempos e `corrected` (a
   correção de grafia do corte, §8.5, ou `null`);
 - `caption`: estilo efetivo da legenda, no formato de `cut caption` (§8.6); o padrão completo
@@ -687,9 +693,27 @@ uma lista ordenada de faixas de palavras:
 ]
 ```
 
-- A lista cobre escolher frases, reordenar trechos e dividir uma frase.
-- As palavras MUST estar dentro da faixa do corte; senão, `invalid_argument`.
+- A lista cobre escolher frases, reordenar trechos e dividir uma frase. Ela substitui a
+  anterior inteira, na ordem dada.
+- `invalid_argument`, sem gravar nada: lista vazia; elemento que não é um objeto com
+  `from_word` e `to_word` inteiros; palavra que não é da pregação do corte; trecho que
+  termina antes de começar; palavra fora da faixa do corte (as bordas da faixa valem);
+  trechos que se sobrepõem, inclusive repetidos. Arquivo ilegível, que não é JSON ou não é
+  uma lista também dá `invalid_argument`. Em todos os casos, `details.argument` é `file` e
+  nenhuma mensagem repete o caminho nem o conteúdo (ADR-0015). Corte inexistente:
+  `not_found`.
+- Gravar marca o corte como editado (`edited`), e `sermon suggest` o mantém (§7.6). As
+  correções de grafia ficam gravadas, inclusive as das palavras que saem do corte, que
+  voltam se a frase voltar; as exportações já feitas não mudam. Vale em qualquer estado do
+  corte; não é tarefa nem toma a trava.
+- A CLI roda no host e não confere papel, como `preset`; pela API, só o administrador
+  (§5.3).
+- Saída: o corte como `cut show` (§8.2), em JSON ou em texto.
 - `cut show --json` devolve `segments` no mesmo formato, para editar e devolver.
+
+```
+wordcut cut segments 34 --file - --json < trechos.json
+```
 
 ### 8.11. `cut delete <id>` — administrador
 
