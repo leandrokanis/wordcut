@@ -5,13 +5,16 @@ import type { SermonShown } from "../../api/types";
 import { formatDuration } from "../../ui/format";
 import { useMachineStatus } from "../status/MachineStatus";
 import { otherWork } from "../status/StatusBar";
+import type { Processing } from "./useProcessing";
 
 interface SermonExportMenuProps {
   sermon: SermonShown;
+  processing: Processing;
 }
 
-/** The level 2 action of a processed sermon: Exportar opens the prototype's menu. */
-export function SermonExportMenu({ sermon }: SermonExportMenuProps) {
+/** The level 2 action of a processed sermon: Exportar opens the prototype's menu, which also
+ * offers Reprocessar once the borders differ from the processed ones. */
+export function SermonExportMenu({ sermon, processing }: SermonExportMenuProps) {
   const [open, setOpen] = useState(false);
   const button = useRef<HTMLButtonElement>(null);
   const root = useRef<HTMLDivElement>(null);
@@ -63,6 +66,21 @@ export function SermonExportMenu({ sermon }: SermonExportMenuProps) {
             <b>Pregação 16:9</b>
             <small>{videoSummary(sermon)}</small>
           </a>
+          {sermon.borders_changed && (
+            <button
+              className="mi"
+              type="button"
+              role="menuitem"
+              disabled={busy !== undefined || processing.pending}
+              onClick={() => {
+                setOpen(false);
+                processing.launch(true);
+              }}
+            >
+              <b>Reprocessar</b>
+              <small>Refaz transcrição e sugestões; as edições dos cortes se perdem</small>
+            </button>
+          )}
           {busy !== undefined && <p className="mnote">Máquina ocupada: {busy}.</p>}
         </div>
       )}

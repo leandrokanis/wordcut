@@ -23,7 +23,6 @@ export function SermonPage() {
   const preview = useRef<PreviewHandle>(null);
   const [cursor, setCursor] = useState(0);
   const [patched, setPatched] = useState<SermonShown>();
-  const [bordersChanged, setBordersChanged] = useState(false);
   const shown = patched ?? sermon.data;
   const cuts = useSermonCuts(sermon.data);
   // A fresh load of the sermon already has the borders the PATCH saved.
@@ -34,20 +33,15 @@ export function SermonPage() {
     sermonId: id,
     saved: shown ? savedBounds(shown, liveDuration ?? 0) : { start: 0, end: 0 },
     liveDuration: liveDuration ?? 0,
-    onSaved(saved) {
-      setPatched(saved);
-      setBordersChanged(saved.status === "processed");
-    },
+    // The PATCH answers the sermon as shown, borders_changed included.
+    onSaved: setPatched,
   });
 
   function moveEdge(edge: Edge, liveSeconds: number) {
     preview.current?.seek(edges.move(edge, liveSeconds));
   }
 
-  const processing = useProcessing(shown, () => {
-    setBordersChanged(false);
-    sermon.reload();
-  });
+  const processing = useProcessing(shown, sermon.reload);
   const editable = shown !== undefined && !processing.processing && shown.status !== "processing";
   useEffect(() => {
     if (processing.processing) {
@@ -78,8 +72,8 @@ export function SermonPage() {
         <div className="l2-bar">
           <span className="spacer" />
           <Saved savedAt={edges.savedAt} />
-          <ProcessButton sermon={shown} bordersChanged={bordersChanged} processing={processing} />
-          {shown.status === "processed" && editable && <SermonExportMenu sermon={shown} />}
+          <ProcessButton sermon={shown} processing={processing} />
+          {shown.status === "processed" && editable && <SermonExportMenu sermon={shown} processing={processing} />}
         </div>
         <Preview
           key={shown.status === "processed" ? "processed" : "live"}

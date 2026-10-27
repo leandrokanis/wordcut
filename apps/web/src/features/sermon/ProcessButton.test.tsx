@@ -1,4 +1,4 @@
-import { act, fireEvent, screen, within } from "@testing-library/react";
+import { act, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach } from "vitest";
 
@@ -196,42 +196,3 @@ test("locks Processar with the reason once the API says the live is on", async (
   ]).toEqual([LIVE_ON, true]);
 });
 
-async function openProcessedAndMoveBorder() {
-  const routes = {
-    "PATCH /api/sermons/12": ({ body }: RecordedCall) => {
-      const { start, end } = body as { start: number; end: number };
-      return { body: processedSermon({ live_start: start, live_end: end }) };
-    },
-  };
-  await openSermon(processedSermon({ live_duration: 7080 }), routes);
-  const before = screen.queryByRole("button", { name: "Reprocessar" });
-  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue(
-    DOMRect.fromRect({ x: 0, y: 0, width: 1000, height: 100 }),
-  );
-  const timeline = screen.getByRole("region", { name: "Timeline" });
-  const start = within(timeline).getByRole("slider", { name: "Início da pregação" });
-  fireEvent.pointerDown(start, { clientX: 254 });
-  fireEvent.pointerMove(start, { clientX: 300 });
-  fireEvent.pointerUp(start, { clientX: 300 });
-  return before;
-}
-
-test("offers Reprocessar, warning that the cuts' edits are lost, once the borders change", async () => {
-  const before = await openProcessedAndMoveBorder();
-
-  await screen.findByRole("button", { name: "Reprocessar" });
-
-  expect([before, screen.getByText(/as edições dos cortes se perdem/).tagName]).toEqual([
-    null,
-    "P",
-  ]);
-});
-
-test("reprocesses with force, the only way the API discards the cuts' edits", async () => {
-  fakeEventSource();
-  await openProcessedAndMoveBorder();
-
-  await userEvent.click(await screen.findByRole("button", { name: "Reprocessar" }));
-
-  expect(processPosts().map(({ body }) => body)).toEqual([{ force: true }]);
-});

@@ -287,6 +287,13 @@ Formato de [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões
   processamento nem enquanto a pregação reprocessa; abre e fecha pelo teclado (setas, Esc
   devolve o foco ao botão) e fecha ao clicar fora, sem baixar
   ([#7](https://github.com/leandrokanis/wordcut/issues/7)).
+- A pregação guarda as bordas na live do último processamento bem-sucedido (migração 0011;
+  as já processadas ficam com as bordas atuais) e `sermon show`, `sermon list` e a API
+  passam a trazer `borders_changed`: verdadeiro quando a pregação está processada e as bordas
+  atuais diferem das processadas. O `sermon show` legível avisa para reprocessar com
+  `--force`. Na web, Reprocessar sai do botão do nível 2 e entra no menu Exportar a partir
+  desse campo, valendo depois de recarregar ou em outra sessão; a recusa da API aparece na
+  barra do nível 2 ([#8](https://github.com/leandrokanis/wordcut/issues/8)).
 
 ### Alterado
 

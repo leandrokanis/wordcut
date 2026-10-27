@@ -1,4 +1,4 @@
-"""SQL access to the ``sermons`` table (migrations 0002, 0004 and 0007)."""
+"""SQL access to the ``sermons`` table (migrations 0002, 0004, 0007 and 0011)."""
 
 from __future__ import annotations
 
@@ -10,7 +10,8 @@ from typing import Any
 COLUMNS = (
     "id, youtube_id, url, title, service_date, live_duration, live_finished, status,"
     " live_start, live_end, created_at, updated_at, sermon_start, sermon_end, video_path,"
-    " processed_at, suggestion_error_code, suggestion_error_message"
+    " processed_at, suggestion_error_code, suggestion_error_message, processed_live_start,"
+    " processed_live_end"
 )
 
 
@@ -52,6 +53,8 @@ class SermonRow:
     video_path: str | None = None
     processed_at: datetime | None = None
     suggestion_error: SuggestionError | None = None
+    processed_live_start: float | None = None
+    processed_live_end: float | None = None
 
 
 def insert(connection: sqlite3.Connection, sermon: NewSermon) -> SermonRow:
@@ -126,10 +129,15 @@ def record_processed(
     processed_at: datetime,
 ) -> None:
     """Mark the sermon ``processed``, in the caller's transaction, with its borders fitted to
-    the words (live time) and its video (``video_path``, relative to the data folder)."""
+    the words (live time) and its video (``video_path``, relative to the data folder).
+
+    The live borders become the processed ones: a sermon being processed refuses a trim, so
+    they are the borders the processing used.
+    """
     connection.execute(
-        "UPDATE sermons SET status = 'processed', sermon_start = ?, sermon_end = ?,"
-        " video_path = ?, processed_at = ?, updated_at = ? WHERE id = ?",
+        "UPDATE sermons SET status = 'processed', processed_live_start = live_start,"
+        " processed_live_end = live_end, sermon_start = ?, sermon_end = ?, video_path = ?,"
+        " processed_at = ?, updated_at = ? WHERE id = ?",
         (
             sermon_start,
             sermon_end,
@@ -205,6 +213,8 @@ def _row(values: tuple[Any, ...]) -> SermonRow:
         processed_at,
         suggestion_error_code,
         suggestion_error_message,
+        processed_live_start,
+        processed_live_end,
     ) = values
     return SermonRow(
         id=sermon_id,
@@ -228,4 +238,6 @@ def _row(values: tuple[Any, ...]) -> SermonRow:
             if suggestion_error_code is None
             else SuggestionError(suggestion_error_code, suggestion_error_message)
         ),
+        processed_live_start=processed_live_start,
+        processed_live_end=processed_live_end,
     )

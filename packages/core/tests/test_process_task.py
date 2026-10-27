@@ -6,10 +6,11 @@ from typing import Any
 import pytest
 
 from wordcut import processing
-from wordcut.db import connect, tasks
+from wordcut.db import connect, sermons, tasks
+from wordcut.errors import WordcutError
 from wordcut.home import Home
 from wordcut.processing import OnProgress
-from wordcut.service.sermons import create_sermon, show_sermon
+from wordcut.service.sermons import create_sermon, show_sermon, trim_sermon
 from wordcut.service.settings import update_settings
 from wordcut.tasks import BUILTIN_KIND_MODULES, Progress, Resource, execution, kind
 from wordcut.tasks.execution import start
@@ -163,3 +164,66 @@ def test_the_task_transcribes_with_the_configured_whisperx_model(
     run_task(home, sermon_id, detach=False)
 
     assert models == [used]
+
+
+class WordsInsideTheBorders(FakeGateways):
+    """Words that start and end inside the live borders, so the fitted borders differ."""
+
+    def transcribe(self, media: Path, workdir: Path, *, on_progress: OnProgress) -> Transcript:
+        words = (Word("Irmãos", 1002.5, 1003.0), Word("Amém.", 1096.0, 1097.5))
+        shifted = tuple(word.shifted(-SECTION_START) for word in words)
+        return Transcript(words=shifted, language="pt", model="fake")
+
+
+class FailingTranscription(FakeGateways):
+    def transcribe(self, media: Path, workdir: Path, *, on_progress: OnProgress) -> Transcript:
+        raise RuntimeError("WhisperX quebrou")
+
+
+def processed_borders(home: Home, sermon_id: int) -> tuple[float | None, float | None]:
+    with closing(connect(home)) as connection:
+        row = sermons.by_id(connection, sermon_id)
+    assert row is not None
+    return row.processed_live_start, row.processed_live_end
+
+
+def test_a_successful_processing_keeps_the_live_borders_it_used_as_the_processed_ones(
+    home: Home, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        processing, "default_gateways", lambda whisper_model: WordsInsideTheBorders()
+    )
+    sermon_id = trimmed_sermon(home)
+
+    run_task(home, sermon_id, detach=False)
+
+    assert processed_borders(home, sermon_id) == (1000.0, 1100.0)
+
+
+def test_a_failed_reprocessing_keeps_the_borders_of_the_last_successful_one(
+    home: Home, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sermon_id = trimmed_sermon(home)
+    run_task(home, sermon_id, detach=False)
+    with closing(connect(home)) as connection:
+        trim_sermon(connection, sermon_id, 1010.0, 1100.0)
+    monkeypatch.setattr(
+        processing, "default_gateways", lambda whisper_model: FailingTranscription()
+    )
+
+    with pytest.raises(WordcutError):
+        start(home, "process", Resource("sermon", sermon_id), {"force": True}, detach=False)
+
+    assert processed_borders(home, sermon_id) == (1000.0, 1100.0)
+
+
+def test_a_successful_reprocessing_after_a_border_change_clears_the_change(home: Home) -> None:
+    sermon_id = trimmed_sermon(home)
+    run_task(home, sermon_id, detach=False)
+    with closing(connect(home)) as connection:
+        trim_sermon(connection, sermon_id, 1010.0, 1100.0)
+
+    start(home, "process", Resource("sermon", sermon_id), {"force": True}, detach=False)
+
+    with closing(connect(home)) as connection:
+        assert show_sermon(connection, sermon_id, home=home)["borders_changed"] is False

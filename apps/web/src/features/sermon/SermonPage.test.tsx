@@ -223,20 +223,14 @@ describe("while the sermon processes", () => {
 
   test("hides the download once the API accepts the reprocessing of a processed sermon", async () => {
     fakeEventSource();
-    await openSermon(processedSermon({ live_duration: 7080 }), {
-      "PATCH /api/sermons/12": ({ body }: RecordedCall) => {
-        const { start, end } = body as { start: number; end: number };
-        return { body: processedSermon({ live_duration: 7080, live_start: start, live_end: end }) };
-      },
-    });
-    dragStart();
-    const reprocess = await screen.findByRole("button", { name: "Reprocessar" });
-    const before = screen.queryByRole("button", { name: "Exportar" });
+    await openSermon(processedSermon({ live_duration: 7080, borders_changed: true }));
+    const exportar = screen.getByRole("button", { name: "Exportar" });
+    await userEvent.click(exportar);
 
-    await userEvent.click(reprocess);
+    await userEvent.click(screen.getByRole("menuitem", { name: /Reprocessar/ }));
     await screen.findByRole("button", { name: /^Processando/ });
 
-    expect([before?.tagName, screen.queryByRole("button", { name: "Exportar" })]).toEqual([
+    expect([exportar.tagName, screen.queryByRole("button", { name: "Exportar" })]).toEqual([
       "BUTTON",
       null,
     ]);

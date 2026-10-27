@@ -322,7 +322,8 @@ wordcut sermon create https://youtube.com/live/… --start 1:02:10 --end 1:48:30
 
 ### 7.2. `sermon list [--status S]` · `sermon show <id> [--transcript]`
 
-- `list`: ID, título, data, duração da pregação, estado e quantidade de cortes por estado.
+- `list`: ID, título, data, duração da pregação, estado, quantidade de cortes por estado e
+  `borders_changed`.
 - `show`: os mesmos dados, mais as bordas na live (`live_start`, `live_end`), as bordas
   ajustadas às palavras pelo processamento (`sermon_start`, `sermon_end`, em tempo da live;
   `null` antes de processar), `processed_at`, a última tarefa da pregação (`last_task`, no
@@ -333,6 +334,12 @@ wordcut sermon create https://youtube.com/live/… --start 1:02:10 --end 1:48:30
   `range_end_word` (primeira e última palavra da faixa contínua, na ordem da pregação),
   `source` (`llm` ou `admin`), `preset_id` (o preset da sugestão; `null` se o preset foi
   apagado ou o corte não veio do LLM) e `edited`.
+- `borders_changed` (em `list` e `show`): `true` quando a pregação está `processed` e as
+  bordas na live (`live_start`, `live_end`) diferem, ao milissegundo, das usadas no último
+  processamento bem-sucedido (1.1.b.3); `false` nos demais casos, inclusive para pregações
+  processadas antes de as bordas processadas serem guardadas, até a próxima mudança. Sem
+  `--json`, o `show` traz a linha
+  `Bordas mudaram desde o processamento: reprocesse com wordcut sermon process --force.`
 - `suggestion_error`: `{"code", "message"}` da última sugestão que falhou, ou `null` quando
   ela deu certo ou nunca rodou. Sem `--json`, o `show` termina com a linha
   `Sugestão de cortes falhou: <mensagem>`.
@@ -342,6 +349,7 @@ wordcut sermon create https://youtube.com/live/… --start 1:02:10 --end 1:48:30
               "segments": [ { "from_word": 1201, "to_word": 1230 } ],
               "range_start_word": 1201, "range_end_word": 1230, "source": "llm",
               "preset_id": 1, "edited": false } ],
+  "borders_changed": false,
   "suggestion_error": null }
 ```
 - `--transcript`: acrescenta a transcrição, uma frase por linha, com ID da frase, tempo e IDs
@@ -362,7 +370,9 @@ Define as bordas da pregação, em tempo da live (1.1.b.2).
 - Faixa com menos de 1 minuto: `sermon_too_short`.
 - Bordas fora de `[0, duração da live]` ou com o início no fim ou depois dele:
   `invalid_argument`. Com a duração da live desconhecida (live no ar), vale só a ordem.
-- Numa pregação processada, só grava as bordas; reprocessar é `sermon process --force`.
+- Numa pregação processada, só grava as bordas; reprocessar é `sermon process --force`. A
+  resposta traz `borders_changed` (§7.2), que volta a `false` quando as bordas voltam às
+  processadas.
 
 ### 7.4. `sermon process <id> [--force] [--wait]`
 
@@ -375,7 +385,9 @@ pede as sugestões ao LLM com o preset padrão (2.1.b.1).
   refeitos (1.1.b.3); sem ele, `would_discard_edits`. Com `--force`, os cortes da pregação
   são apagados junto com as palavras e as frases.
 - Uma pregação `failed` é refeita pelo mesmo comando (1.1.c.3).
-- A pregação fica `processing` desde o lançamento e termina `processed` ou `failed`.
+- A pregação fica `processing` desde o lançamento e termina `processed` ou `failed`. O
+  sucesso guarda as bordas na live usadas como as processadas, e `borders_changed` (§7.2)
+  volta a `false`; a falha não as muda.
 - Depois de gravar palavras e frases, a tarefa pede os cortes ao LLM uma vez (constituição
   §III), com o prompt do preset padrão e as frases numeradas de 1 em diante, sem tempos. A
   resposta é validada por esquema; fora dele, uma nova tentativa; fora de novo, `llm_error`.

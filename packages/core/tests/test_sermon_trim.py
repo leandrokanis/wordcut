@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from wordcut.db import connect
+from wordcut.db import MIGRATIONS, connect, sermons
 from wordcut.errors import WordcutError
 from wordcut.home import Home
 from wordcut.lock import ProcessingLock
@@ -354,3 +354,109 @@ def test_create_with_a_single_border_is_refused_before_anything_is_created(
         {"argument": missing},
         {"items": []},
     )
+
+
+PROCESSED_AT = TRIMMED_AT + timedelta(minutes=30)
+
+
+def processed_between(
+    connection: sqlite3.Connection, sermon_id: int, start: float, end: float
+) -> None:
+    """Stand in for a processing that succeeded with the borders ``start`` and ``end``."""
+    trim_sermon(connection, sermon_id, start, end, now=TRIMMED_AT)
+    with connection:
+        sermons.record_processed(
+            connection, sermon_id, start + 0.4, end - 0.6, "sermon.mp4", PROCESSED_AT
+        )
+
+
+def borders_changed(connection: sqlite3.Connection, sermon_id: int) -> bool:
+    changed: bool = show_sermon(connection, sermon_id, home=home_of(connection))["borders_changed"]
+    return changed
+
+
+def test_processed_sermon_whose_borders_changed_tells_so(
+    connection: sqlite3.Connection, sermon: dict[str, Any]
+) -> None:
+    processed_between(connection, sermon["id"], 3730.0, 6510.0)
+    trim_sermon(connection, sermon["id"], 3735.5, 6510.0, now=PROCESSED_AT)
+
+    assert borders_changed(connection, sermon["id"]) is True
+
+
+def test_processed_sermon_with_its_processed_borders_shows_no_change(
+    connection: sqlite3.Connection, sermon: dict[str, Any]
+) -> None:
+    processed_between(connection, sermon["id"], 3730.0, 6510.0)
+
+    assert borders_changed(connection, sermon["id"]) is False
+
+
+def test_borders_put_back_to_the_processed_ones_show_no_change(
+    connection: sqlite3.Connection, sermon: dict[str, Any]
+) -> None:
+    processed_between(connection, sermon["id"], 3730.0, 6510.0)
+    trim_sermon(connection, sermon["id"], 3735.5, 6400.0, now=PROCESSED_AT)
+
+    trim_sermon(connection, sermon["id"], 3730.0, 6510.0, now=PROCESSED_AT)
+
+    assert borders_changed(connection, sermon["id"]) is False
+
+
+@pytest.mark.parametrize("status", ["created", "trimmed", "failed"])
+def test_sermon_not_processed_shows_no_change_whatever_its_borders(
+    connection: sqlite3.Connection, sermon: dict[str, Any], status: str
+) -> None:
+    processed_between(connection, sermon["id"], 3730.0, 6510.0)
+    trim_sermon(connection, sermon["id"], 3735.5, 6400.0, now=PROCESSED_AT)
+    put_in_state(connection, sermon["id"], status)
+
+    assert borders_changed(connection, sermon["id"]) is False
+
+
+def test_listed_sermon_tells_whether_its_borders_changed(
+    connection: sqlite3.Connection, sermon: dict[str, Any]
+) -> None:
+    processed_between(connection, sermon["id"], 3730.0, 6510.0)
+    trim_sermon(connection, sermon["id"], 3735.5, 6510.0, now=PROCESSED_AT)
+
+    assert [
+        item["borders_changed"]
+        for item in list_sermons(connection, home=home_of(connection))["items"]
+    ] == [True]
+
+
+def test_trimming_a_processed_sermon_answers_whether_its_borders_changed(
+    connection: sqlite3.Connection, sermon: dict[str, Any]
+) -> None:
+    processed_between(connection, sermon["id"], 3730.0, 6510.0)
+
+    answers = [
+        trim_sermon(connection, sermon["id"], start, 6510.0, now=PROCESSED_AT)["borders_changed"]
+        for start in (3735.5, 3730.0)
+    ]
+
+    assert answers == [True, False]
+
+
+def test_sermon_processed_before_the_processed_borders_were_kept_shows_no_change(
+    tmp_path: Path,
+) -> None:
+    home = Home(tmp_path / "home")
+    up_to_10 = tmp_path / "migrations"
+    up_to_10.mkdir()
+    for packaged in MIGRATIONS.glob("*.sql"):
+        if int(packaged.name.split("_")[0]) <= 10:
+            (up_to_10 / packaged.name).write_text(packaged.read_text(encoding="utf-8"))
+    with closing(connect(home, up_to_10)) as old, old:
+        sermon_id = old.execute(
+            "INSERT INTO sermons (youtube_id, url, title, service_date, live_finished, status,"
+            " live_start, live_end, created_at, updated_at) VALUES ('Ab3_x-9QzLk', ?, 'Culto',"
+            " '2026-10-18', 1, 'processed', 3730.0, 6510.0, '2026-10-26T19:40:00-03:00',"
+            " '2026-10-26T19:40:00-03:00')",
+            (LINK,),
+        ).lastrowid
+    assert sermon_id is not None
+
+    with closing(connect(home)) as migrated:
+        assert borders_changed(migrated, sermon_id) is False

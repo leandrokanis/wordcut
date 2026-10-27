@@ -39,7 +39,12 @@ def link(youtube_id: str) -> str:
 def listed(created: dict[str, Any]) -> dict[str, Any]:
     """What ``list_sermons`` shows of a sermon that has no borders nor cuts yet."""
     sermon = {field: value for field, value in created.items() if field != "created"}
-    return {**sermon, "duration": None, "cut_counts": {"suggested": 0, "chosen": 0, "discarded": 0}}
+    return {
+        **sermon,
+        "duration": None,
+        "borders_changed": False,
+        "cut_counts": {"suggested": 0, "chosen": 0, "discarded": 0},
+    }
 
 
 class FakeLive:

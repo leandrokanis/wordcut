@@ -575,3 +575,21 @@ def test_the_task_a_processing_launched_is_found_among_the_tasks(
         "running",
         launched["sermon_id"],
     )
+
+
+def test_show_list_and_trim_tell_whether_the_borders_changed_since_processing(
+    assistant: TestClient, home: Home
+) -> None:
+    sermon_id = processed_sermon(home)
+
+    changed = assistant.patch(f"/api/sermons/{sermon_id}", json={"start": 990, "end": 1110})
+    shown = assistant.get(f"/api/sermons/{sermon_id}").json()
+    listed = assistant.get("/api/sermons").json()["items"]
+    put_back = assistant.patch(f"/api/sermons/{sermon_id}", json={"start": 1000, "end": 1100})
+
+    assert (
+        changed.json()["borders_changed"],
+        shown["borders_changed"],
+        [item["borders_changed"] for item in listed],
+        put_back.json()["borders_changed"],
+    ) == (True, True, [True], False)

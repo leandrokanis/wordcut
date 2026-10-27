@@ -99,7 +99,11 @@ Corpos de entrada:
 - `start` e `end` do `PATCH` são obrigatórios, em segundos da live e como número
   (`3730.5`); texto como `"1:02:10"` dá 400. A resposta não traz `needs_reprocess`: numa
   pregação já processada, o estado continua `processed` e as bordas novas valem depois de
-  processar de novo com `force`.
+  processar de novo com `force`. Ela traz `borders_changed`, como o `GET`.
+- `borders_changed` (booleano, no `GET /api/sermons`, no `GET /api/sermons/{id}` e na
+  resposta do `PATCH`): `true` quando a pregação está processada e as bordas atuais diferem
+  das usadas no último processamento bem-sucedido ([docs/cli.md](cli.md) §7.2). A web
+  oferece Reprocessar no menu Exportar a partir dele.
 - A pregação nasce sem bordas no `POST /api/sermons`; as bordas vão no `PATCH`.
 - O `PATCH` da legenda aceita `enabled` (booleano), `font`, `color` e `border_color`
   (`#RRGGBB`), `position` (`top`, `center`, `bottom`), `shadow` (`none`, `soft`, `strong`)

@@ -33,6 +33,7 @@ export function listedSermon(overrides: Partial<SermonListItem> = {}): SermonLis
     status: "processed",
     created_at: "2026-10-18T21:10:00-03:00",
     duration: 2475,
+    borders_changed: false,
     cut_counts: { suggested: 3, chosen: 1, discarded: 0 },
     ...overrides,
   };

@@ -24,9 +24,12 @@ export interface Sermon {
   created_at: string;
 }
 
-/** An item of ``GET /api/sermons``: ``duration`` is null until the sermon has borders. */
+/** An item of ``GET /api/sermons``: ``duration`` is null until the sermon has borders;
+ * ``borders_changed`` is true when the sermon is processed and its borders differ from the
+ * ones the processing used. */
 export interface SermonListItem extends Sermon {
   duration: number | null;
+  borders_changed: boolean;
   cut_counts: Record<CutStatus, number>;
 }
 

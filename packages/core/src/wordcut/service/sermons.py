@@ -349,8 +349,19 @@ def _listed(connection: sqlite3.Connection, row: SermonRow) -> dict[str, Any]:
     return {
         **_sermon(row),
         "duration": _sermon_duration(row),
+        "borders_changed": _borders_changed(row),
         "cut_counts": {**dict.fromkeys(CUT_STATES, 0), **cuts.counts_of(connection, row.id)},
     }
+
+
+def _borders_changed(row: SermonRow) -> bool:
+    """True when the sermon is processed and its borders differ from the processed ones.
+
+    Borders are kept to the millisecond, so plain equality compares them at that precision.
+    """
+    current = (row.live_start, row.live_end)
+    processed = (row.processed_live_start, row.processed_live_end)
+    return row.status == "processed" and current != processed
 
 
 def _sermon_duration(row: SermonRow) -> float | None:
