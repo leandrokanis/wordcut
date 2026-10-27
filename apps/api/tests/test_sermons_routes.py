@@ -327,6 +327,17 @@ def test_the_video_of_a_processed_sermon_downloads_with_the_readable_name(
     )
 
 
+def test_the_video_of_a_processed_sermon_downloads_even_with_the_lock_held(
+    assistant: TestClient, home: Home, lock_owner: Any
+) -> None:
+    sermon_id = processed_sermon(home)
+    lock_owner("process", "sermon 99")
+
+    response = assistant.get(f"/api/sermons/{sermon_id}/video")
+
+    assert (response.status_code, response.content) == (200, VIDEO)
+
+
 def test_the_video_of_a_sermon_not_processed_is_refused(
     assistant: TestClient, live: FakeLive
 ) -> None:

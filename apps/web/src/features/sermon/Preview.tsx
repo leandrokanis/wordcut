@@ -7,6 +7,7 @@ import {
   useState,
 } from "react";
 
+import { sermonVideoUrl } from "../../api/client";
 import type { SermonShown } from "../../api/types";
 import { PlayerFactoryContext, type PlayerLike } from "./Player";
 
@@ -101,7 +102,7 @@ export const Preview = forwardRef<PreviewHandle, PreviewProps>(function Preview(
           <video
             className="frame h"
             ref={video}
-            src={`/api/sermons/${sermon.id}/video`}
+            src={sermonVideoUrl(sermon.id)}
             aria-label="Prévia da pregação processada"
             preload="metadata"
             playsInline

@@ -281,6 +281,12 @@ Formato de [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões
   e-mail com o papel e Remover, libera acesso por e-mail e papel, protege o último
   administrador (o papel volta ao anterior) e manda quem se rebaixa para a tela de recusa. Um
   só "Salvo" para a tela, nunca depois de erro; o motivo da recusa aparece junto ao campo.
+- Web: a pregação processada ganha no nível 2 o menu Exportar do protótipo com o item
+  "Pregação 16:9 · 1080p · duração", que baixa o vídeo recortado pela API com o nome legível
+  dado pelo servidor, mesmo com a máquina ocupada (o menu avisa). O menu não aparece antes do
+  processamento nem enquanto a pregação reprocessa; abre e fecha pelo teclado (setas, Esc
+  devolve o foco ao botão) e fecha ao clicar fora, sem baixar
+  ([#7](https://github.com/leandrokanis/wordcut/issues/7)).
 
 ### Alterado
 

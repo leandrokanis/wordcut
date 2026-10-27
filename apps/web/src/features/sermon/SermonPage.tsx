@@ -11,6 +11,7 @@ import { cutLayers } from "./CutLayers";
 import { CutsPanel, useSermonCuts } from "./CutsPanel";
 import { Preview, type PreviewHandle } from "./Preview";
 import { ProcessButton } from "./ProcessButton";
+import { SermonExportMenu } from "./SermonExportMenu";
 import { Timeline } from "./Timeline";
 import { Transport } from "./Transport";
 import { useProcessing } from "./useProcessing";
@@ -78,6 +79,7 @@ export function SermonPage() {
           <span className="spacer" />
           <Saved savedAt={edges.savedAt} />
           <ProcessButton sermon={shown} bordersChanged={bordersChanged} processing={processing} />
+          {shown.status === "processed" && editable && <SermonExportMenu sermon={shown} />}
         </div>
         <Preview
           key={shown.status === "processed" ? "processed" : "live"}

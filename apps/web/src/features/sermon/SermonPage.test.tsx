@@ -76,6 +76,33 @@ test.each(["created", "trimmed", "processing", "processed", "failed"] as const)(
   },
 );
 
+test.each(["created", "trimmed", "processing", "failed"] as const)(
+  "leaves the bar to Processar on a %s sermon, without the download",
+  async (status) => {
+    fakeShellApi({ "GET /api/sermons/12": { body: shownSermon({ status }) } });
+
+    renderRoute("/sermons/12");
+    await screen.findByRole("region", { name: "Timeline" });
+
+    expect([
+      screen.queryByRole("button", { name: "Exportar" }),
+      screen.getByRole("button", { name: /^Processa/ }).tagName,
+    ]).toEqual([null, "BUTTON"]);
+  },
+);
+
+test("offers Exportar instead of Processar on a processed sermon", async () => {
+  fakeShellApi({ "GET /api/sermons/12": { body: processedSermon() } });
+
+  renderRoute("/sermons/12");
+  await screen.findByRole("region", { name: "Timeline" });
+
+  expect([
+    screen.getByRole("button", { name: "Exportar" }).tagName,
+    screen.queryByRole("button", { name: /^Processa/ }),
+  ]).toEqual(["BUTTON", null]);
+});
+
 test("plays the preview from the transport", async () => {
   fakeShellApi({ "GET /api/sermons/12": { body: shownSermon() } });
   const players = fakePlayers();
@@ -193,6 +220,27 @@ describe("while the sermon processes", () => {
     vi.useRealTimers();
     return { ...allowed, edits: borderSaves().length > 0 };
   }
+
+  test("hides the download once the API accepts the reprocessing of a processed sermon", async () => {
+    fakeEventSource();
+    await openSermon(processedSermon({ live_duration: 7080 }), {
+      "PATCH /api/sermons/12": ({ body }: RecordedCall) => {
+        const { start, end } = body as { start: number; end: number };
+        return { body: processedSermon({ live_duration: 7080, live_start: start, live_end: end }) };
+      },
+    });
+    dragStart();
+    const reprocess = await screen.findByRole("button", { name: "Reprocessar" });
+    const before = screen.queryByRole("button", { name: "Exportar" });
+
+    await userEvent.click(reprocess);
+    await screen.findByRole("button", { name: /^Processando/ });
+
+    expect([before?.tagName, screen.queryByRole("button", { name: "Exportar" })]).toEqual([
+      "BUTTON",
+      null,
+    ]);
+  });
 
   const LOCKED = { edits: false, startHere: false, endHere: false, play: false, process: false };
 

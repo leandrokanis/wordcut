@@ -187,6 +187,11 @@ export async function listRenders(cutId: number): Promise<Render[]> {
   return (await request<{ items: Render[] }>(`/api/cuts/${cutId}/renders`)).items;
 }
 
+/** Where the browser plays or downloads the processed 16:9 video, named by the API. */
+export function sermonVideoUrl(sermonId: number): string {
+  return `/api/sermons/${sermonId}/video`;
+}
+
 /** Where the browser downloads the export's video, named by the API. */
 export function renderFileUrl(renderId: number): string {
   return `/api/renders/${renderId}/file`;
