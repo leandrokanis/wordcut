@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 
-import { showSermon } from "../../api/client";
+import { useMe } from "../../app/Identity";
+import { patchCutRange, showSermon, type ApiError } from "../../api/client";
 import type { SermonShown } from "../../api/types";
 import { useResource } from "../../api/useResource";
 import { Saved } from "../../ui/Saved";
 import { isTrimmed, savedBounds } from "./bounds";
 import { useClipEdges, type Edge } from "./ClipEdges";
-import { cutLayers } from "./CutLayers";
-import { CutsPanel, useSermonCuts } from "./CutsPanel";
+import { cutLayers, type CutLayer, type RangeChange } from "./CutLayers";
+import { CutsPanel, openCut, useSermonCuts } from "./CutsPanel";
 import { Preview, type PreviewHandle } from "./Preview";
 import { ProcessButton } from "./ProcessButton";
 import { SermonExportMenu } from "./SermonExportMenu";
@@ -26,6 +27,9 @@ export function SermonPage() {
   const [patched, setPatched] = useState<SermonShown>();
   const shown = patched ?? sermon.data;
   const cuts = useSermonCuts(sermon.data);
+  const admin = useMe().role === "admin";
+  const navigate = useNavigate();
+  const [layerError, setLayerError] = useState<string>();
   // A fresh load of the sermon already has the borders the PATCH saved.
   useEffect(() => setPatched(undefined), [sermon.data]);
 
@@ -40,6 +44,19 @@ export function SermonPage() {
 
   function moveEdge(edge: Edge, liveSeconds: number) {
     preview.current?.seek(edges.move(edge, liveSeconds));
+  }
+
+  // A refused range leaves the layer where it was and says why (FR-003).
+  function changeRange(layer: CutLayer, change: RangeChange): Promise<unknown> {
+    setLayerError(undefined);
+    return patchCutRange(layer.id, change).then(cuts.reload, (error: ApiError) =>
+      setLayerError(error.message),
+    );
+  }
+
+  function openLayer(layer: CutLayer) {
+    setLayerError(undefined);
+    openCut(layer, navigate).catch((error: ApiError) => setLayerError(error.message));
   }
 
   const processing = useProcessing(shown, sermon.reload);
@@ -95,6 +112,11 @@ export function SermonPage() {
             {edges.error}
           </p>
         )}
+        {layerError && (
+          <p className="ferr edge-error" role="alert">
+            {layerError}
+          </p>
+        )}
         <Timeline
           liveDuration={liveDuration}
           bounds={edges.bounds}
@@ -103,7 +125,9 @@ export function SermonPage() {
           onSeek={(liveSeconds) => preview.current?.seek(liveSeconds)}
           onEdgeMove={editable ? moveEdge : null}
           onEdgeRelease={edges.release}
-          layers={cutLayers(shown, cuts.data)}
+          layers={cutLayers(shown, cuts.data, admin)}
+          onCutChange={changeRange}
+          onCutOpen={openLayer}
           media={media}
         />
       </main>

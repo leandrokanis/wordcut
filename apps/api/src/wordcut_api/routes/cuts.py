@@ -1,5 +1,6 @@
 """Cuts: list, show and preview them, choose, discard or restore them, fix the spelling of
-their words, set what they play and set their caption style (docs/api.md)."""
+their words, set what they play, resize or move their range and set their caption style
+(docs/api.md)."""
 
 from __future__ import annotations
 
@@ -9,7 +10,7 @@ from contextlib import closing
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends
-from pydantic import StrictBool, StrictInt
+from pydantic import StrictBool, StrictFloat, StrictInt
 
 from wordcut import db
 from wordcut.errors import WordcutError
@@ -19,9 +20,11 @@ from wordcut.service.cuts import (
     discard_cut,
     fix_word,
     list_cuts,
+    move_range,
     preview_cut,
     reset_caption,
     restore_cut,
+    set_range,
     set_segments,
     show_cut,
     update_caption,
@@ -53,6 +56,15 @@ class Segments(Body):
     """What the cut plays, in the order it plays it (docs/cli.md §8.10)."""
 
     segments: list[WordRange]
+
+
+class RangeChange(Changes):
+    """The new borders of the cut's range, either or both, or the shift of the whole range in
+    seconds, never both (docs/cli.md §8.9)."""
+
+    start: StrictFloat | StrictInt | None = None
+    end: StrictFloat | StrictInt | None = None
+    by: StrictFloat | StrictInt | None = None
 
 
 class CaptionChanges(Changes):
@@ -124,6 +136,22 @@ def change_segments(cut_id: int, body: Segments) -> dict[str, Any]:
     wanted = [segment.model_dump() for segment in body.segments]
     with closing(db.connect(deps.home())) as connection:
         return without_paths(set_segments(connection, cut_id, wanted))
+
+
+@router.patch("/cuts/{cut_id}/range", dependencies=[Depends(require("admin"))])
+def change_range(cut_id: int, body: RangeChange) -> dict[str, Any]:
+    """The cut once ``{start, end}`` resizes its range or ``{by}`` moves it."""
+    given = body.given()
+    if "by" in given and len(given) > 1:
+        raise WordcutError(
+            "invalid_argument",
+            "Use start e end para redimensionar ou by para mover, não os dois.",
+            {"argument": "by"},
+        )
+    with closing(db.connect(deps.home())) as connection:
+        if "by" in given:
+            return without_paths(move_range(connection, cut_id, given["by"]))
+        return without_paths(set_range(connection, cut_id, given.get("start"), given.get("end")))
 
 
 @router.get("/cuts/{cut_id}/caption")

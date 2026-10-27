@@ -49,6 +49,7 @@ PERMISSIONS: dict[tuple[str, str], str] = {
     ("POST", "/api/cuts/{cut_id}/restore"): ASSISTANT,
     ("PUT", "/api/cuts/{cut_id}/words/{word_id}"): ASSISTANT,
     ("PUT", "/api/cuts/{cut_id}/segments"): ADMIN,
+    ("PATCH", "/api/cuts/{cut_id}/range"): ADMIN,
     ("GET", "/api/cuts/{cut_id}/caption"): ASSISTANT,
     ("PATCH", "/api/cuts/{cut_id}/caption"): ASSISTANT,
     ("DELETE", "/api/cuts/{cut_id}/caption"): ASSISTANT,
@@ -81,6 +82,7 @@ FAKE_KEY = "sk-or-v1-ficticia-permissoes-0123456789abcdef-WXYZ"
 FAKE_COOKIES = ".youtube.com\tTRUE\t/\tTRUE\t1893456000\tSID-FICTICIO\tvalor-ficticio-perm\n"
 # Valid bodies that would change something, were the role allowed to.
 CHANGING_BODIES: dict[tuple[str, str], dict[str, Any]] = {
+    ("PATCH", "/api/cuts/{cut_id}/range"): {"by": 5},
     ("PATCH", "/api/settings"): {"llm_model": "provedor/modelo-de-teste"},
     ("PUT", "/api/settings/llm-key"): {"value": FAKE_KEY},
     ("PUT", "/api/settings/youtube-cookies"): {"value": FAKE_COOKIES},

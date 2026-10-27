@@ -162,6 +162,8 @@ export function listedCut(overrides: Partial<ListedCut> = {}): ListedCut {
     duration: 58.4,
     start: 620.5,
     end: 678.9,
+    range_start: 620.5,
+    range_end: 678.9,
     segments: [{ from_word: 1201, to_word: 1230 }],
     range_start_word: 1201,
     range_end_word: 1230,

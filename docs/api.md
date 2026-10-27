@@ -68,7 +68,7 @@ As palavras-chave DEVE, NÃO DEVE e PODE seguem o BCP 14
 | `GET /api/tasks/{id}` | — | 200 a tarefa de `task show` | 404 | assistente |
 | `GET /api/tasks/{id}/events` | — | 200 `text/event-stream` (§3) | 404 em JSON, antes de abrir o fluxo | assistente |
 | `GET /api/status` | — | 200 `{"lock", "running_tasks"}` de `wordcut status` | — | assistente |
-| `GET /api/sermons/{id}/cuts[?status=]` | — | 200 `{"items"}` de `cut list`, os descartados por último, cada corte com `start` e `end` (vão dos trechos, em tempo da pregação) | 400 `status` fora de `suggested`, `chosen`, `discarded`; 404 | assistente |
+| `GET /api/sermons/{id}/cuts[?status=]` | — | 200 `{"items"}` de `cut list`, os descartados por último, cada corte com `start` e `end` (vão dos trechos) e `range_start` e `range_end` (a faixa), em tempo da pregação | 400 `status` fora de `suggested`, `chosen`, `discarded`; 404 | assistente |
 | `GET /api/cuts/{id}` | — | 200 o corte de `cut show`, com as exportações sem `path` | 404 | assistente |
 | `GET /api/cuts/{id}/preview` | — | 200 a sequência de `cut preview`; nunca espera a trava | 404 | assistente |
 | `POST /api/cuts/{id}/choose` | — | 200 o corte como o `GET` o mostra | 404 | assistente |
@@ -76,6 +76,7 @@ As palavras-chave DEVE, NÃO DEVE e PODE seguem o BCP 14
 | `POST /api/cuts/{id}/restore` | — | 200 o corte como o `GET` o mostra; um corte não descartado fica como está | 404 | assistente |
 | `PUT /api/cuts/{id}/words/{word_id}` | `{"text"}` | 200 `{"cut_id", "word_id", "text", "start", "end", "corrected"}` de `cut fix-word`; o texto original remove a correção | 400 `text` vazio ou com mais de uma palavra, `word_id` fora dos trechos; 404; 409 `spelling_too_different` com `distance`, `limit` e `original` | assistente |
 | `PUT /api/cuts/{id}/segments` | `{"segments": [{"from_word", "to_word"}]}` | 200 o corte como o `GET` o mostra, editado | 400 corpo fora do formato ou regra de `cut segments` (lista vazia, palavra fora da faixa ou de outra pregação, trecho invertido, sobreposição); 404 | administrador |
+| `PATCH /api/cuts/{id}/range` | `{"start"?, "end"?}` ou `{"by"}` | 200 o corte como o `GET` o mostra, editado | 400 corpo vazio, `by` junto com `start` ou `end`, campo desconhecido, valor que não é número, regra de `cut range`/`cut move` (menos de 10 s depois de encostar, fim antes do início, corte vazio); 404 | administrador |
 | `GET /api/cuts/{id}/caption` | — | 200 o estilo da legenda de `cut caption` | 404 | assistente |
 | `PATCH /api/cuts/{id}/caption` | campos do estilo | 200 o estilo inteiro | 400 sem campo, valor fora da faixa (`min`, `max`), escolha fora (`choices`), cor fora de `#RRGGBB`; 404 | assistente |
 | `DELETE /api/cuts/{id}/caption` | — | 200 o estilo padrão, ligado | 404 | assistente |
@@ -125,6 +126,13 @@ Corpos de entrada:
   `PUT .../segments` troca a lista inteira de trechos, com as regras de `cut segments`
   (§8.10); a recusa não grava nada. A aba Texto da web, para o administrador, mostra essas
   frases com uma caixa cada e grava por essa rota.
+- O `PATCH .../range` redimensiona a faixa com `start` e `end` (um deles basta; o outro fica)
+  ou a move com `by`, em segundos da pregação e como número, com as regras de `cut range` e
+  `cut move` ([docs/cli.md](cli.md) §8.9); a recusa não grava nada. Na timeline do nível 2, o
+  administrador arrasta as bordas (`start` e `end`) ou o meio (`by`) da camada de um corte
+  não descartado, com prévia local; grava ao soltar e, se a API recusar, a camada volta e o
+  erro aparece. Um toque sem arrastar (até 3 px) abre o corte não descartado, para qualquer
+  papel; a camada de um corte descartado não abre, como o cartão do painel.
 - O `PATCH` da legenda aceita `enabled` (booleano), `font`, `color` e `border_color`
   (`#RRGGBB`), `position` (`top`, `center`, `bottom`), `shadow` (`none`, `soft`, `strong`)
   e `size`, `offset` e `border` (inteiros), com os nomes e as faixas de `cut caption`

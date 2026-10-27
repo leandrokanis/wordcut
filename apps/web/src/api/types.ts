@@ -91,6 +91,9 @@ export interface ListedCut extends SermonCut {
   duration: number;
   start: number;
   end: number;
+  /** Where the cut's range starts and ends, in sermon time. */
+  range_start: number;
+  range_end: number;
   segments: { from_word: number; to_word: number }[];
   range_start_word: number;
   range_end_word: number;
@@ -187,7 +190,10 @@ export interface RenderEstimate {
 }
 
 /** ``GET /api/cuts/{id}``, service/cuts.py ``show_cut``: ``renders`` oldest first. */
-export interface Cut extends Omit<ListedCut, "start" | "end" | "segments"> {
+export interface Cut extends Omit<
+  ListedCut,
+  "start" | "end" | "segments" | "range_start" | "range_end"
+> {
   segments: CutSegment[];
   range_sentences: RangeSentence[];
   words: CutWord[];

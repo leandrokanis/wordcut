@@ -1,12 +1,16 @@
 from contextlib import closing
+from datetime import date, datetime, timezone
 from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
 
 from wordcut.cuts.caption import DEFAULT_CAPTION
-from wordcut.db import connect
+from wordcut.db import connect, cuts, sermons, transcripts
+from wordcut.db.cuts import NewCut, Segment
+from wordcut.db.sermons import NewSermon
 from wordcut.home import Home
+from wordcut.processing.sentences import split_sentences
 from wordcut.service.cuts import (
     caption_of,
     fix_word,
@@ -16,6 +20,7 @@ from wordcut.service.cuts import (
     update_caption,
 )
 from wordcut.service.sermons import CUT_STATES
+from wordcut.transcript import Word
 
 
 def test_listing_answers_the_cuts_as_the_cli_lists_them_the_discarded_last(
@@ -505,5 +510,129 @@ def test_setting_the_segments_of_a_missing_cut_is_not_found(admin: TestClient) -
     response = admin.put(
         "/api/cuts/99/segments", json={"segments": [{"from_word": 1, "to_word": 1}]}
     )
+
+    assert (response.status_code, response.json()["error"]["details"]) == (404, {"cut_id": 99})
+
+
+# Eight sentences of two words; sentence k spans 10k to 10k + 8 s.
+LONG_SPOKEN = tuple(
+    word
+    for k in range(8)
+    for word in (Word("Frase", 10.0 * k, 10.0 * k + 4), Word(f"{k}.", 10.0 * k + 4.5, 10.0 * k + 8))
+)
+
+
+@pytest.fixture
+def long_cut(home: Home) -> tuple[int, list[int]]:
+    """A cut playing sentences 1 to 3 of a ``LONG_SPOKEN`` sermon over sentences 0 to 4, its
+    ID and the IDs of the sermon's words."""
+    with closing(connect(home)) as connection, connection:
+        sermon = sermons.insert(
+            connection,
+            NewSermon(
+                youtube_id="Zz9_y-8PqRs",
+                url="https://youtu.be/Zz9_y-8PqRs",
+                title="Culto de quarta",
+                service_date=date(2026, 10, 21),
+                live_duration=7718.0,
+                live_finished=True,
+                created_at=datetime(2026, 10, 27, 3, 0, tzinfo=timezone.utc),
+            ),
+        )
+        transcripts.replace(connection, sermon.id, LONG_SPOKEN, split_sentences(LONG_SPOKEN))
+        word = [row.id for row in transcripts.words_of(connection, sermon.id)]
+        new = NewCut(
+            "suggested", "Faixa", (Segment(word[2], word[7]),), word[0], word[9], "llm", None
+        )
+        [created] = cuts.insert_many(connection, sermon.id, [new], sermon.created_at)
+    return created, word
+
+
+def test_an_admin_resizes_the_range_and_gets_the_cut_as_get_shows_it(
+    admin: TestClient, long_cut: tuple[int, list[int]]
+) -> None:
+    cut_id, word = long_cut
+
+    response = admin.patch(f"/api/cuts/{cut_id}/range", json={"start": 17, "end": 41.0})
+
+    assert (
+        response.status_code,
+        response.json(),
+        (response.json()["range_start_word"], response.json()["range_end_word"]),
+    ) == (200, admin.get(f"/api/cuts/{cut_id}").json(), (word[4], word[7]))
+
+
+def test_an_admin_moves_the_range_and_the_chosen_sentences_go_along(
+    admin: TestClient, long_cut: tuple[int, list[int]]
+) -> None:
+    cut_id, word = long_cut
+
+    response = admin.patch(f"/api/cuts/{cut_id}/range", json={"by": 10})
+
+    assert (
+        response.status_code,
+        response.json(),
+        [(item["from_word"], item["to_word"]) for item in response.json()["segments"]],
+    ) == (200, admin.get(f"/api/cuts/{cut_id}").json(), [(word[4], word[9])])
+
+
+def test_an_assistant_is_forbidden_to_change_the_range_and_nothing_changes(
+    assistant: TestClient, long_cut: tuple[int, list[int]]
+) -> None:
+    cut_id, _ = long_cut
+    before = assistant.get(f"/api/cuts/{cut_id}").json()
+
+    response = assistant.patch(f"/api/cuts/{cut_id}/range", json={"by": 10})
+
+    assert (
+        response.status_code,
+        response.json()["error"]["code"],
+        assistant.get(f"/api/cuts/{cut_id}").json(),
+    ) == (403, "forbidden", before)
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {},
+        {"start": 0, "by": 10},
+        {"end": 40, "by": 10},
+        {"inicio": 0},
+        {"start": "segredo-digitado"},
+        {"by": None},
+        {"start": 19, "end": 31},
+        {"start": 40, "end": 20},
+        {"start": 50, "end": 78},
+    ],
+    ids=[
+        "empty",
+        "start and by",
+        "end and by",
+        "misspelt field",
+        "text for a time",
+        "null shift",
+        "shorter than 10 s",
+        "end before the start",
+        "no chosen sentence left",
+    ],
+)
+def test_a_range_change_that_breaks_a_rule_is_400_invalid_argument_and_changes_nothing(
+    body: dict[str, Any], admin: TestClient, long_cut: tuple[int, list[int]]
+) -> None:
+    cut_id, _ = long_cut
+    before = admin.get(f"/api/cuts/{cut_id}").json()
+
+    response = admin.patch(f"/api/cuts/{cut_id}/range", json=body)
+
+    assert (
+        response.status_code,
+        response.json()["error"]["code"],
+        "segredo-digitado" in response.text,
+        admin.get(f"/api/cuts/{cut_id}").json(),
+    ) == (400, "invalid_argument", False, before)
+
+
+def test_changing_the_range_of_a_missing_cut_is_not_found(admin: TestClient) -> None:
+    response = admin.patch("/api/cuts/99/range", json={"by": 5})
 
     assert (response.status_code, response.json()["error"]["details"]) == (404, {"cut_id": 99})

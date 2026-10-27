@@ -208,8 +208,10 @@ video.frame { object-fit: contain; }
 .clip.trimclip { overflow: visible; border-color: #4d60b0; }
 .clip.trimclip.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .clip.trimclip .lbl { margin-left: 14px; }
-.clip.ct { top: 4px; bottom: 4px; background: color-mix(in srgb, var(--c) 28%, var(--panel)); border-color: var(--c); align-items: center; }
+.clip.ct { top: 4px; bottom: 4px; overflow: visible; background: color-mix(in srgb, var(--c) 28%, var(--panel)); border-color: var(--c); align-items: center; cursor: pointer; }
 .clip.ct .lbl { background: none; color: var(--fg); font-family: var(--font-mono); }
+.clip.ct:has(.trim) .lbl { margin-left: 14px; }
+.clip.ct .trim { width: 8px; background: var(--c); }
 .clip.ct[data-discarded] { opacity: .35; }
 .trim { position: absolute; top: -1.5px; bottom: -1.5px; width: 12px; background: var(--accent); cursor: ew-resize; z-index: 2; display: grid; place-items: center; touch-action: none; }
 .trim::after { content: ""; width: 2px; height: 40%; border-radius: 1px; background: #1a1a1a; }

@@ -2,7 +2,7 @@ import { afterEach } from "vitest";
 
 import { apiError, fakeApi } from "../test/fakeApi";
 import { admin, createdSermon, listedSermon } from "../test/fixtures";
-import { ApiError, createSermon, getMe, listSermons } from "./client";
+import { ApiError, createSermon, getMe, listSermons, patchCutRange } from "./client";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -84,5 +84,23 @@ test("posts the link as JSON with only the url field", async () => {
   expect([calls[0].headers.get("Content-Type"), calls[0].body]).toEqual([
     "application/json",
     { url: "https://youtu.be/lmnopqrstuv" },
+  ]);
+});
+
+test.each([
+  [
+    { start: 12.5, end: 48 },
+    { start: 12.5, end: 48 },
+  ],
+  [{ by: -7.08 }, { by: -7.08 }],
+])("patches the cut's range with only the fields of the change", async (change, sent) => {
+  const calls = fakeApi({ "PATCH /api/cuts/34/range": { body: { id: 34 } } });
+
+  await patchCutRange(34, change);
+
+  expect([calls[0].method, calls[0].url, calls[0].body]).toEqual([
+    "PATCH",
+    "/api/cuts/34/range",
+    sent,
   ]);
 });

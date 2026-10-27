@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, type NavigateFunction } from "react-router-dom";
 
 import {
   chooseCut,
@@ -80,19 +80,23 @@ function ProcessingSteps({ task }: { task?: Task }) {
   );
 }
 
+/** Goes to the cut's level; opening a suggested cut marks it chosen first (1.1.e). */
+export function openCut(
+  cut: { id: number; status: ListedCut["status"] },
+  navigate: NavigateFunction,
+): Promise<void> {
+  const chosen = cut.status === "suggested" ? chooseCut(cut.id) : Promise.resolve();
+  return chosen.then(() => navigate(`/cuts/${cut.id}`));
+}
+
 function PanelBody({ sermon, cuts }: Pick<CutsPanelProps, "sermon" | "cuts">) {
   const [menuOf, setMenuOf] = useState<number>();
   const [failure, setFailure] = useState<ApiError>();
   const navigate = useNavigate();
 
-  // Opening a suggested cut marks it chosen (1.1.e); a discarded one is restored first.
   function open(cut: ListedCut) {
-    const chosen = cut.status === "suggested" ? chooseCut(cut.id) : Promise.resolve();
     setFailure(undefined);
-    chosen.then(
-      () => navigate(`/cuts/${cut.id}`),
-      (error: ApiError) => setFailure(error),
-    );
+    openCut(cut, navigate).catch((error: ApiError) => setFailure(error));
   }
 
   // The list is asked for again rather than reordered here: the order is the service's.

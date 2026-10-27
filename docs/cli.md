@@ -510,8 +510,10 @@ Estados (`status`): `suggested`, `chosen`, `discarded`.
 
 Lista os cortes da pregação com texto montado, duração e estado (1.1.e.1). Descartados vêm
 por último. Cada corte traz também `start` e `end`: o menor início e o maior fim dos seus
-trechos, em tempo da pregação, arredondados ao milissegundo. É o vão que a timeline do
-nível 2 desenha; com trechos fora de ordem ele vai além do que o corte toca.
+trechos, em tempo da pregação, arredondados ao milissegundo; com trechos fora de ordem esse
+vão vai além do que o corte toca. E traz `range_start` e `range_end`: o início e o fim da
+faixa do corte (§8.9), no mesmo tempo e arredondamento. A camada do corte na timeline do
+nível 2 desenha a faixa.
 
 ### 8.2. `cut show <id>`
 
@@ -675,11 +677,38 @@ Cria um corte do zero com as frases da faixa, já `chosen` (2.1.c.4).
 
 ### 8.9. `cut range <id> [--start T] [--end T]` · `cut move <id> --by ±S` — administrador
 
-Ajustam a faixa contínua do corte (2.1.c.3).
+Ajustam a faixa contínua do corte (2.1.c.3). Os tempos são da pregação (0 no início dela).
 
-- `range`: redimensiona; as frases que ficam de fora saem do corte.
-- `move`: desloca a faixa inteira em `S` segundos; as frases escolhidas acompanham e encostam
-  na frase mais próxima.
+- `range`: redimensiona. `T` aceita `SS`, `MM:SS` ou `HH:MM:SS`, como em `sermon trim`; a
+  borda omitida fica onde estava, e sem nenhuma das duas é `invalid_argument`. O início
+  encosta no início de frase mais próximo e o fim, no fim de frase mais próximo; as palavras
+  dos trechos que ficam fora da faixa saem do corte (um trecho que cruza a borda é cortado
+  nela). Ampliar a faixa só oferece as frases novas em `range_sentences` (§8.2), com
+  `included` `none`; elas não entram sozinhas no corte.
+- `move`: desloca a faixa inteira em `S` segundos (`--by -12.5` ou `--by=-12.5` volta). O
+  deslocamento para no início e no fim da pregação (a primeira e a última frase da
+  transcrição), e a faixa deslocada encosta em frases como em `range`. Cada frase escolhida
+  (com ao menos uma palavra no corte, mesmo que só em parte) vai inteira para a frase da faixa
+  nova cujo início fica mais perto do seu início deslocado, sem repetir destino; as que ficam
+  sem destino livre saem. Os trechos novos seguem a ordem em que o corte tocava as frases, e
+  destinos vizinhos tocados em seguida viram um trecho só.
+- `invalid_argument`, sem gravar nada (`details.argument` é `range`): faixa com menos de
+  10 s depois de encostar nas frases; fim antes do início ou igual a ele; fim que, ao
+  encostar, cai antes do início; faixa que deixaria o corte sem nenhuma palavra; tempo que não é número. Em `move`,
+  um `--by` que não é número finito dá `invalid_argument` com `details.argument` `by`. Corte
+  inexistente: `not_found`.
+- Gravar marca o corte como editado (`edited`), e `sermon suggest` o mantém (§7.6). As
+  correções de grafia ficam gravadas, como em `cut segments` (§8.10). Vale em qualquer estado
+  do corte, inclusive descartado (a web é que não arrasta o descartado); não é tarefa nem toma
+  a trava.
+- A CLI roda no host e não confere papel, como `cut segments`; pela API, só o administrador
+  (§5.3).
+- Saída: o corte como `cut show` (§8.2), em JSON ou em texto.
+
+```
+wordcut cut range 34 --start 1:02:10 --end 1:03:05 --json
+wordcut cut move 34 --by -12.5 --json
+```
 
 ### 8.10. `cut segments <id> --file <arquivo|->` — administrador
 

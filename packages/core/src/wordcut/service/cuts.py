@@ -1,8 +1,9 @@
-"""Cuts of a sermon: list, show, preview, choose them, fix the spelling of their words and
-set their caption style (docs/cli.md §8.1–§8.6)."""
+"""Cuts of a sermon: list, show, preview, choose them, fix the spelling of their words, set
+their caption style, their range and what they play (docs/cli.md §8.1–§8.6, §8.9, §8.10)."""
 
 from __future__ import annotations
 
+import math
 import sqlite3
 import unicodedata
 from collections.abc import Mapping, Sequence
@@ -16,26 +17,33 @@ from wordcut.db import cuts, renders, transcripts, word_fixes
 from wordcut.db.cuts import CutRow, Segment
 from wordcut.db.renders import RenderRow
 from wordcut.db.transcripts import WordRow
+from wordcut.edit.cut_range import Span, shift_selection, snap_range, trim_segments
 from wordcut.errors import WordcutError
 from wordcut.home import Home
+from wordcut.processing.sentences import Sentence
 from wordcut.rendering.options import merged
 from wordcut.service.sermons import existing_sermon, shown_cut
+
+MIN_RANGE_S = 10
 
 
 def list_cuts(
     connection: sqlite3.Connection, sermon_id: int, status: str | None = None
 ) -> dict[str, Any]:
     """The cuts of the sermon in the order they were added, the discarded ones last, each
-    with what it says, how long it lasts and the stretch of the sermon it spans (``start``
-    and ``end``, in sermon time); only those in ``status`` when given (docs/cli.md §8.1)."""
+    with what it says, how long it lasts, the stretch of the sermon it spans (``start`` and
+    ``end``) and where its range starts and ends (``range_start`` and ``range_end``), in
+    sermon time; only those in ``status`` when given (docs/cli.md §8.1)."""
     existing_sermon(connection, sermon_id)
     words = transcripts.words_of(connection, sermon_id)
     found = [row for row in cuts.of_sermon(connection, sermon_id) if status in (None, row.status)]
     in_order = sorted(found, key=lambda row: row.status == "discarded")
     fixes = word_fixes.of_sermon(connection, sermon_id)
+    by_id = {word.id: word for word in words}
     return {
         "items": [
-            _spanned(row, assemble(row.segments, words, fixes.get(row.id, {}))) for row in in_order
+            _spanned(row, assemble(row.segments, words, fixes.get(row.id, {})), by_id)
+            for row in in_order
         ]
     }
 
@@ -159,6 +167,128 @@ def set_segments(
         cuts.set_segments(connection, row.id, wanted, moment)
         cuts.mark_edited(connection, row.id, moment)
     return show_cut(connection, row.id)
+
+
+def set_range(
+    connection: sqlite3.Connection,
+    cut_id: int,
+    start: float | None = None,
+    end: float | None = None,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """Resize the cut's range to ``start`` and ``end`` (sermon time; the one not given stays),
+    snapped to the nearest sentence start and end, and drop from what the cut plays the words
+    left outside; give the cut as ``show_cut`` does (docs/cli.md §8.9)."""
+    if start is None and end is None:
+        raise _invalid_range("Informe o início, o fim ou os dois.")
+    if not all(math.isfinite(border) for border in (start, end) if border is not None):
+        raise _invalid_range("Informe o início e o fim em segundos.")
+    row = existing_cut(connection, cut_id)
+    spoken = _Spoken.of(connection, row)
+    current_start, current_end = spoken.times(row)
+    start = current_start if start is None else start
+    end = current_end if end is None else end
+    if end <= start:
+        raise _invalid_range("O fim da faixa precisa vir depois do início.")
+    wanted = spoken.checked(snap_range(spoken.sentences, start, end))
+    segments = trim_segments(spoken.segments(row), wanted)
+    return _store_range(connection, row, spoken, wanted, segments, now)
+
+
+def move_range(
+    connection: sqlite3.Connection, cut_id: int, by: float, now: datetime | None = None
+) -> dict[str, Any]:
+    """Shift the cut's whole range ``by`` seconds, no further than the sermon, snapped to
+    sentences, taking each chosen sentence to the sentence of the new range whose start is
+    nearest its own shifted start; give the cut as ``show_cut`` does (docs/cli.md §8.9)."""
+    if not math.isfinite(by):
+        raise WordcutError(
+            "invalid_argument", "Informe o deslocamento em segundos.", {"argument": "by"}
+        )
+    row = existing_cut(connection, cut_id)
+    spoken = _Spoken.of(connection, row)
+    wanted, segments = shift_selection(
+        spoken.sentences, spoken.segments(row), spoken.times(row), by
+    )
+    return _store_range(connection, row, spoken, spoken.checked(wanted), segments, now)
+
+
+def _store_range(
+    connection: sqlite3.Connection,
+    row: CutRow,
+    spoken: _Spoken,
+    wanted: Span,
+    segments: Sequence[Span],
+    now: datetime | None,
+) -> dict[str, Any]:
+    if not segments:
+        raise _invalid_range(
+            "Nenhuma frase escolhida ficaria na faixa; o corte não pode ficar vazio."
+        )
+    moment = now or datetime.now().astimezone()
+    with connection:
+        cuts.set_range(
+            connection,
+            row.id,
+            spoken.ids(wanted),
+            [Segment(*spoken.ids(s)) for s in segments],
+            moment,
+        )
+        cuts.mark_edited(connection, row.id, moment)
+    return show_cut(connection, row.id)
+
+
+class _Spoken:
+    """The words and sentences of a cut's sermon, by position, for ``wordcut.edit.cut_range``."""
+
+    def __init__(self, words: Sequence[WordRow], sentences: Sequence[Sentence]) -> None:
+        self.words = words
+        self.sentences = sentences
+        self._place = {word.id: index for index, word in enumerate(words)}
+
+    @classmethod
+    def of(cls, connection: sqlite3.Connection, row: CutRow) -> _Spoken:
+        words = transcripts.words_of(connection, row.sermon_id)
+        place = {word.id: index for index, word in enumerate(words)}
+        sentences = [
+            Sentence(
+                place[sentence.first_word_id],
+                place[sentence.last_word_id],
+                sentence.start,
+                sentence.end,
+                sentence.text,
+            )
+            for sentence in transcripts.sentences_of(connection, row.sermon_id)
+        ]
+        return cls(words, sentences)
+
+    def segments(self, row: CutRow) -> list[Span]:
+        return [(self._place[s.from_word], self._place[s.to_word]) for s in row.segments]
+
+    def times(self, row: CutRow) -> tuple[float, float]:
+        """When the cut's range starts and ends, in sermon time."""
+        return (
+            self.words[self._place[row.range_start_word]].start,
+            self.words[self._place[row.range_end_word]].end,
+        )
+
+    def checked(self, span: Span) -> Span:
+        """``span``, or ``invalid_argument`` when it runs backwards or is too short."""
+        first, last = span
+        if last < first:
+            raise _invalid_range("O fim da faixa precisa vir depois do início.")
+        if self.words[last].end - self.words[first].start < MIN_RANGE_S:
+            raise _invalid_range(
+                f"A faixa precisa ter ao menos {MIN_RANGE_S} s depois de encostar nas frases."
+            )
+        return span
+
+    def ids(self, span: Span) -> tuple[int, int]:
+        return self.words[span[0]].id, self.words[span[1]].id
+
+
+def _invalid_range(message: str) -> WordcutError:
+    return WordcutError("invalid_argument", message, {"argument": "range"})
 
 
 def _valid_segments(
@@ -300,13 +430,15 @@ def _listed(row: CutRow, assembled: AssembledCut) -> dict[str, Any]:
     }
 
 
-def _spanned(row: CutRow, assembled: AssembledCut) -> dict[str, Any]:
+def _spanned(row: CutRow, assembled: AssembledCut, by_id: Mapping[int, WordRow]) -> dict[str, Any]:
     """The cut as ``_listed`` gives it, with the earliest start and the latest end of its
-    segments: the stretch of the sermon the level 2 timeline draws it over."""
+    segments and the start and end of its range, which the level 2 timeline draws."""
     return {
         **_listed(row, assembled),
         "start": round(min(segment.start for segment in assembled.segments), MILLISECOND_DIGITS),
         "end": round(max(segment.end for segment in assembled.segments), MILLISECOND_DIGITS),
+        "range_start": round(by_id[row.range_start_word].start, MILLISECOND_DIGITS),
+        "range_end": round(by_id[row.range_end_word].end, MILLISECOND_DIGITS),
     }
 
 

@@ -1,6 +1,7 @@
 """``wordcut cut <action>``: see and preview the suggested cuts of a sermon, choose, discard
 or restore them, fix the spelling of their caption words, set their caption style, set what
-they play and export them (docs/cli.md §8.1–§8.7, §8.10)."""
+they play, resize or move their range and export them (docs/cli.md §8.1–§8.7, §8.9,
+§8.10)."""
 
 from __future__ import annotations
 
@@ -25,16 +26,18 @@ from wordcut.service.cuts import (
     discard_cut,
     fix_word,
     list_cuts,
+    move_range,
     preview_cut,
     reset_caption,
     restore_cut,
+    set_range,
     set_segments,
     show_cut,
     update_caption,
 )
 from wordcut.service.rendering import estimate_render, show_render, start_render
 from wordcut.service.sermons import CUT_STATES
-from wordcut.timefmt import format_timestamp
+from wordcut.timefmt import format_timestamp, parse_timestamp
 from wordcut_cli import deps
 from wordcut_cli.contract import Context, add_command, add_group
 from wordcut_cli.tasks_support import add_wait_option, launch
@@ -54,7 +57,7 @@ def register(commands: Commands) -> None:
         commands,
         "cut",
         help="cortes: ver, escolher, descartar, restaurar, corrigir a grafia, definir os"
-        " trechos, ajustar o estilo da legenda e exportar",
+        " trechos, ajustar a faixa, ajustar o estilo da legenda e exportar",
     )
     listing = add_command(
         actions,
@@ -129,6 +132,35 @@ def register(commands: Commands) -> None:
     segments.add_argument("id", type=int, help="ID do corte")
     segments.add_argument(
         "--file", required=True, help="arquivo com a lista de trechos, em JSON; - lê do stdin"
+    )
+    resize = add_command(
+        actions,
+        "range",
+        help="redimensiona a faixa do corte, encostando em início e fim de frase; as palavras"
+        " que ficam de fora saem do corte — administrador",
+        run=_range_command,
+        render=_render_cut,
+        example="wordcut cut range 34 --start 1:02:10 --end 1:03:05 --json",
+    )
+    resize.add_argument("id", type=int, help="ID do corte")
+    resize.add_argument(
+        "--start", type=parse_timestamp, help="início na pregação, SS, MM:SS ou HH:MM:SS"
+    )
+    resize.add_argument(
+        "--end", type=parse_timestamp, help="fim na pregação, SS, MM:SS ou HH:MM:SS"
+    )
+    move = add_command(
+        actions,
+        "move",
+        help="desloca a faixa inteira em segundos, sem sair da pregação; as frases escolhidas"
+        " acompanham e encostam na frase mais próxima — administrador",
+        run=_move_command,
+        render=_render_cut,
+        example="wordcut cut move 34 --by -12.5 --json",
+    )
+    move.add_argument("id", type=int, help="ID do corte")
+    move.add_argument(
+        "--by", type=float, required=True, help="deslocamento em segundos; negativo volta"
     )
     caption = add_command(
         actions,
@@ -365,6 +397,16 @@ def _segments(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:
             if (error.details or {}).get("argument") != "segments":
                 raise
             raise WordcutError(error.code, error.message, {"argument": "file"}) from error
+
+
+def _range_command(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:
+    with closing(deps.connection()) as connection:
+        return set_range(connection, args.id, args.start, args.end)
+
+
+def _move_command(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:
+    with closing(deps.connection()) as connection:
+        return move_range(connection, args.id, args.by)
 
 
 def _segments_file(source: str) -> list[Any]:

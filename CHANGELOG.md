@@ -326,6 +326,19 @@ Formato de [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões
   uma falha ao gravar deixa a tela como estava e mostra o erro. As ferramentas travam enquanto
   grava ou a pregação processa, e o assistente as vê desabilitadas com o motivo
   ([#10](https://github.com/leandrokanis/wordcut/issues/10)).
+- Ajustar a faixa do corte (2.1.c.3): `wordcut cut range <id> [--start T] [--end T]`,
+  `wordcut cut move <id> --by ±S` e `PATCH /api/cuts/{id}/range` (`{start, end}` ou `{by}`,
+  só administrador). Redimensionar encosta o início e o fim nas frases mais próximas e tira do
+  corte as palavras que ficam fora; ampliar só oferece as frases novas. Mover desloca a faixa
+  sem sair da pregação e leva cada frase escolhida, inteira, para a frase de início mais
+  próximo, sem repetir destino. Faixa com menos de 10 s, invertida ou que esvaziaria o corte é
+  recusada com `invalid_argument`, sem gravar; o corte passa a editado e as correções de
+  grafia ficam. `cut list` e o `GET` dos cortes trazem `range_start` e `range_end`, e a camada
+  do corte na timeline do nível 2 passa a desenhar a faixa. Na web, o administrador arrasta as
+  bordas ou o meio da camada de um corte não descartado, com prévia, e grava ao soltar; uma
+  recusa devolve a camada e mostra o erro; um clique sem arrastar abre o corte não descartado,
+  para qualquer papel, e a camada do descartado, como o cartão, não abre
+  ([#11](https://github.com/leandrokanis/wordcut/issues/11)).
 
 ### Alterado
 

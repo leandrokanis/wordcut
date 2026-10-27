@@ -164,6 +164,15 @@ export function putCutSegments(
   return send("PUT", `/api/cuts/${id}/segments`, { segments });
 }
 
+/** Resizes the cut's range to ``{start, end}`` or moves it ``{by}`` seconds, in sermon time;
+ * answers the cut as ``GET /api/cuts/{id}`` shows it (docs/cli.md §8.9). */
+export function patchCutRange(
+  id: number,
+  change: { start: number; end: number } | { by: number },
+): Promise<Cut> {
+  return send("PATCH", `/api/cuts/${id}/range`, change);
+}
+
 /** Changes only the given fields of the cut's caption style; answers the whole style. */
 export function patchCaption(id: number, fields: Partial<CaptionStyle>): Promise<CaptionStyle> {
   return send("PATCH", `/api/cuts/${id}/caption`, fields);

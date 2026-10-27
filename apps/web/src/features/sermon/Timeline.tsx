@@ -10,7 +10,7 @@ import { formatDuration } from "../../ui/format";
 import { FilmIcon, WaveIcon } from "../../ui/icons";
 import type { Bounds } from "./bounds";
 import type { Edge } from "./ClipEdges";
-import { CutLayerHead, CutLayerLane, type CutLayer } from "./CutLayers";
+import { CutLayerHead, CutLayerLane, type CutLayer, type RangeChange } from "./CutLayers";
 import type { TimelineMedia } from "./useTimelineMedia";
 import { waveformImage } from "./waveform";
 
@@ -30,8 +30,12 @@ interface TimelineProps {
   /** Null while the borders cannot change: no handles are drawn. */
   onEdgeMove: ((edge: Edge, liveSeconds: number) => void) | null;
   onEdgeRelease: () => void;
-  /** The cuts, drawn read only above the video track. */
+  /** The cuts, drawn above the video track. */
   layers?: CutLayer[];
+  /** Saves a cut's range dragged on its layer. */
+  onCutChange?: (layer: CutLayer, change: RangeChange) => Promise<unknown>;
+  /** Opens a cut whose layer was pressed without a drag. */
+  onCutOpen?: (layer: CutLayer) => void;
   /** The thumbnails and the waveform of the live, and how their preparation goes. */
   media?: TimelineMedia;
 }
@@ -59,6 +63,8 @@ function LiveTimeline({
   onEdgeMove,
   onEdgeRelease,
   layers = [],
+  onCutChange = () => Promise.resolve(),
+  onCutOpen = () => {},
   media,
 }: TimelineProps & { liveDuration: number }) {
   const content = useRef<HTMLDivElement>(null);
@@ -143,7 +149,14 @@ function LiveTimeline({
             ))}
           </div>
           {layers.map((layer) => (
-            <CutLayerLane key={layer.id} layer={layer} at={at} />
+            <CutLayerLane
+              key={layer.id}
+              layer={layer}
+              at={at}
+              liveDuration={liveDuration}
+              onChange={onCutChange}
+              onOpen={onCutOpen}
+            />
           ))}
           <div className="lane video" aria-label="Faixa Vídeo">
             <div
@@ -223,7 +236,10 @@ export function rulerMarks(duration: number): { seconds: number; labelled: boole
   const minor = step / MARKS_PER_STEP;
   const marks = [];
   for (let index = 0; index * minor <= duration; index++) {
-    marks.push({ seconds: index * minor, labelled: index % MARKS_PER_STEP === 0 });
+    marks.push({
+      seconds: index * minor,
+      labelled: index % MARKS_PER_STEP === 0,
+    });
   }
   return marks;
 }

@@ -258,6 +258,8 @@ def test_listed_cut_has_the_sermon_cut_fields_plus_its_text_duration_and_span_wi
                 "duration": 0.9,
                 "start": 2.5,
                 "end": 3.4,
+                "range_start": 2.5,
+                "range_end": 3.4,
                 "segments": [{"from_word": word[4], "to_word": word[5]}],
                 "range_start_word": word[4],
                 "range_end_word": word[5],

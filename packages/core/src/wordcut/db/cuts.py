@@ -120,6 +120,21 @@ def set_segments(
     )
 
 
+def set_range(
+    connection: sqlite3.Connection,
+    cut_id: int,
+    range_words: tuple[int, int],
+    segments: Sequence[Segment],
+    updated_at: datetime,
+) -> None:
+    """Store the range of words of the cut and what it plays, in the caller's transaction."""
+    connection.execute(
+        "UPDATE cuts SET range_start_word = ?, range_end_word = ?, segments = ?, updated_at = ?"
+        " WHERE id = ?",
+        (*range_words, _segments_json(segments), updated_at.isoformat(), cut_id),
+    )
+
+
 def set_caption(
     connection: sqlite3.Connection,
     cut_id: int,

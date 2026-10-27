@@ -125,7 +125,7 @@ ACTION_METAVAR = "<ação>"
 class HelpFormatter(argparse.HelpFormatter):
     """Wraps the description to the terminal width, keeps the example as written and names
     a group's actions ``<ação>`` in the usage line, which argparse cannot wrap inside
-    ``{…}``; the list of actions below keeps the ``{…}``."""
+    ``{…}``; the list of actions below keeps the ``{…}``, wrapped after a comma."""
 
     # argparse's own formatters (RawDescriptionHelpFormatter, MetavarTypeHelpFormatter)
     # change the help by overriding these two methods.
@@ -133,6 +133,21 @@ class HelpFormatter(argparse.HelpFormatter):
         if text.startswith(EXAMPLE_HEADING):
             return "".join(indent + line for line in text.splitlines(keepends=True))
         return super()._fill_text(text, width, indent)
+
+    def _format_action_invocation(self, action: argparse.Action) -> str:
+        invocation = super()._format_action_invocation(action)
+        if not isinstance(action, argparse._SubParsersAction):
+            return invocation
+        room = self._width - self._current_indent
+        lines = [""]
+        for name in invocation.split(","):
+            piece = name if not lines[-1] else f",{name}"
+            if lines[-1] and len(lines[-1]) + len(piece) + 1 > room:
+                lines[-1] += ","
+                lines.append(name)
+            else:
+                lines[-1] += piece
+        return f"\n{' ' * self._current_indent}".join(lines)
 
     def _format_args(self, action: argparse.Action, default_metavar: str) -> str:
         if isinstance(action, argparse._SubParsersAction):
