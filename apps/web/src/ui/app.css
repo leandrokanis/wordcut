@@ -301,6 +301,11 @@ button.th { width: 100%; border: 0; border-bottom: 1px solid var(--line); backgr
 .clip.cap.off { opacity: .3; }
 .lane-hint { position: absolute; z-index: 2; inset: 7px auto 7px 8px; display: flex; align-items: center; padding: 0 8px; border-radius: 4px; background: var(--raised); color: var(--muted); font-size: 11.5px; }
 .clip.vid .lbl b { font-weight: 600; }
+button.clip.vid { padding: 0; font: inherit; font-size: 11px; color: inherit; cursor: pointer; text-align: left; }
+.clip.vid.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.clip.vid.ooo { border-style: dashed; }
+.transport .ibtn:disabled { opacity: .4; cursor: not-allowed; }
+.transport .tools .ferr { margin: 0 0 0 6px; }
 .caption .cw { cursor: text; border-radius: .25em; user-select: none; }
 .caption .cw:hover { background: rgba(255,214,0,.16); }
 .caption .cw-in { font: inherit; color: inherit; -webkit-text-stroke: inherit; paint-order: inherit; text-shadow: inherit; text-align: center; background: rgba(0,0,0,.55); border: 2px solid var(--accent); border-radius: .2em; padding: 0 .15em; outline: none; min-width: 2ch; }

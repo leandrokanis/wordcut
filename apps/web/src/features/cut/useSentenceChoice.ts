@@ -1,21 +1,19 @@
 import { useState } from "react";
 
-import { putCutSegments, type ApiError } from "../../api/client";
 import type { Cut } from "../../api/types";
 import { useMe } from "../../app/Identity";
 import { toggleSentence } from "./sentenceChoice";
 import type { SentenceChoice } from "./TextTab";
+import type { ContentHistory } from "./useContentHistory";
 
-/** The administrator's choice of the sentences the cut plays, saved with
- * ``PUT /api/cuts/{id}/segments``; ``onSaved`` takes the cut the API answers and resolves
- * once the page shows it. Nothing for anyone else. */
+/** The administrator's choice of the sentences the cut plays, saved through the session's
+ * ``history``, so it can be undone. Nothing for anyone else. */
 export function useSentenceChoice(
   cut: Cut,
-  onSaved: (cut: Cut) => Promise<void>,
+  history: ContentHistory,
   processing: boolean,
 ): SentenceChoice | undefined {
   const { role } = useMe();
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string>();
 
   async function onToggle(sentenceId: number) {
@@ -25,19 +23,12 @@ export function useSentenceChoice(
       setError(toggled.error);
       return;
     }
-    setSaving(true);
     setError(undefined);
-    try {
-      await onSaved(await putCutSegments(cut.id, toggled.segments));
-    } catch (refused) {
-      setError((refused as ApiError).message);
-    } finally {
-      setSaving(false);
-    }
+    setError(await history.apply(toggled.segments));
   }
 
   if (role !== "admin") {
     return undefined;
   }
-  return { onToggle, disabled: saving || processing, error };
+  return { onToggle, disabled: history.saving || processing, error };
 }

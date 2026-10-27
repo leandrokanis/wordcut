@@ -54,7 +54,7 @@ test("goes back to Texto when Legenda is closed", async () => {
 
 test.each([
   ["the preview", () => screen.getByLabelText("Prévia do corte")],
-  ["the video track", () => screen.getByRole("group", { name: "Trecho 1" })],
+  ["the video track", () => screen.getByRole("button", { name: "Trecho 1" })],
   ["the transport", () => screen.getByLabelText("Tempo do corte")],
 ])("goes back to Texto on a click on %s", async (_area, area) => {
   await openTabs();

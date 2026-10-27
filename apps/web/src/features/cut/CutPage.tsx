@@ -14,6 +14,8 @@ import { CutTransport } from "./CutTransport";
 import { ExportButton } from "./ExportButton";
 import { TextTab } from "./TextTab";
 import { useCaptionStyle } from "./useCaptionStyle";
+import { useContentHistory } from "./useContentHistory";
+import { useSegmentTools } from "./useSegmentTools";
 import { useSentenceChoice } from "./useSentenceChoice";
 import { useWordFixes } from "./useWordFixes";
 import { WordEditor } from "./WordEditor";
@@ -56,6 +58,8 @@ export function CutPage() {
     setChanged({ cut: saved, sequence: await previewCut(saved.id), sermon });
   }
 
+  // Keep the key: another cut must start with empty undo stacks, or Ctrl+Z would save this
+  // cut's segments into it.
   return (
     <CutLevel
       key={cut.id}
@@ -94,6 +98,7 @@ function CutLevel({ cut, sequence, sermonStart, processing, onChanged }: CutLeve
   const [cursor, setCursor] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [tab, setTab] = useState<Tab>("text");
+  const [selected, setSelected] = useState<number>();
   const [savedAt, setSavedAt] = useState(0);
   const markSaved = () => setSavedAt(Date.now());
   const caption = useCaptionStyle(cut.id, cut.caption, markSaved);
@@ -101,12 +106,16 @@ function CutLevel({ cut, sequence, sermonStart, processing, onChanged }: CutLeve
   const [editing, setEditing] = useState<TimedWord>();
   const [fixError, setFixError] = useState<string>();
   const fixed = useMemo(() => ({ ...cut, words: fixes.words }), [cut, fixes.words]);
-  const choice = useSentenceChoice(
+  const history = useContentHistory(cut, async (saved) => {
+    await onChanged(saved);
+    markSaved();
+  });
+  const choice = useSentenceChoice(cut, history, processing);
+  const tools = useSegmentTools(
     cut,
-    async (saved) => {
-      await onChanged(saved);
-      markSaved();
-    },
+    cursor,
+    { selected, select: setSelected },
+    history,
     processing,
   );
   const size = caption.style.size;
@@ -206,6 +215,7 @@ function CutLevel({ cut, sequence, sermonStart, processing, onChanged }: CutLeve
           onToggle={toggle}
           cursor={cursor}
           duration={sequence.duration}
+          tools={tools}
         />
         <CutTimeline
           segments={sequence.segments}
@@ -215,6 +225,8 @@ function CutLevel({ cut, sequence, sermonStart, processing, onChanged }: CutLeve
           blocks={blocks}
           captionOn={caption.style.enabled}
           legendOpen={tab === "caption"}
+          selected={selected}
+          onSelect={setSelected}
         />
       </main>
     </div>

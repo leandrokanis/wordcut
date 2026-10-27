@@ -316,6 +316,16 @@ Formato de [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões
   vizinhos ou cria o trecho na ordem da pregação, e a prévia, a trilha e a duração se
   remontam; a última frase não sai, e as caixas travam enquanto grava ou a pregação processa.
   O assistente vê o texto como antes ([#5](https://github.com/leandrokanis/wordcut/issues/5)).
+- Ajustar os trechos na trilha do corte (2.1.c.2): no nível 3, clicar num trecho da faixa
+  Vídeo o seleciona, e o transporte ganha as ferramentas do protótipo — desfazer, refazer,
+  dividir o trecho no cursor na fronteira de frase mais próxima, mover para a esquerda ou a
+  direita e remover (nunca o último) — e o chip da duração contra a meta de 40 a 75 s. Cada
+  ação grava por `PUT /api/cuts/{id}/segments` e remonta prévia, trilha e duração; os trechos
+  fora da ordem da pregação ficam marcados na trilha. Desfazer e refazer (Ctrl+Z e
+  Ctrl+Shift+Z, fora de campos de texto) valem na sessão e incluem marcar e desmarcar frases;
+  uma falha ao gravar deixa a tela como estava e mostra o erro. As ferramentas travam enquanto
+  grava ou a pregação processa, e o assistente as vê desabilitadas com o motivo
+  ([#10](https://github.com/leandrokanis/wordcut/issues/10)).
 
 ### Alterado
 

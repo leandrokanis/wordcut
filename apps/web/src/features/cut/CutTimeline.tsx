@@ -7,8 +7,9 @@ import type { CaptionBlock } from "./captions";
 import { offsetOf, type Span } from "./sequence";
 
 interface CutTimelineProps {
-  /** The segments in the order the cut plays them, in sermon time. */
-  segments: Span[];
+  /** The segments in the order the cut plays them, in sermon time; ``out_of_order`` as
+   * ``GET /api/cuts/{id}/preview`` marks it (docs/cli.md §8.3). */
+  segments: (Span & { out_of_order?: boolean })[];
   duration: number;
   /** The player's position, in seconds of the cut. */
   cursor: number;
@@ -18,6 +19,9 @@ interface CutTimelineProps {
   captionOn: boolean;
   /** The Legenda tab is open: the layer is marked as selected. */
   legendOpen: boolean;
+  /** The segment selected for the segment tools, by its position in ``segments``. */
+  selected?: number;
+  onSelect: (index: number) => void;
 }
 
 /** Only the cut, in time of the cut: the ruler, the "Legenda" layer with the caption's blocks
@@ -31,6 +35,8 @@ export function CutTimeline({
   blocks,
   captionOn,
   legendOpen,
+  selected,
+  onSelect,
 }: CutTimelineProps) {
   const content = useRef<HTMLDivElement>(null);
   const at = (seconds: number) => `${(seconds / duration) * 100}%`;
@@ -86,11 +92,18 @@ export function CutTimeline({
           </div>
           <div className="lane video" onPointerDown={seek}>
             {segments.map((segment, index) => (
-              <div
+              <button
                 key={index}
-                className="clip vid"
-                role="group"
-                aria-label={`Trecho ${index + 1}`}
+                type="button"
+                className={clipClass(index === selected, segment.out_of_order)}
+                aria-label={
+                  segment.out_of_order
+                    ? `Trecho ${index + 1}, fora da ordem da pregação`
+                    : `Trecho ${index + 1}`
+                }
+                title={segment.out_of_order ? "Fora da ordem da pregação" : undefined}
+                aria-pressed={index === selected}
+                onClick={() => onSelect(index)}
                 style={{
                   left: at(offsetOf(segments, index)),
                   width: at(segment.end - segment.start),
@@ -99,7 +112,7 @@ export function CutTimeline({
                 <span className="lbl">
                   <b>T{index + 1}</b> · {formatDuration(segment.end - segment.start)}
                 </span>
-              </div>
+              </button>
             ))}
           </div>
           <div className="playhead" aria-label="Cursor" style={{ left: at(cursor) }} />
@@ -107,6 +120,10 @@ export function CutTimeline({
       </div>
     </section>
   );
+}
+
+function clipClass(selected: boolean, outOfOrder = false): string {
+  return ["clip vid", selected && "sel", outOfOrder && "ooo"].filter(Boolean).join(" ");
 }
 
 function blockText(block: CaptionBlock): string {
