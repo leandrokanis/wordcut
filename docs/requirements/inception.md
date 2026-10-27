@@ -162,6 +162,10 @@ J3 (agente pela CLI).
 - **Onda 6 — regra 5 (valor 3 $ < 4 $).** F12 (🔴, EEE) é a última peça, pesada e de valor
   médio; as verdes que poderiam acompanhá-la são necessárias antes para fechar a J1. Até lá, o
   admin só muda o conteúdo pedindo nova sugestão (F6).
+- **F12 — história 2.1.c.1 antecipada (2026-10-27), fora da ordem das ondas.** Na primeira
+  sugestão real, os cortes vieram com poucos trechos longos e o admin não tinha como tirar uma
+  frase só; escolher as frases no texto da faixa entra logo depois do MVP. O resto da F12 segue
+  na onda 6.
 
 ## 9. Canvas do MVP
 

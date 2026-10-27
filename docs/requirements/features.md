@@ -58,7 +58,7 @@ Valem para todas as features.
 - [Épico 2.1 — Curar o conteúdo](#épico-21--curar-o-conteúdo)
   - [Feature 2.1.a — Configurações](features/2.1.a-settings.md) · onda 1 (MVP)
   - [Feature 2.1.b — Sugestão de cortes pelo LLM](features/2.1.b-llm-script-suggestion.md) · onda 3 (MVP)
-  - [Feature 2.1.c — Editar o conteúdo](features/2.1.c-edit-content.md) · onda 6
+  - [Feature 2.1.c — Editar o conteúdo](features/2.1.c-edit-content.md) · onda 6 (2.1.c.1 antecipada)
 
 **[Tema 3 — Rapidez e custo previsível](#tema-3--rapidez-e-custo-previsível)**
 
