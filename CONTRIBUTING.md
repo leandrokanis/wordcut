@@ -79,8 +79,47 @@ npm --prefix apps/web run build
 
 ### 3.3. Commits
 
-- Mensagem em inglês, no imperativo, com o assunto em até 72 caracteres.
+As mensagens seguem [Conventional Commits 1.0.0](https://www.conventionalcommits.org/pt-br/v1.0.0/):
+
+```
+<tipo>[(escopo)][!]: <descrição>
+
+[corpo]
+
+[rodapés]
+```
+
+- **Tipo** DEVE ser um destes:
+
+  | Tipo | Quando |
+  |---|---|
+  | `feat` | funcionalidade nova para quem usa |
+  | `fix` | correção de defeito |
+  | `docs` | só documentação, requisitos, specs ou ADRs |
+  | `refactor` | mudança de código sem mudar comportamento |
+  | `perf` | ganho de desempenho |
+  | `test` | só testes |
+  | `build` | build, dependências, Docker, workspace |
+  | `ci` | integração contínua |
+  | `chore` | manutenção que não entra nos outros tipos |
+  | `style` | formatação, sem mudança de código |
+  | `revert` | reverte um commit anterior |
+
+- **Escopo**, quando a mudança fica num componente só: `core`, `cli`, `api`, `web` ou
+  `skills`. Mudança que atravessa componentes vai sem escopo.
+- **Quebra de compatibilidade**: `!` depois do tipo ou do escopo, e o rodapé
+  `BREAKING CHANGE: <o que muda para quem usa>` quando o assunto não basta.
+- **Descrição** em inglês, no imperativo, começando em minúscula e sem ponto final. O
+  assunto inteiro tem até 72 caracteres.
+- Nada de `WIP`: um commit só entra na branch compartilhada quando o passo está completo e
+  os quality gates passam.
 - Um commit por mudança lógica.
+
+O hook em `.githooks/commit-msg` recusa mensagens fora do formato. Ative uma vez por clone:
+
+```sh
+git config core.hooksPath .githooks
+```
 
 ## 4. Código
 

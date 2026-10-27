@@ -12,3 +12,4 @@ organização do monorepo, o fluxo de trabalho, os quality gates e a política d
   [specs/roadmap.md](specs/roadmap.md).
 - Texto de documentação em português; código, identificadores, comentários e mensagens de
   commit em inglês.
+- Mensagens de commit em [Conventional Commits](CONTRIBUTING.md#33-commits), sem `WIP`.
