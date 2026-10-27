@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type InputHTMLAttributes } from "react";
+import { useRef, useState, type InputHTMLAttributes } from "react";
 
 import type { ApiError } from "../../api/client";
 
@@ -13,10 +13,16 @@ type Props = Omit<InputHTMLAttributes<HTMLInputElement>, "value" | "onChange"> &
 /** A text the API validates: saved with Enter or on leaving the field, only when it changed. */
 export function CommitInput({ id, value, save, className = "input", ...rest }: Props) {
   const [draft, setDraft] = useState(value);
+  const [shown, setShown] = useState(value);
   const [error, setError] = useState<string>();
   const tried = useRef<string>();
 
-  useEffect(() => setDraft(value), [value]);
+  // Adjusted while rendering, not in an effect: an effect runs after paint and could
+  // overwrite what the user already typed into the freshly mounted field.
+  if (value !== shown) {
+    setShown(value);
+    setDraft(value);
+  }
 
   function commit() {
     // The text the API refused is not sent again until it changes.
