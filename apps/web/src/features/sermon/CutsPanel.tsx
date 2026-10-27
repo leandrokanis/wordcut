@@ -8,9 +8,10 @@ import {
   restoreCut,
   type ApiError,
 } from "../../api/client";
-import type { ListedCut, SermonShown } from "../../api/types";
+import type { ListedCut, SermonShown, Task } from "../../api/types";
 import { useResource, type Resource } from "../../api/useResource";
 import { CutCard } from "./CutCard";
+import { processSteps } from "./stage";
 
 /** The cuts of the sermon, asked for again whenever the sermon is processed anew. */
 export function useSermonCuts(sermon: SermonShown | undefined): Resource<ListedCut[]> {
@@ -24,23 +25,62 @@ export function useSermonCuts(sermon: SermonShown | undefined): Resource<ListedC
 interface CutsPanelProps {
   sermon: SermonShown;
   cuts: Resource<ListedCut[]>;
+  /** The sermon is processing: the panel shows the steps of ``task`` instead of the cuts. */
+  processing: boolean;
+  task?: Task;
 }
 
 /** Level 2's side panel: the cuts of the sermon, in the service's order. */
-export function CutsPanel({ sermon, cuts }: CutsPanelProps) {
+export function CutsPanel({ sermon, cuts, processing, task }: CutsPanelProps) {
   return (
     <aside className="side" aria-label="Cortes">
       <div className="side-h">
         <h2>Cortes</h2>
       </div>
       <div className="side-b">
-        <PanelBody sermon={sermon} cuts={cuts} />
+        {processing ? <ProcessingSteps task={task} /> : <PanelBody sermon={sermon} cuts={cuts} />}
       </div>
     </aside>
   );
 }
 
-function PanelBody({ sermon, cuts }: CutsPanelProps) {
+/** The steps of the processing, after docs/prototype/wordcut.html (stepsHtml). */
+function ProcessingSteps({ task }: { task?: Task }) {
+  return (
+    <div role="status" aria-label="Processando a pregação">
+      <ol className="steps">
+        {processSteps(task).map((step) => {
+          const percent = Math.round(step.progress * 100);
+          return (
+            <li
+              key={step.name}
+              className={`step ${step.state === "running" ? "run" : step.state === "done" ? "done" : ""}`}
+              aria-current={step.state === "running" ? "step" : undefined}
+            >
+              <span className="ic" aria-hidden="true">
+                {step.state === "done" ? "✓" : ""}
+              </span>
+              <span>{step.name}</span>
+              <span className="tc">{percent}%</span>
+              <span
+                className="progress"
+                role="progressbar"
+                aria-label={step.name}
+                aria-valuenow={percent}
+                aria-valuemin={0}
+                aria-valuemax={100}
+              >
+                <i style={{ width: `${percent}%` }} />
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
+  );
+}
+
+function PanelBody({ sermon, cuts }: Pick<CutsPanelProps, "sermon" | "cuts">) {
   const [menuOf, setMenuOf] = useState<number>();
   const [failure, setFailure] = useState<ApiError>();
   const navigate = useNavigate();

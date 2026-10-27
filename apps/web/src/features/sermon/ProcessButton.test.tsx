@@ -69,12 +69,25 @@ async function launchAndFollow(sermon = shownSermon(), routes = {}) {
   return streams()[0];
 }
 
-test("shows the progress on the button as the events arrive", async () => {
+test("shows the stage and the progress on the button as the events arrive", async () => {
   const stream = await launchAndFollow();
 
-  act(() => stream.emit("progress", runningTask({ progress: 0.35 })));
+  act(() => stream.emit("progress", runningTask({ progress: 0.12, progress_message: "baixando" })));
+  const downloading = screen.getByRole("button", { name: "Processando — Baixando 12%" });
+  act(() =>
+    stream.emit("progress", runningTask({ progress: 0.5, progress_message: "transcrevendo" })),
+  );
 
-  expect(screen.getByRole("button", { name: "Processando 35%" })).toBeDisabled();
+  expect([downloading.textContent, downloading.hasAttribute("disabled")]).toEqual([
+    "Processando — Transcrevendo 50%",
+    true,
+  ]);
+});
+
+test("says only Processando until the task names its stage", async () => {
+  await launchAndFollow();
+
+  expect(screen.getByRole("button", { name: "Processando" })).toBeDisabled();
 });
 
 /** The sermon's GET answers as the API would before and after the task ends. */
@@ -127,7 +140,9 @@ test("follows the task already running when the sermon opens", async () => {
 
   expect({
     streams: streams().map(({ url }) => url),
-    button: screen.getByRole("button", { name: "Processando 35%" }).hasAttribute("disabled"),
+    button: screen
+      .getByRole("button", { name: "Processando — Transcrevendo 35%" })
+      .hasAttribute("disabled"),
   }).toEqual({ streams: ["/api/tasks/15/events"], button: true });
 });
 

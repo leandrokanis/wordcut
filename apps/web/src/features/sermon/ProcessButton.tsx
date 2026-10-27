@@ -1,52 +1,29 @@
-import { useState } from "react";
-
-import { processSermon, type ApiError } from "../../api/client";
-import type { SermonShown, Task } from "../../api/types";
+import type { SermonShown } from "../../api/types";
 import { useMachineStatus } from "../status/MachineStatus";
 import { otherWork } from "../status/StatusBar";
 import { isTrimmed } from "./bounds";
-import { useTaskEvents } from "./useTaskEvents";
+import { progressLabel } from "./stage";
+import type { Processing } from "./useProcessing";
 
 interface ProcessButtonProps {
   sermon: SermonShown;
   /** The borders of the processed sermon were saved in this session (the API does not say
    * whether they changed since the processing). */
   bordersChanged: boolean;
-  /** The task ended, done or failed: the sermon changed on the API. */
-  onEnd: () => void;
+  processing: Processing;
 }
 
 /** The level's main action before export: Processar, its progress, and Reprocessar. */
-export function ProcessButton({ sermon, bordersChanged, onEnd }: ProcessButtonProps) {
-  const [launched, setLaunched] = useState<number>();
-  const [endedError, setEndedError] = useState<Task["error"]>(null);
-  const [refusal, setRefusal] = useState<ApiError>();
-  const running = runningTaskOf(sermon);
-  const taskId = launched ?? running?.id;
-  const events = useTaskEvents(taskId, (task) => {
-    setLaunched(undefined);
-    setEndedError(task.error);
-    onEnd();
-  });
+export function ProcessButton({ sermon, bordersChanged, processing }: ProcessButtonProps) {
+  const { refusal, endedError, launch } = processing;
   const busy = otherWork(useMachineStatus().status?.lock, `sermon ${sermon.id}`);
   const failure = endedError ?? (sermon.status === "failed" ? sermon.last_task?.error : null);
-  const following = taskId !== undefined;
-  const progress = events.task?.progress ?? running?.progress ?? 0;
 
-  function launch(force = false) {
-    setEndedError(null);
-    setRefusal(undefined);
-    processSermon(sermon.id, force).then(
-      (task) => setLaunched(task.task_id),
-      (error: ApiError) => setRefusal(error),
-    );
-  }
-
-  if (following) {
+  if (processing.processing) {
     return (
       <div className="l2-action">
         <button className="btn primary" type="button" disabled>
-          Processando {Math.round(progress * 100)}%
+          {progressLabel(processing.task)}
         </button>
       </div>
     );
@@ -86,17 +63,11 @@ export function ProcessButton({ sermon, bordersChanged, onEnd }: ProcessButtonPr
       <button
         className="btn primary"
         type="button"
-        disabled={!trimmed || busy !== undefined || liveOn}
+        disabled={!trimmed || busy !== undefined || liveOn || processing.pending}
         onClick={() => launch(reprocess)}
       >
         {reprocess ? "Reprocessar" : "Processar"}
       </button>
     </div>
   );
-}
-
-/** The process task of a sermon that was processing when it was loaded. */
-function runningTaskOf(sermon: SermonShown): Task | undefined {
-  const task = sermon.last_task;
-  return sermon.status === "processing" && task?.status === "running" ? task : undefined;
 }

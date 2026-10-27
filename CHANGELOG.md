@@ -288,6 +288,15 @@ Formato de [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões
   na troca de etapa, na web, na CLI (`--wait`, `task wait`) e na SSE, sem mudança de contrato;
   nunca diminui e é gravado no máximo uma vez por segundo, além das trocas de etapa
   ([#3](https://github.com/leandrokanis/wordcut/issues/3); ADR-0024).
+- Web: a pregação em processamento mostra a etapa e o percentual no botão ("Processando —
+  Transcrevendo 50%") e, no painel de cortes, a lista de passos do protótipo (baixar,
+  transcrever, cortar, sugerir), cada um com o seu percentual, no lugar de "Os cortes aparecem
+  depois do processamento.". Enquanto processa, iniciado nesta sessão ou em outra, o editor
+  fica travado: bordas, atalhos I e O, "Início aqui"/"Fim aqui", reprodução e Processar; a
+  prévia que tocava é pausada. A trava começa quando a API aceita o processamento (o
+  Processar fica desabilitado enquanto o pedido não tem resposta), não vale para a recusa e
+  sai no fim, com sucesso ou falha, sem recarregar a página
+  ([#4](https://github.com/leandrokanis/wordcut/issues/4)).
 
 - `cut list` e `GET /api/sermons/{id}/cuts` trazem em cada corte `start` e `end`: o menor
   início e o maior fim dos trechos, em tempo da pregação, ao milissegundo.

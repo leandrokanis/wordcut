@@ -13,6 +13,7 @@ import { Preview, type PreviewHandle } from "./Preview";
 import { ProcessButton } from "./ProcessButton";
 import { Timeline } from "./Timeline";
 import { Transport } from "./Transport";
+import { useProcessing } from "./useProcessing";
 
 /** Level 2: the cuts panel beside the 16:9 preview and the timeline of one sermon. */
 export function SermonPage() {
@@ -42,7 +43,16 @@ export function SermonPage() {
     preview.current?.seek(edges.move(edge, liveSeconds));
   }
 
-  const editable = shown !== undefined && shown.status !== "processing";
+  const processing = useProcessing(shown, () => {
+    setBordersChanged(false);
+    sermon.reload();
+  });
+  const editable = shown !== undefined && !processing.processing && shown.status !== "processing";
+  useEffect(() => {
+    if (processing.processing) {
+      preview.current?.pause();
+    }
+  }, [processing.processing]);
   const markAtCursor = editable ? (edge: Edge) => edges.mark(edge, cursor) : null;
   useMarkKeys(markAtCursor);
 
@@ -62,19 +72,12 @@ export function SermonPage() {
   }
   return (
     <div className="l2">
-      <CutsPanel sermon={shown} cuts={cuts} />
+      <CutsPanel sermon={shown} cuts={cuts} processing={!editable} task={processing.task} />
       <main className="work">
         <div className="l2-bar">
           <span className="spacer" />
           <Saved savedAt={edges.savedAt} />
-          <ProcessButton
-            sermon={shown}
-            bordersChanged={bordersChanged}
-            onEnd={() => {
-              setBordersChanged(false);
-              sermon.reload();
-            }}
-          />
+          <ProcessButton sermon={shown} bordersChanged={bordersChanged} processing={processing} />
         </div>
         <Preview
           key={shown.status === "processed" ? "processed" : "live"}
@@ -87,6 +90,7 @@ export function SermonPage() {
           cursor={cursor}
           liveDuration={liveDuration}
           onMark={markAtCursor}
+          locked={!editable}
         />
         {edges.error && (
           <p className="ferr edge-error" role="alert">

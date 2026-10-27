@@ -4,10 +4,12 @@ import { afterEach } from "vitest";
 
 import type { ListedCut, SermonShown } from "../../api/types";
 import { apiError, type RecordedCall, type Reply } from "../../test/fakeApi";
+import { fakeEventSource } from "../../test/fakeEventSource";
 import {
   cutPreview,
   listedCut,
   processedSermon,
+  runningTask,
   shownCut,
   shownSermon,
 } from "../../test/fixtures";
@@ -135,7 +137,7 @@ test("says so when the processed sermon has no cuts and no suggestion error", as
   expect(await within(panel).findByText("Nenhum corte nesta pregação.")).toBeInTheDocument();
 });
 
-test.each(["created", "trimmed", "processing", "failed"] as const)(
+test.each(["created", "trimmed", "failed"] as const)(
   "tells a %s sermon that the cuts come after processing, without asking for them",
   async (status) => {
     const panel = await panelOf([listedCut()], shownSermon({ status }));
@@ -303,4 +305,89 @@ test("never asks the API to change a cut's content", async () => {
   await screen.findByLabelText(CUT_LEVEL);
 
   expect(sent()).toEqual(["POST /api/cuts/35/discard", "POST /api/cuts/34/choose"]);
+});
+
+describe("while the sermon processes", () => {
+  const STEPS = [
+    "Baixar a faixa em 1080p",
+    "Transcrever palavra por palavra",
+    "Cortar a pregação em 16:9",
+    "Sugerir cortes",
+  ];
+
+  /** Opens a sermon processing task 15, whose next event is ``progress`` at ``fraction``. */
+  async function processingPanel(fraction: number, message: string) {
+    const { streams } = fakeEventSource();
+    const panel = await panelOf(
+      [],
+      shownSermon({ status: "processing", last_task: runningTask({ id: 15, progress: 0 }) }),
+    );
+    act(() =>
+      streams()[0].emit(
+        "progress",
+        runningTask({ id: 15, progress: fraction, progress_message: message }),
+      ),
+    );
+    return within(panel).getByRole("status");
+  }
+
+  /** Each step's name, its progress in percent and whether it is the one under way. */
+  function stepsOf(status: HTMLElement) {
+    return within(status)
+      .getAllByRole("listitem")
+      .map((step) => [
+        within(step).getByRole("progressbar").getAttribute("aria-label"),
+        Number(within(step).getByRole("progressbar").getAttribute("aria-valuenow")),
+        step.getAttribute("aria-current") === "step",
+      ]);
+  }
+
+  test("shows the prototype's steps, each with its own share of the progress", async () => {
+    const status = await processingPanel(0.6, "transcrevendo");
+
+    expect(stepsOf(status)).toEqual([
+      [STEPS[0], 100, false],
+      [STEPS[1], 50, true],
+      [STEPS[2], 0, false],
+      [STEPS[3], 0, false],
+    ]);
+  });
+
+  test("tells a processing sermon that it is processing, not that the cuts come after", async () => {
+    const status = await processingPanel(0.12, "baixando");
+
+    expect([status.getAttribute("aria-label"), screen.queryByText(/Os cortes aparecem/)]).toEqual([
+      "Processando a pregação",
+      null,
+    ]);
+  });
+
+  test.each([
+    ["sincronizando", 0.3, [86, 0, 0, 0], 0],
+    ["gravando", 0.95, [100, 100, 91, 0], 2],
+    ["sugerindo", 0.96, [100, 100, 100, 0], 3],
+  ])("counts %s at %s in the step it belongs to", async (message, fraction, percents, current) => {
+    const status = await processingPanel(fraction, message);
+
+    expect(stepsOf(status)).toEqual(
+      STEPS.map((name, index) => [name, percents[index], index === current]),
+    );
+  });
+
+  test("shows the steps as soon as the API accepts a processing launched here", async () => {
+    fakeEventSource();
+    const panel = await panelOf([], shownSermon(), {
+      "POST /api/sermons/12/process": {
+        status: 202,
+        body: { task_id: 9, kind: "process", status: "running", sermon_id: 12 },
+      },
+    });
+
+    await userEvent.click(screen.getByRole("button", { name: "Processar" }));
+
+    expect([
+      within(panel).getByRole("status").getAttribute("aria-label"),
+      within(panel).queryByText(/Os cortes aparecem/),
+    ]).toEqual(["Processando a pregação", null]);
+  });
 });
