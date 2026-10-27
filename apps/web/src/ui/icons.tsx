@@ -38,6 +38,10 @@ export function FilmIcon() {
   return <Icon path="M5 5h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2zM7 5v14M17 5v14M3 9.5h4M3 14.5h4M17 9.5h4M17 14.5h4" />;
 }
 
+export function WaveIcon() {
+  return <Icon path="M3 12h1M7 8v8M11 5v14M15 9v6M19 7v10M22 12h-1" />;
+}
+
 export function PlayIcon() {
   return (
     <svg viewBox="0 0 12 12" aria-hidden="true">

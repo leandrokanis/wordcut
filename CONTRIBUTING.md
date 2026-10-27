@@ -47,6 +47,11 @@ nenhuma app; apps não dependem umas das outras. Regra de negócio vive só no `
 - O YouTube chega aos comandos da CLI e às rotas da API pela porta `deps.live_source()`,
   chamada na hora; nas duas suítes, uma fixture automática a troca por um dublê que falha, e
   o teste que precisa do YouTube troca de novo por um dublê próprio.
+- Criar uma pregação lança a tarefa `prepare` destacada. A fixture automática
+  `harmless_tasks_unless_asked` troca toda tarefa destacada por um processo inofensivo
+  quando o teste não pede `detached_tasks` nem `harmless_tasks`, e `no_real_timeline_media`
+  faz `timeline_media.default_gateways` falhar
+  ([ADR-0025](docs/adr/0025-midia-da-timeline-por-storyboards-e-audio-minimo.md)).
 - A suíte não renderiza vídeo real. A fixture `no_real_rendering` faz
   `rendering.default_gateways` falhar, e nenhum teste lança um `render` destacado de verdade
   ([ADR-0018](docs/adr/0018-exportacao-por-portas-sem-arquivo-parcial.md)). O único `ffmpeg`

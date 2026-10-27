@@ -15,6 +15,7 @@ import { SermonExportMenu } from "./SermonExportMenu";
 import { Timeline } from "./Timeline";
 import { Transport } from "./Transport";
 import { useProcessing } from "./useProcessing";
+import { useTimelineMedia } from "./useTimelineMedia";
 
 /** Level 2: the cuts panel beside the 16:9 preview and the timeline of one sermon. */
 export function SermonPage() {
@@ -42,6 +43,7 @@ export function SermonPage() {
   }
 
   const processing = useProcessing(shown, sermon.reload);
+  const media = useTimelineMedia(shown, sermon.reload);
   const editable = shown !== undefined && !processing.processing && shown.status !== "processing";
   useEffect(() => {
     if (processing.processing) {
@@ -102,6 +104,7 @@ export function SermonPage() {
           onEdgeMove={editable ? moveEdge : null}
           onEdgeRelease={edges.release}
           layers={cutLayers(shown, cuts.data)}
+          media={media}
         />
       </main>
     </div>

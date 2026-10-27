@@ -57,6 +57,29 @@ export interface SermonShown extends Omit<SermonListItem, "live_duration"> {
   last_task: Task | null;
   cuts: SermonCut[];
   suggestion_error: { code: string; message: string } | null;
+  timeline: TimelineState;
+}
+
+/** service/sermons.py ``_timeline``: the preparation of the thumbnails and the waveform, and
+ * the ``prepare`` task that runs it while ``pending``. */
+export interface TimelineState {
+  status: "pending" | "ready" | "failed";
+  error: { code: string; message: string } | null;
+  task_id: number | null;
+}
+
+/** ``GET /api/sermons/{id}/thumbnails.json``: the size of a thumbnail of the strip and the
+ * second of the live each one shows, in the order they lie side by side. */
+export interface ThumbnailsLayout {
+  width: number;
+  height: number;
+  times: number[];
+}
+
+/** ``GET /api/sermons/{id}/waveform``: the peaks of the whole live, 0 to 1, in time order. */
+export interface Waveform {
+  buckets: number;
+  peaks: number[];
 }
 
 /** An item of ``GET /api/sermons/{id}/cuts``, service/cuts.py ``_spanned``: ``text`` is the
@@ -180,7 +203,7 @@ export interface FixedWord extends CutWord {
   cut_id: number;
 }
 
-export type TaskKind = "process" | "render" | "suggest";
+export type TaskKind = "process" | "render" | "suggest" | "prepare";
 
 /** A task as service/tasks.py ``shown_task`` gives it. */
 export interface Task {

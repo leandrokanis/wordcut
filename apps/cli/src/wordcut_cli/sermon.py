@@ -1,5 +1,5 @@
-"""``wordcut sermon <action>``: create, list, show, trim, process, download and suggest the
-cuts of sermons (docs/cli.md §7)."""
+"""``wordcut sermon <action>``: create, list, show, trim, process, download, suggest the cuts
+of sermons and prepare the media of their timeline (docs/cli.md §7)."""
 
 from __future__ import annotations
 
@@ -18,6 +18,7 @@ from wordcut.service.sermons import (
     SERMON_STATES,
     create_sermon,
     list_sermons,
+    prepare_sermon_timeline,
     sermon_video,
     show_sermon,
     trim_sermon,
@@ -38,6 +39,7 @@ STATE_NAMES = {
     "processed": "processada",
     "failed": "falhou",
 }
+TIMELINE_STATE_NAMES = {"pending": "preparando", "ready": "pronta", "failed": "falhou"}
 TIME_HELP = "em tempo da live: HH:MM:SS[.mmm], MM:SS[.mmm] ou segundos"
 
 
@@ -143,6 +145,19 @@ def register(commands: Commands) -> None:
     suggest.add_argument("id", type=int, help="ID da pregação")
     suggest.add_argument("--preset", type=int, help="ID do preset; padrão: o preset padrão")
     add_wait_option(suggest)
+    prepare = add_command(
+        actions,
+        "prepare",
+        help=(
+            "prepara de novo as miniaturas e a forma de onda da timeline da pregação, a partir"
+            " das imagens de navegação e do áudio da live; não usa a trava de processamento"
+        ),
+        run=_prepare,
+        render=_render_preparation,
+        example="wordcut sermon prepare 12 --wait --json",
+    )
+    prepare.add_argument("id", type=int, help="ID da pregação")
+    add_wait_option(prepare)
     download.add_argument(
         "-o",
         "--output",
@@ -166,7 +181,12 @@ def _create(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:
     _require_what_processing_needs(args)
     with closing(deps.connection()) as connection:
         sermon = create_sermon(
-            connection, deps.live_source(), args.link, start=args.start, end=args.end
+            connection,
+            deps.live_source(),
+            args.link,
+            home=Home.from_environment(),
+            start=args.start,
+            end=args.end,
         )
     _warn_if_reprocess_needed(sermon, ctx)
     if not sermon["live_finished"]:
@@ -235,6 +255,17 @@ def _suggest(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:
     return launch(ctx, args.wait, start)
 
 
+def _prepare(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:
+    """The launched task, or with ``wait`` the sermon's timeline once prepared."""
+    home = Home.from_environment()
+    launched = launch(ctx, args.wait, partial(prepare_sermon_timeline, home, args.id))
+    if not args.wait:
+        return launched
+    with closing(deps.connection()) as connection:
+        shown = show_sermon(connection, args.id, home=home)
+    return {"sermon_id": args.id, "timeline": shown["timeline"]}
+
+
 def _download(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:
     """Copy outside the processing lock: reading a finished video races with nothing."""
     with closing(deps.connection()) as connection:
@@ -289,6 +320,20 @@ def _render_suggestion(result: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _render_preparation(result: dict[str, Any]) -> str:
+    if "task_id" in result:
+        return (
+            f"Tarefa {result['task_id']} iniciada: preparação da timeline da pregação"
+            f" {result['sermon_id']}. Acompanhe com wordcut task wait {result['task_id']}."
+        )
+    return f"Timeline da pregação {result['sermon_id']}: {_timeline(result['timeline'])}."
+
+
+def _timeline(timeline: dict[str, Any]) -> str:
+    state = TIMELINE_STATE_NAMES[timeline["status"]]
+    return state if timeline["error"] is None else f"{state} ({timeline['error']['message']})"
+
+
 def _render_downloaded(result: dict[str, Any]) -> str:
     return str(result["path"])
 
@@ -310,6 +355,7 @@ def _render_shown(result: dict[str, Any]) -> str:
         f"Estado: {STATE_NAMES[result['status']]}",
         f"Bordas: {_borders(result)}",
         f"Cortes: {len(result['cuts']) or 'nenhum'}",
+        f"Timeline: {_timeline(result['timeline'])}",
     ]
     if result["borders_changed"]:
         lines.append(

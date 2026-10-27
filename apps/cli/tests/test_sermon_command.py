@@ -284,7 +284,8 @@ def test_show_without_json_describes_the_sermon_in_portuguese(
         "Live: 2:08:38, terminada\n"
         "Estado: criada\n"
         "Bordas: não definidas\n"
-        "Cortes: nenhum\n",
+        "Cortes: nenhum\n"
+        "Timeline: preparando\n",
     )
 
 
@@ -293,7 +294,7 @@ def test_sermon_help_lists_its_actions(capsys: pytest.CaptureFixture[str]) -> No
 
     assert (
         exit_code,
-        "{create,list,show,trim,process,download,suggest}" in capsys.readouterr().out,
+        "{create,list,show,trim,process,download,suggest,prepare}" in capsys.readouterr().out,
     ) == (
         0,
         True,
@@ -301,7 +302,7 @@ def test_sermon_help_lists_its_actions(capsys: pytest.CaptureFixture[str]) -> No
 
 
 @pytest.mark.parametrize(
-    "action", ["create", "list", "show", "trim", "process", "download", "suggest"]
+    "action", ["create", "list", "show", "trim", "process", "download", "suggest", "prepare"]
 )
 def test_each_sermon_action_help_shows_an_example_ready_to_copy(
     action: str, capsys: pytest.CaptureFixture[str]
@@ -341,7 +342,7 @@ def test_show_tells_why_the_last_suggestion_failed(
 
     assert (
         exit_code,
-        readable.splitlines()[-2:],
+        readable.splitlines()[-3:],
         [cut["title"] for cut in shown["cuts"]],
         shown["suggestion_error"],
         shown["cut_counts"],
@@ -349,6 +350,7 @@ def test_show_tells_why_the_last_suggestion_failed(
         0,
         [
             "Cortes: 1",
+            "Timeline: preparando",
             "Sugestão de cortes falhou: Sem a chave do LLM (wordcut settings set-key).",
         ],
         ["Graça que alcança"],

@@ -130,7 +130,9 @@ def install(monkeypatch: pytest.MonkeyPatch, *answers: str) -> ModelFactory:
 
 
 def trimmed_sermon(connection: sqlite3.Connection) -> int:
-    sermon_id: int = create_sermon(connection, FakeLive(), LINK, start=1000.0, end=1100.0)["id"]
+    sermon_id: int = create_sermon(
+        connection, FakeLive(), LINK, start=1000.0, end=1100.0, home=Home.from_environment()
+    )["id"]
     return sermon_id
 
 

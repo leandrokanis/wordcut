@@ -160,14 +160,17 @@ def test_force_processes_a_processed_sermon_again(
     live: FakeLive, gateways: Any, capsys: pytest.CaptureFixture[str]
 ) -> None:
     sermon_id = trimmed(capsys)
-    main(["sermon", "process", sermon_id, "--wait", "--quiet"])
-    capsys.readouterr()
+    _, first = run_json(["sermon", "process", sermon_id, "--wait", "--json"], capsys)
 
     exit_code, sermon = run_json(
         ["sermon", "process", sermon_id, "--force", "--wait", "--json"], capsys
     )
 
-    assert (exit_code, sermon["status"], sermon["last_task"]["id"]) == (0, "processed", 2)
+    assert (exit_code, sermon["status"], sermon["last_task"]["id"]) == (
+        0,
+        "processed",
+        first["last_task"]["id"] + 1,
+    )
 
 
 class RefusingYouTube(FakeGateways):

@@ -49,7 +49,7 @@ function layersOf(timeline: HTMLElement): HTMLElement[] {
   return within(timeline).queryAllByRole("group", { name: /^Corte \d+/ });
 }
 
-test("draws one layer per cut, in the panel's order, above the video track", async () => {
+test("draws one layer per cut, in the panel's order, above the video and audio tracks", async () => {
   const timeline = await timelineOf([
     listedCut({ id: 35, status: "chosen", title: "Graça" }),
     listedCut({ id: 34, status: "discarded", title: "Fé no deserto" }),
@@ -61,7 +61,7 @@ test("draws one layer per cut, in the panel's order, above the video track", asy
     heads,
   }).toEqual({
     layers: ["Corte 1: Graça", "Corte 2: Fé no deserto"],
-    heads: ["", "1Graça", "2Fé no deserto", "Vídeo"],
+    heads: ["", "1Graça", "2Fé no deserto", "Vídeo", "Áudio"],
   });
 });
 

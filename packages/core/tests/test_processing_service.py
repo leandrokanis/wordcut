@@ -109,7 +109,7 @@ def opened(home: Home) -> Iterator[Any]:
 def trimmed_sermon(home: Home, live: FakeLive | None = None) -> int:
     with closing(connect(home)) as connection:
         created = create_sermon(
-            connection, live or FakeLive(), LINK, start=LIVE_START, end=LIVE_END
+            connection, live or FakeLive(), LINK, home=home, start=LIVE_START, end=LIVE_END
         )
     sermon_id: int = created["id"]
     return sermon_id
@@ -240,7 +240,7 @@ def test_a_failure_leaves_the_task_and_the_sermon_failed_with_its_error(
     with pytest.raises(WordcutError) as raised:
         process(home, sermon_id)
 
-    [task] = list_tasks(home)["items"]
+    [task] = list_tasks(home, kind="process")["items"]
     assert (
         raised.value.code,
         raised.value.exit_code,
@@ -281,7 +281,7 @@ def test_a_sermon_whose_detached_processing_failed_can_be_trimmed_again_at_once(
 
 def untrimmed_sermon(home: Home) -> int:
     with closing(connect(home)) as connection:
-        sermon_id: int = create_sermon(connection, FakeLive(), LINK)["id"]
+        sermon_id: int = create_sermon(connection, FakeLive(), LINK, home=home)["id"]
     return sermon_id
 
 
@@ -296,7 +296,8 @@ def processed_sermon(home: Home) -> int:
 
 
 def task_count(home: Home) -> int:
-    return len(list_tasks(home)["items"])
+    """The processing tasks; creating a sermon also starts preparing its timeline."""
+    return len(list_tasks(home, kind="process")["items"])
 
 
 @pytest.mark.parametrize(
@@ -518,7 +519,7 @@ def test_a_sermon_whose_task_process_died_is_read_failed_with_its_task_interrupt
 ) -> None:
     sermon_id = trimmed_sermon(home)
     start_processing(home, sermon_id, live=FakeLive(), detach=True)
-    killed(harmless_tasks[0])
+    killed(harmless_tasks[-1])
 
     sermon = shown(home, sermon_id)
 
@@ -534,7 +535,7 @@ def test_listing_processing_sermons_leaves_out_one_whose_task_process_died(
 ) -> None:
     sermon_id = trimmed_sermon(home)
     start_processing(home, sermon_id, live=FakeLive(), detach=True)
-    killed(harmless_tasks[0])
+    killed(harmless_tasks[-1])
 
     with closing(connect(home)) as connection:
         assert list_sermons(connection, "processing", home=home) == {"items": []}

@@ -294,9 +294,22 @@ Formato de [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões
   `--force`. Na web, Reprocessar sai do botão do nível 2 e entra no menu Exportar a partir
   desse campo, valendo depois de recarregar ou em outra sessão; a recusa da API aparece na
   barra do nível 2 ([#8](https://github.com/leandrokanis/wordcut/issues/8)).
+- Miniaturas e forma de onda na timeline da pregação (1.1.b.1, ADR-0025): a tarefa nova
+  `prepare`, sem trava e uma por pregação, baixa só as imagens de navegação da live
+  (storyboards do YouTube) e o áudio na menor qualidade, monta a faixa de miniaturas e os
+  picos da forma de onda em `media/sermons/<id>/timeline/` e apaga o áudio. `sermon create`
+  a lança numa pregação nova; `wordcut sermon prepare <id> [--wait]` e
+  `POST /api/sermons/{id}/prepare` a pedem de novo. Estado na tabela `timeline_media`
+  (migração 0012) e em `timeline` no `sermon show` e no `GET` da pregação; `task list
+  --kind` aceita `prepare`. A API serve `GET /api/sermons/{id}/thumbnails`,
+  `thumbnails.json` e `waveform`, com 404 enquanto não há mídia. Na web, a timeline do nível
+  2 ganha as faixas "Vídeo" (miniaturas) e "Áudio" (onda), esmaecidas fora das bordas, o
+  aviso "Preparando a timeline…" que some quando a tarefa termina e, na falha, "Tentar de
+  novo" ([#9](https://github.com/leandrokanis/wordcut/issues/9)).
 
 ### Alterado
 
+- `last_task` do `sermon show` deixa de fora a tarefa `prepare`, que aparece em `timeline`.
 - O progresso de `sermon process` avança dentro do download da faixa e da transcrição, não só
   na troca de etapa, na web, na CLI (`--wait`, `task wait`) e na SSE, sem mudança de contrato;
   nunca diminui e é gravado no máximo uma vez por segundo, além das trocas de etapa

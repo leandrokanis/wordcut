@@ -4,8 +4,9 @@ A API (`apps/api`, FastAPI) expõe à web as mesmas operações da CLI, sobre a 
 serviço ([ADR-0004](adr/0004-camada-de-servico-no-core.md)). Este documento lista as rotas,
 os corpos, os status e os eventos de progresso. As decisões estão na
 [ADR-0019](adr/0019-identidade-e-erros-na-api.md), na
-[ADR-0020](adr/0020-rotas-e-progresso-por-sse-na-api.md) e na
-[ADR-0021](adr/0021-rotas-de-cortes-e-administracao-na-api.md).
+[ADR-0020](adr/0020-rotas-e-progresso-por-sse-na-api.md), na
+[ADR-0021](adr/0021-rotas-de-cortes-e-administracao-na-api.md) e, para a mídia da timeline,
+na [ADR-0025](adr/0025-midia-da-timeline-por-storyboards-e-audio-minimo.md).
 
 As palavras-chave DEVE, NÃO DEVE e PODE seguem o BCP 14
 ([RFC 2119](https://www.rfc-editor.org/rfc/rfc2119),
@@ -58,8 +59,12 @@ As palavras-chave DEVE, NÃO DEVE e PODE seguem o BCP 14
 | `PATCH /api/sermons/{id}` | `{"start", "end"}` | 200 a pregação como o `GET` a mostra | 400 bordas fora da live; 404; 409 `sermon_too_short`, `busy` | assistente |
 | `POST /api/sermons/{id}/process` | `{"force": false}`, opcional | 202 a tarefa lançada | 404; 409 `sermon_not_trimmed`, `would_discard_edits`, `live_not_finished`, `busy`; 502 `youtube_error` | assistente |
 | `POST /api/sermons/{id}/suggest` | `{"preset_id": null}`, opcional | 202 a tarefa lançada | 404 pregação ou preset; 409 `sermon_not_processed`, `llm_not_configured`, `busy` | administrador |
+| `POST /api/sermons/{id}/prepare` | — | 202 a tarefa `prepare` lançada, que refaz as miniaturas e a forma de onda | 404; 409 `busy` com outra `prepare` da pregação em andamento | assistente |
+| `GET /api/sermons/{id}/thumbnails` | — | 200 a faixa de miniaturas (`image/jpeg`), lado a lado na ordem do tempo | 404 pregação inexistente ou miniaturas indisponíveis | assistente |
+| `GET /api/sermons/{id}/thumbnails.json` | — | 200 `{"width", "height", "times"}`: tamanho de uma miniatura da faixa e o segundo da live de cada uma | 404 como `thumbnails` | assistente |
+| `GET /api/sermons/{id}/waveform` | — | 200 `{"buckets", "peaks"}`: os picos da live inteira, de 0 a 1, na ordem do tempo | 404 pregação inexistente ou forma de onda indisponível | assistente |
 | `GET /api/sermons/{id}/video` | — | 200 o vídeo 16:9 (`video/mp4`), `Content-Disposition: attachment` com o nome `AAAA-MM-DD - Título.mp4` | 404; 409 `sermon_not_processed` | assistente |
-| `GET /api/tasks[?status=&kind=]` | — | 200 `{"items"}` de `task list` | 400 `status` fora de `running`, `succeeded`, `failed`; `kind` fora de `process`, `render`, `suggest` | assistente |
+| `GET /api/tasks[?status=&kind=]` | — | 200 `{"items"}` de `task list` | 400 `status` fora de `running`, `succeeded`, `failed`; `kind` fora de `process`, `render`, `suggest`, `prepare` | assistente |
 | `GET /api/tasks/{id}` | — | 200 a tarefa de `task show` | 404 | assistente |
 | `GET /api/tasks/{id}/events` | — | 200 `text/event-stream` (§3) | 404 em JSON, antes de abrir o fluxo | assistente |
 | `GET /api/status` | — | 200 `{"lock", "running_tasks"}` de `wordcut status` | — | assistente |
@@ -104,7 +109,16 @@ Corpos de entrada:
   resposta do `PATCH`): `true` quando a pregação está processada e as bordas atuais diferem
   das usadas no último processamento bem-sucedido ([docs/cli.md](cli.md) §7.2). A web
   oferece Reprocessar no menu Exportar a partir dele.
-- A pregação nasce sem bordas no `POST /api/sermons`; as bordas vão no `PATCH`.
+- A pregação nasce sem bordas no `POST /api/sermons`; as bordas vão no `PATCH`. Uma
+  pregação nova já sai com a preparação da timeline lançada ([docs/cli.md](cli.md) §7.7).
+- `timeline` (no `GET /api/sermons/{id}` e na resposta do `PATCH`): `{"status", "error",
+  "task_id"}`, com `status` `pending` (a tarefa `prepare` em `task_id` roda), `ready` ou
+  `failed` (com `error`, mensagem genérica) ([docs/cli.md](cli.md) §7.7). A web acompanha a
+  tarefa pelos eventos (§3) e, no fim, lê a pregação de novo e busca as mídias.
+- As três rotas de mídia da timeline dão 404 `not_found` enquanto a preparação não terminou,
+  quando ela falhou ou, nas miniaturas, quando a live não tem storyboards; nunca 500. As
+  respostas não trazem caminho do servidor. A faixa muda quando a timeline é preparada de
+  novo: a web acrescenta `?v=` à URL para não reaproveitar a imagem antiga.
 - O `PATCH` da legenda aceita `enabled` (booleano), `font`, `color` e `border_color`
   (`#RRGGBB`), `position` (`top`, `center`, `bottom`), `shadow` (`none`, `soft`, `strong`)
   e `size`, `offset` e `border` (inteiros), com os nomes e as faixas de `cut caption`

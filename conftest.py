@@ -70,6 +70,19 @@ def no_real_rendering(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture(autouse=True)
+def no_real_timeline_media(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Fail a test that would fetch thumbnails and audio from YouTube for real."""
+    from wordcut import timeline_media
+
+    def refuse() -> timeline_media.TimelineMediaGateways:
+        raise AssertionError(
+            "test reached real timeline media; replace timeline_media.default_gateways"
+        )
+
+    monkeypatch.setattr(timeline_media, "default_gateways", refuse)
+
+
+@pytest.fixture(autouse=True)
 def no_real_llm(monkeypatch: pytest.MonkeyPatch) -> None:
     """Fail a test that would call the LLM on OpenRouter for real."""
     from wordcut import suggestion
@@ -167,6 +180,28 @@ def harmless_tasks(
 
     The task stays ``running`` and its lock held, and nothing of the task's kind runs.
     """
+    yield from _harmless_launches(monkeypatch)
+
+
+@pytest.fixture(autouse=True)
+def harmless_tasks_unless_asked(
+    request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> Iterator[None]:
+    """A test that asks for neither ``detached_tasks`` nor ``harmless_tasks`` gets harmless
+    detached tasks too.
+
+    Creating a sermon launches its ``prepare`` task detached; without this, a test that only
+    needs a sermon would race with a real task process that ends on its own (ADR-0025).
+    """
+    if {"detached_tasks", "harmless_tasks"} & set(request.fixturenames):
+        yield
+        return
+    yield from (None for _ in _harmless_launches(monkeypatch))
+
+
+def _harmless_launches(
+    monkeypatch: pytest.MonkeyPatch,
+) -> Iterator[list[subprocess.Popen[bytes]]]:
     from wordcut.tasks import execution
 
     launched: list[subprocess.Popen[bytes]] = []

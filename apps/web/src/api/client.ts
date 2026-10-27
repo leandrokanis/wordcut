@@ -22,6 +22,8 @@ import type {
   Settings,
   SettingsModels,
   TaskLaunched,
+  ThumbnailsLayout,
+  Waveform,
 } from "./types";
 
 /** A failed call: the API's error object, with the HTTP status. */
@@ -104,6 +106,24 @@ export function trimSermon(id: number, start: number, end: number): Promise<Serm
 /** Launches the processing; ``force`` discards the edits of the cuts of a processed sermon. */
 export function processSermon(id: number, force = false): Promise<TaskLaunched> {
   return post(`/api/sermons/${id}/process`, force ? { force } : {});
+}
+
+/** Prepares the thumbnails and the waveform of the sermon's timeline again. */
+export function prepareSermon(id: number): Promise<TaskLaunched> {
+  return post(`/api/sermons/${id}/prepare`, {});
+}
+
+export function getThumbnailsLayout(sermonId: number): Promise<ThumbnailsLayout> {
+  return request(`/api/sermons/${sermonId}/thumbnails.json`);
+}
+
+/** The strip of thumbnails; ``version`` changes once the strip is prepared again. */
+export function thumbnailsUrl(sermonId: number, version: number): string {
+  return `/api/sermons/${sermonId}/thumbnails?v=${version}`;
+}
+
+export function getWaveform(sermonId: number): Promise<Waveform> {
+  return request(`/api/sermons/${sermonId}/waveform`);
 }
 
 /** The cuts of the sermon in the service's order: the discarded ones last. */

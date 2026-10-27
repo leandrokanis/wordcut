@@ -125,6 +125,7 @@ interativa permitida é a digitação sem eco de segredo em `settings set-key` e
 | `sermon process` | 1.1.c | assistente | ✅ com trava |
 | `sermon download` | 1.1.d | assistente | — |
 | `sermon suggest` | 2.1.b | admin | ✅ sem trava |
+| `sermon prepare` | 1.1.b | assistente | ✅ sem trava |
 | `sermon delete` | 1.2.b | admin | — |
 | `cut list` · `show` · `preview` | 1.1.e, 1.1.g | assistente | — |
 | `cut choose` · `discard` · `restore` | 1.1.e | assistente | — |
@@ -229,7 +230,7 @@ Sem `--json`, o `message` vai para o stderr.
 | `forbidden` | 1 | só na API (HTTP 403): e-mail fora da equipe, ou papel sem permissão para a rota; a mensagem nunca traz o e-mail (ADR-0015, ADR-0019) |
 | `invalid_argument` | 2 | argumento inválido; `details.argument` diz qual opção do comando, quando identificável, com o nome que o parser define, e `details.choices` lista as opções válidas de uma escolha; argumento não reconhecido não traz `details`; a mensagem nunca repete o que foi digitado, nem como nome de opção (ADR-0015) |
 | `not_found` | 3 | ID ou e-mail inexistente |
-| `busy` | 4 | outra tarefa segura a trava, ou já há uma sugestão da mesma pregação em andamento (§7.6); `details` traz a tarefa (`task_id`, `kind`, `started_at`) |
+| `busy` | 4 | outra tarefa segura a trava, ou já há uma sugestão (§7.6) ou uma preparação da timeline (§7.7) da mesma pregação em andamento; `details` traz a tarefa (`task_id`, `kind`, `started_at`) |
 | `live_not_finished` | 5 | processar uma live que ainda não terminou |
 | `sermon_not_trimmed` | 5 | processar sem bordas definidas |
 | `sermon_too_short` | 5 | bordas com menos de 1 minuto |
@@ -251,14 +252,16 @@ Códigos novos MAY ser acrescentados; os existentes MUST NOT mudar de saída.
 
 ### 6.1. Modelo
 
-`sermon process`, `sermon suggest` e `cut render` são **tarefas**: rodam em segundo plano,
-têm ID e estado gravados no SQLite e podem ser acompanhadas.
+`sermon process`, `sermon suggest`, `sermon prepare` e `cut render` são **tarefas**: rodam
+em segundo plano, têm ID e estado gravados no SQLite e podem ser acompanhadas. `sermon
+create` também lança uma, a preparação da timeline da pregação nova (§7.7).
 
 | Tipo (`kind`) | Comando | Trava |
 |---|---|:-:|
 | `process` | `sermon process` | ✅ |
 | `render` | `cut render` | ✅ |
 | `suggest` | `sermon suggest` | — |
+| `prepare` | `sermon prepare`, e `sermon create` numa pregação nova | — |
 
 Estados: `running`, `succeeded`, `failed`.
 
@@ -307,6 +310,10 @@ Cria a pregação a partir do link da live e devolve título, data do culto e du
 
 - O mesmo vídeo duas vezes MUST devolver a pregação existente, com `"created": false` e
   saída 0.
+- Uma pregação nova MUST ter a timeline preparada em segundo plano (§7.7): a criação lança a
+  tarefa `prepare`, destacada, e volta sem esperá-la. O mesmo vídeo de novo não prepara outra
+  vez. Se o lançamento falhar, a pregação continua criada e a timeline aparece como não
+  preparada.
 - Live não terminada: cria, avisa no stderr e devolve `"live_finished": false` (1.1.a.2).
 - `--start`/`--end`: delimita na criação, como `sermon trim`; os dois juntos ou nenhum. Bordas
   recusadas MUST NOT deixar pregação criada. Para um vídeo que já tem pregação, delimita a
@@ -327,8 +334,9 @@ wordcut sermon create https://youtube.com/live/… --start 1:02:10 --end 1:48:30
 - `show`: os mesmos dados, mais as bordas na live (`live_start`, `live_end`), as bordas
   ajustadas às palavras pelo processamento (`sermon_start`, `sermon_end`, em tempo da live;
   `null` antes de processar), `processed_at`, a última tarefa da pregação (`last_task`, no
-  formato de `task show`, ou `null`), os cortes (`cuts`) e o erro da última sugestão
-  (`suggestion_error`).
+  formato de `task show`, ou `null`; a preparação da timeline não conta), os cortes
+  (`cuts`), o erro da última sugestão (`suggestion_error`) e o estado da timeline
+  (`timeline`, §7.7).
 - Cada corte em `cuts`, na ordem em que foi criado: `id`, `status`, `title`, `segments` (no
   formato de `cut segments`, §8.10, na ordem em que o corte toca), `range_start_word` e
   `range_end_word` (primeira e última palavra da faixa contínua, na ordem da pregação),
@@ -343,6 +351,9 @@ wordcut sermon create https://youtube.com/live/… --start 1:02:10 --end 1:48:30
 - `suggestion_error`: `{"code", "message"}` da última sugestão que falhou, ou `null` quando
   ela deu certo ou nunca rodou. Sem `--json`, o `show` termina com a linha
   `Sugestão de cortes falhou: <mensagem>`.
+- `timeline`: `{"status", "error", "task_id"}` da preparação das miniaturas e da forma de
+  onda (§7.7). Sem `--json`, o `show` traz a linha `Timeline: preparando`, `Timeline: pronta`
+  ou `Timeline: falhou (<mensagem>)`.
 
 ```json
 { "cuts": [ { "id": 34, "status": "suggested", "title": "Graça que alcança",
@@ -453,7 +464,40 @@ O pedido e a validação da resposta são os do `sermon process` (§7.4).
   `suggested_cuts` traz os cortes novos no formato do `sermon show`; `suggestion_warnings`,
   os descartados pela duração, como no §7.4.
 
-### 7.7. `sermon delete <id>` — administrador
+### 7.7. `sermon prepare <id> [--wait]`
+
+Tarefa sem trava (1.1.b.1, ADR-0025): prepara as miniaturas e a forma de onda da timeline da
+pregação. Baixa só as imagens de navegação da live (storyboards do YouTube, do maior
+tamanho) e o áudio da live inteira na menor qualidade; calcula os picos da forma de onda e
+apaga o áudio. `sermon create` lança a mesma tarefa numa pregação nova (§7.1); este comando
+a pede de novo.
+
+- Não toma a trava de processamento: roda junto com um `process` ou um `render`. Outra
+  `prepare` da mesma pregação em andamento: `busy`, com `task_id`, `kind` e `started_at`
+  dela. A tarefa órfã (§6.5) não conta. A conferência e a criação da tarefa não são
+  atômicas.
+- Roda em qualquer estado da timeline, pronta inclusive: refaz tudo. Mostrar a pregação
+  (`sermon show`, web) nunca prepara.
+- Live sem storyboards: a timeline fica pronta só com a forma de onda, sem erro. A falha das
+  miniaturas também deixa só a forma de onda; a falha do áudio deixa a timeline `failed`.
+- `timeline.status` (§7.2): `pending` enquanto a tarefa roda (`task_id` é a tarefa),
+  `ready` ou `failed`. Uma pregação sem preparação em andamento nem terminada (criada antes
+  desta versão, ou com a tarefa morta) aparece `failed` com o erro `interrupted`.
+- `timeline.error`: `{"code", "message"}` da falha, com uma mensagem genérica que nunca traz
+  caminho, URL, cookies nem a saída do yt-dlp; o código é o da falha (`youtube_error`,
+  `network_error`, `internal_error`). A tarefa falha com o mesmo erro.
+- A falha da preparação MUST NOT impedir `sermon trim` nem `sermon process`.
+- Etapas no progresso: `miniaturas`, `áudio`, `forma de onda`.
+- Sem `--wait`, devolve a tarefa (§6.2). Com `--wait`, devolve
+  `{"sermon_id": 12, "timeline": {"status": "ready", "error": null, "task_id": null}}`; o
+  resultado gravado na tarefa é `{"sermon_id", "status": "ready", "thumbnails"}`, com
+  `thumbnails` falso quando a live não tem storyboards.
+
+```
+wordcut sermon prepare 12 --wait --json
+```
+
+### 7.8. `sermon delete <id>` — administrador
 
 Apaga a pregação, seus cortes, exportações e mídias (1.2.b). Falha com `busy` se uma tarefa
 da pregação estiver rodando.
@@ -793,6 +837,7 @@ A CLI também roda no contêiner: `docker compose run --rm cli <comando>`.
 |---|---|---|
 | Banco (SQLite) e mídias | `~/.local/share/wordcut/` | sobrescrito por `WORDCUT_HOME`; nos contêineres, o volume de dados |
 | Mídias de uma pregação | `media/sermons/<id>/` na pasta de dados | `sermon.mp4`; intermediários em `work/`, apagados no sucesso |
+| Mídias da timeline | `media/sermons/<id>/timeline/` na pasta de dados | `thumbnails.jpg`, `thumbnails.json`, `waveform.json`; intermediários em `timeline-work/`, apagados no fim |
 | Exportações de um corte | `media/cuts/<id>/` na pasta de dados | `<render_id>.mp4`; intermediários em `work/`, apagados no fim |
 | Saída dos processos de tarefa | `tasks/<id>.log` na pasta de dados | traz o rastreio de um erro interno; permissão 600 |
 | Segredos (chave do LLM, cookies) | `~/.config/wordcut/` | permissão 600 |

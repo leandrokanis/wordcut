@@ -124,6 +124,7 @@ export function shownSermon(overrides: Partial<SermonShown> = {}): SermonShown {
     last_task: null,
     cuts: [],
     suggestion_error: null,
+    timeline: { status: "ready", error: null, task_id: null },
     ...overrides,
   };
 }

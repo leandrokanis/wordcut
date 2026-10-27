@@ -157,7 +157,11 @@ processada sem cortes e o erro aparece no `sermon show`
 ([ADR-0016](docs/adr/0016-sugestao-por-porta-com-falha-na-pregacao.md)). A exportação
 (`cut render`) também usa uma porta, grava as opções no corte e só deixa o arquivo em
 `media/cuts/<corte>/<exportação>.mp4` quando termina bem
-([ADR-0018](docs/adr/0018-exportacao-por-portas-sem-arquivo-parcial.md)).
+([ADR-0018](docs/adr/0018-exportacao-por-portas-sem-arquivo-parcial.md)). Criar uma pregação
+lança a tarefa `prepare`, sem trava, que baixa só as imagens de navegação da live e o áudio
+na menor qualidade e grava as miniaturas e a forma de onda da timeline; `sermon prepare
+<id> --wait` a pede de novo
+([ADR-0025](docs/adr/0025-midia-da-timeline-por-storyboards-e-audio-minimo.md)).
 
 Os dados (banco SQLite, criado e migrado na primeira chamada, mídias e a trava
 `processing.lock`) ficam em `~/.local/share/wordcut/`, ou em `WORDCUT_HOME` quando definida.
@@ -180,7 +184,10 @@ uv run mypy
 
 A suíte não usa a rede real: ela define `WORDCUT_FORBID_NETWORK`, e com essa variável o
 OpenRouter e o YouTube recusam com `network_error`, até numa tarefa destacada
-([ADR-0017](docs/adr/0017-testes-sem-rede-real.md)).
+([ADR-0017](docs/adr/0017-testes-sem-rede-real.md)). Um teste que não pede
+`detached_tasks` nem `harmless_tasks` tem as tarefas destacadas trocadas por um processo
+inofensivo, porque criar uma pregação lança a preparação da timeline
+([ADR-0025](docs/adr/0025-midia-da-timeline-por-storyboards-e-audio-minimo.md)).
 
 Web:
 

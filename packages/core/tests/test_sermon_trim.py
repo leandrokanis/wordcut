@@ -73,7 +73,7 @@ def failure_of(connection: sqlite3.Connection, sermon_id: int, start: float, end
 
 @pytest.fixture
 def sermon(connection: sqlite3.Connection) -> dict[str, Any]:
-    return create_sermon(connection, FakeLive(), LINK, now=CREATED_AT)
+    return create_sermon(connection, FakeLive(), LINK, now=CREATED_AT, home=home_of(connection))
 
 
 def test_trimming_a_created_sermon_records_the_borders_and_makes_it_trimmed(
@@ -236,7 +236,9 @@ def test_listed_sermon_shows_the_duration_between_its_borders(
 def test_live_of_unknown_duration_accepts_any_ordered_range_of_at_least_a_minute(
     connection: sqlite3.Connection,
 ) -> None:
-    on_air = create_sermon(connection, FakeLive(LIVE_ON_AIR), LINK, now=CREATED_AT)
+    on_air = create_sermon(
+        connection, FakeLive(LIVE_ON_AIR), LINK, now=CREATED_AT, home=home_of(connection)
+    )
 
     trimmed = trim_sermon(connection, on_air["id"], 3730.0, 99999.0, now=TRIMMED_AT)
 
@@ -246,7 +248,9 @@ def test_live_of_unknown_duration_accepts_any_ordered_range_of_at_least_a_minute
 def test_live_of_unknown_duration_still_refuses_borders_out_of_order(
     connection: sqlite3.Connection,
 ) -> None:
-    on_air = create_sermon(connection, FakeLive(LIVE_ON_AIR), LINK, now=CREATED_AT)
+    on_air = create_sermon(
+        connection, FakeLive(LIVE_ON_AIR), LINK, now=CREATED_AT, home=home_of(connection)
+    )
 
     error, _ = failure_of(connection, on_air["id"], 6510.0, 3730.0)
 
@@ -269,7 +273,15 @@ def test_sermon_being_processed_is_busy_before_its_borders_are_checked(
 def test_sermon_created_with_borders_is_already_trimmed(
     connection: sqlite3.Connection,
 ) -> None:
-    created = create_sermon(connection, FakeLive(), LINK, now=CREATED_AT, start=3730.0, end=6510.0)
+    created = create_sermon(
+        connection,
+        FakeLive(),
+        LINK,
+        now=CREATED_AT,
+        start=3730.0,
+        end=6510.0,
+        home=home_of(connection),
+    )
 
     shown = show_sermon(connection, created["id"], home=home_of(connection))
     assert (created["created"], shown["status"], shown["live_start"], shown["live_end"]) == (
@@ -283,7 +295,15 @@ def test_sermon_created_with_borders_is_already_trimmed(
 def test_answer_of_a_create_with_borders_has_the_trimmed_status(
     connection: sqlite3.Connection,
 ) -> None:
-    created = create_sermon(connection, FakeLive(), LINK, now=CREATED_AT, start=3730.0, end=6510.0)
+    created = create_sermon(
+        connection,
+        FakeLive(),
+        LINK,
+        now=CREATED_AT,
+        start=3730.0,
+        end=6510.0,
+        home=home_of(connection),
+    )
 
     assert created["status"] == "trimmed"
 
@@ -300,7 +320,15 @@ def test_create_with_refused_borders_fails_and_creates_no_sermon(
     connection: sqlite3.Connection, start: float, end: float, code: str
 ) -> None:
     with pytest.raises(WordcutError) as raised:
-        create_sermon(connection, FakeLive(), LINK, now=CREATED_AT, start=start, end=end)
+        create_sermon(
+            connection,
+            FakeLive(),
+            LINK,
+            now=CREATED_AT,
+            start=start,
+            end=end,
+            home=home_of(connection),
+        )
 
     assert (raised.value.code, list_sermons(connection, home=home_of(connection))) == (
         code,
@@ -311,7 +339,15 @@ def test_create_with_refused_borders_fails_and_creates_no_sermon(
 def test_create_with_borders_of_a_known_video_trims_the_existing_sermon(
     connection: sqlite3.Connection, sermon: dict[str, Any]
 ) -> None:
-    again = create_sermon(connection, FakeLive(), LINK, now=TRIMMED_AT, start=3730.0, end=6510.0)
+    again = create_sermon(
+        connection,
+        FakeLive(),
+        LINK,
+        now=TRIMMED_AT,
+        start=3730.0,
+        end=6510.0,
+        home=home_of(connection),
+    )
 
     shown = show_sermon(connection, sermon["id"], home=home_of(connection))
     assert (again["id"], again["created"], again["status"], shown["live_start"]) == (
@@ -327,7 +363,15 @@ def test_create_with_borders_of_a_processed_sermon_keeps_it_and_asks_for_a_repro
 ) -> None:
     put_in_state(connection, sermon["id"], "processed")
 
-    again = create_sermon(connection, FakeLive(), LINK, now=TRIMMED_AT, start=3730.0, end=6510.0)
+    again = create_sermon(
+        connection,
+        FakeLive(),
+        LINK,
+        now=TRIMMED_AT,
+        start=3730.0,
+        end=6510.0,
+        home=home_of(connection),
+    )
 
     assert (again["created"], again["status"], again["needs_reprocess"]) == (
         False,
@@ -343,7 +387,15 @@ def test_create_with_a_single_border_is_refused_before_anything_is_created(
     connection: sqlite3.Connection, start: float | None, end: float | None, missing: str
 ) -> None:
     with pytest.raises(WordcutError) as raised:
-        create_sermon(connection, FakeLive(), LINK, now=CREATED_AT, start=start, end=end)
+        create_sermon(
+            connection,
+            FakeLive(),
+            LINK,
+            now=CREATED_AT,
+            start=start,
+            end=end,
+            home=home_of(connection),
+        )
 
     assert (
         raised.value.code,

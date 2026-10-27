@@ -8,11 +8,12 @@ import pytest
 # none of the doubles that replace the factories in the pytest process.
 BUILD = """
 import json, sys
-from wordcut import processing, suggestion
+from wordcut import processing, suggestion, timeline_media
 from wordcut.errors import WordcutError
 build = {
     "processing": lambda: processing.default_gateways("large-v3"),
     "suggestion": lambda: suggestion.default_model("provedor/modelo-de-teste", "chave-ficticia"),
+    "timeline": timeline_media.default_gateways,
 }[sys.argv[1]]
 try:
     build()
@@ -21,7 +22,7 @@ except WordcutError as error:
 """
 
 
-@pytest.mark.parametrize("real_world", ["processing", "suggestion"])
+@pytest.mark.parametrize("real_world", ["processing", "suggestion", "timeline"])
 def test_the_real_outside_world_refuses_to_be_built_while_the_suite_forbids_the_network(
     real_world: str,
 ) -> None:

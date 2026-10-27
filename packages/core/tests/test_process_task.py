@@ -68,7 +68,9 @@ def home(wordcut_home: Path, monkeypatch: pytest.MonkeyPatch) -> Home:
 
 def trimmed_sermon(home: Home) -> int:
     with closing(connect(home)) as connection:
-        sermon_id: int = create_sermon(connection, FakeLive(), LINK, start=1000.0, end=1100.0)["id"]
+        sermon_id: int = create_sermon(
+            connection, FakeLive(), LINK, start=1000.0, end=1100.0, home=home
+        )["id"]
     return sermon_id
 
 

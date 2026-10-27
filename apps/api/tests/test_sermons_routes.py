@@ -87,7 +87,7 @@ def test_creating_a_sermon_answers_201_with_the_sermon_the_cli_shows(
     response = assistant.post("/api/sermons", json={"url": LINK})
 
     with closing(connect(home)) as connection:
-        again = create_sermon(connection, live, LINK)
+        again = create_sermon(connection, live, LINK, home=home)
     assert (response.status_code, response.json()) == (201, {**again, "created": True})
 
 
@@ -362,6 +362,7 @@ def test_processing_answers_202_with_the_launched_task_and_the_sermon_is_process
     assistant: TestClient, live: FakeLive, harmless_tasks: list[Any]
 ) -> None:
     sermon_id = trimmed_sermon(assistant)
+    preparing = len(harmless_tasks)
 
     response = assistant.post(f"/api/sermons/{sermon_id}/process")
 
@@ -370,7 +371,7 @@ def test_processing_answers_202_with_the_launched_task_and_the_sermon_is_process
     assert (
         response.status_code,
         task,
-        len(harmless_tasks),
+        len(harmless_tasks) - preparing,
         shown["status"],
         shown["last_task"]["id"],
     ) == (
@@ -407,13 +408,14 @@ def test_processing_a_sermon_without_borders_is_refused(
     assistant: TestClient, live: FakeLive, harmless_tasks: list[Any]
 ) -> None:
     created = assistant.post("/api/sermons", json={"url": LINK}).json()
+    preparing = len(harmless_tasks)
 
     response = assistant.post(f"/api/sermons/{created['id']}/process")
 
-    assert (response.status_code, response.json()["error"]["code"], harmless_tasks) == (
+    assert (response.status_code, response.json()["error"]["code"], len(harmless_tasks)) == (
         409,
         "sermon_not_trimmed",
-        [],
+        preparing,
     )
 
 
@@ -422,13 +424,14 @@ def test_processing_while_the_live_is_still_on_air_is_refused(
 ) -> None:
     live.info_answer = LiveInfo("Culto ao vivo", date(2026, 10, 25), 7200.0, "is_live")
     sermon_id = trimmed_sermon(assistant)
+    preparing = len(harmless_tasks)
 
     response = assistant.post(f"/api/sermons/{sermon_id}/process")
 
-    assert (response.status_code, response.json()["error"]["code"], harmless_tasks) == (
+    assert (response.status_code, response.json()["error"]["code"], len(harmless_tasks)) == (
         409,
         "live_not_finished",
-        [],
+        preparing,
     )
 
 
@@ -436,6 +439,7 @@ def test_processing_while_the_machine_is_busy_records_no_task(
     assistant: TestClient, live: FakeLive, home: Home, lock_owner: Any, harmless_tasks: list[Any]
 ) -> None:
     sermon_id = trimmed_sermon(assistant)
+    preparing = len(harmless_tasks)
     lock_owner("process", "sermon 99")
 
     response = assistant.post(f"/api/sermons/{sermon_id}/process")
@@ -445,9 +449,9 @@ def test_processing_while_the_machine_is_busy_records_no_task(
         response.status_code,
         error["code"],
         error["details"]["resource"],
-        list_tasks(home),
-        harmless_tasks,
-    ) == (409, "busy", "sermon 99", {"items": []}, [])
+        list_tasks(home, kind="process"),
+        len(harmless_tasks),
+    ) == (409, "busy", "sermon 99", {"items": []}, preparing)
 
 
 def test_processing_while_another_processing_runs_is_busy_naming_that_task(
@@ -456,6 +460,7 @@ def test_processing_while_another_processing_runs_is_busy_naming_that_task(
     first = assistant.post(f"/api/sermons/{trimmed_sermon(assistant)}/process").json()
     other = assistant.post("/api/sermons", json={"url": OTHER_LINK}).json()
     assistant.patch(f"/api/sermons/{other['id']}", json={"start": 1000, "end": 1100})
+    launched = len(harmless_tasks)
 
     response = assistant.post(f"/api/sermons/{other['id']}/process")
 
@@ -464,9 +469,9 @@ def test_processing_while_another_processing_runs_is_busy_naming_that_task(
         response.status_code,
         error["code"],
         error["details"]["task_id"],
-        len(list_tasks(home)["items"]),
+        len(list_tasks(home, kind="process")["items"]),
         len(harmless_tasks),
-    ) == (409, "busy", first["task_id"], 1, 1)
+    ) == (409, "busy", first["task_id"], 1, launched)
 
 
 # Fictitious; while the suite runs, the real LLM refuses to be built (ADR-0017).
@@ -539,13 +544,14 @@ def test_a_suggestion_for_a_sermon_not_processed_is_refused(
 ) -> None:
     configure_llm(home)
     created = admin.post("/api/sermons", json={"url": LINK}).json()
+    preparing = len(harmless_tasks)
 
     response = admin.post(f"/api/sermons/{created['id']}/suggest")
 
-    assert (response.status_code, response.json()["error"]["code"], harmless_tasks) == (
+    assert (response.status_code, response.json()["error"]["code"], len(harmless_tasks)) == (
         409,
         "sermon_not_processed",
-        [],
+        preparing,
     )
 
 

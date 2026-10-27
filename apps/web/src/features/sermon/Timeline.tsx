@@ -1,10 +1,18 @@
-import { useEffect, useRef, type PointerEvent as ReactPointerEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 
 import { formatDuration } from "../../ui/format";
-import { FilmIcon } from "../../ui/icons";
+import { FilmIcon, WaveIcon } from "../../ui/icons";
 import type { Bounds } from "./bounds";
 import type { Edge } from "./ClipEdges";
 import { CutLayerHead, CutLayerLane, type CutLayer } from "./CutLayers";
+import type { TimelineMedia } from "./useTimelineMedia";
+import { waveformImage } from "./waveform";
 
 // The ruler's steps, in seconds, as the prototype picks them: about 8 labelled marks.
 const RULER_STEPS = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600];
@@ -24,10 +32,13 @@ interface TimelineProps {
   onEdgeRelease: () => void;
   /** The cuts, drawn read only above the video track. */
   layers?: CutLayer[];
+  /** The thumbnails and the waveform of the live, and how their preparation goes. */
+  media?: TimelineMedia;
 }
 
-/** The live in time of the live: the ruler and the "Vídeo" track with the sermon's clip.
- * The whole live lies faded behind the clip, marked ``data-faded``: what the borders cut. */
+/** The live in time of the live: the ruler, the "Vídeo" track with the sermon's clip over
+ * the live's thumbnails and the "Áudio" track with its waveform. The whole live lies faded
+ * behind each clip, marked ``data-faded``: what the borders cut. */
 export function Timeline({ liveDuration, ...track }: TimelineProps) {
   if (!liveDuration) {
     return (
@@ -48,6 +59,7 @@ function LiveTimeline({
   onEdgeMove,
   onEdgeRelease,
   layers = [],
+  media,
 }: TimelineProps & { liveDuration: number }) {
   const content = useRef<HTMLDivElement>(null);
   const endDrag = useRef<() => void>();
@@ -88,6 +100,12 @@ function LiveTimeline({
     />
   );
   const at = (seconds: number) => `${(seconds / liveDuration) * 100}%`;
+  const thumbnails = media?.thumbnails && `url(${media.thumbnails})`;
+  const peaks = media?.peaks;
+  const wave = useMemo(() => peaks && waveformImage(peaks), [peaks]);
+  const clipPlace = { left: at(bounds.start), width: at(bounds.end - bounds.start) };
+  const inner = (image: string | undefined) =>
+    image ? innerBackground(image, bounds, liveDuration) : {};
   const label = trimmed
     ? `Pregação · ${formatDuration(bounds.end - bounds.start)}`
     : `Live inteira · ${formatDuration(liveDuration)}`;
@@ -101,6 +119,10 @@ function LiveTimeline({
         <div className="th video-head">
           <FilmIcon />
           <span className="thn">Vídeo</span>
+        </div>
+        <div className="th audio-head">
+          <WaveIcon />
+          <span className="thn">Áudio</span>
         </div>
       </div>
       <div className="tl-scroll">
@@ -123,24 +145,74 @@ function LiveTimeline({
           {layers.map((layer) => (
             <CutLayerLane key={layer.id} layer={layer} at={at} />
           ))}
-          <div className="lane video">
-            <div className="clip vid ghost" data-faded style={{ left: "0%", width: "100%" }} />
+          <div className="lane video" aria-label="Faixa Vídeo">
+            <div
+              className="clip vid ghost"
+              data-faded
+              style={{ left: "0%", width: "100%", backgroundImage: thumbnails }}
+            />
             <div
               className={trimmed ? "clip vid trimclip on" : "clip vid trimclip"}
               role="group"
               aria-label="Pregação na live"
-              style={{ left: at(bounds.start), width: at(bounds.end - bounds.start) }}
+              style={{ ...clipPlace, ...inner(thumbnails) }}
             >
               {onEdgeMove && handle("start", "l", "Início da pregação")}
               {onEdgeMove && handle("end", "r", "Fim da pregação")}
               <span className="lbl">{label}</span>
             </div>
           </div>
+          <div className="lane audio" aria-label="Faixa Áudio">
+            <div
+              className="clip aud ghost"
+              data-faded
+              style={{ left: "0%", width: "100%", backgroundImage: wave }}
+            />
+            <div
+              className="clip aud"
+              aria-label="Áudio da pregação"
+              style={{ ...clipPlace, ...inner(wave) }}
+            />
+          </div>
           <div className="playhead" aria-label="Cursor" style={{ left: at(cursor) }} />
         </div>
       </div>
+      {media && <MediaNote media={media} />}
     </section>
   );
+}
+
+/** Says that the thumbnails and the waveform are being prepared, or that they failed. */
+function MediaNote({ media }: { media: TimelineMedia }) {
+  if (media.status === "pending") {
+    return <p className="tl-note">Preparando a timeline…</p>;
+  }
+  if (media.status === "ready") {
+    return null;
+  }
+  return (
+    <p className="tl-note" role="status">
+      Miniaturas e forma de onda indisponíveis.
+      <button type="button" className="btn sm ghost" onClick={media.retry}>
+        Tentar de novo
+      </button>
+      {media.refusal && <span className="ferr">{media.refusal.message}</span>}
+    </p>
+  );
+}
+
+/** The prototype's ``innerBg``: the clip shows only its stretch of the whole live's image. */
+function innerBackground(image: string, bounds: Bounds, liveDuration: number): CSSProperties {
+  const span = bounds.end - bounds.start;
+  if (span <= 0) {
+    return {};
+  }
+  const position = span >= liveDuration ? 0 : (bounds.start / (liveDuration - span)) * 100;
+  return {
+    backgroundImage: image,
+    backgroundSize: `${(liveDuration / span) * 100}% 100%`,
+    backgroundPosition: `${position}% 0`,
+  };
 }
 
 /** The ruler's marks over ``duration`` seconds: about 8 labelled ones. */

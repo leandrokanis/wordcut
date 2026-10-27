@@ -294,3 +294,21 @@ def test_failed_download_is_a_youtube_error_that_hides_the_command_and_cookies(
         False,
         True,
     )
+
+
+def test_audio_for_the_waveform_is_the_lowest_audio_of_the_whole_live(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    asked: list[list[str]] = []
+
+    def run(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        asked.append(command)
+        return subprocess.CompletedProcess(command, 0, stdout="")
+
+    source = youtube_with(tmp_path, monkeypatch, run)
+
+    source.download_audio("https://youtu.be/Ab3_x-9QzLk", tmp_path / "audio")
+
+    [command] = asked
+    assert command[command.index("-f") + 1] == "worstaudio"
+    assert "--download-sections" not in command

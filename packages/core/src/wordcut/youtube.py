@@ -13,6 +13,8 @@ from typing import Any, Protocol
 from urllib.parse import ParseResult, parse_qs, urlparse
 from zoneinfo import ZoneInfo
 
+import httpx
+
 from wordcut import config
 from wordcut.errors import WordcutError
 
@@ -21,6 +23,9 @@ CHURCH_TIMEZONE = ZoneInfo("America/Sao_Paulo")
 DEFAULT_FFMPEG_DIR = Path.home() / ".local/share/wordcut/ffmpeg/bin"
 MAX_HEIGHT = 1080
 AUDIO_FORMAT = "ba[ext=m4a]/ba"
+# The waveform needs only how loud the audio is, so the smallest audio of the live will do.
+LOWEST_AUDIO_FORMAT = "worstaudio"
+FETCH_TIMEOUT_SECONDS = 30.0
 
 VIDEO_ID = re.compile(r"[A-Za-z0-9_-]{11}")
 YOUTUBE_HOSTS = frozenset({"youtube.com", "www.youtube.com", "m.youtube.com"})
@@ -140,17 +145,37 @@ class YouTube:
         self._program = tuple(program)
 
     def info(self, url: str) -> LiveInfo:
-        output = self._run(["--dump-single-json", "--skip-download", url], capture=True)
         try:
-            metadata = json.loads(output)
-        except json.JSONDecodeError:
-            raise YouTubeError("O YouTube devolveu dados ilegíveis sobre o vídeo.") from None
-        try:
-            return LiveInfo.from_metadata(metadata)
+            return LiveInfo.from_metadata(self.metadata(url))
         except ValueError:
             raise YouTubeError(
                 "O vídeo não tem horário de início no YouTube; sem ele não há data do culto."
             ) from None
+
+    def metadata(self, url: str) -> dict[str, Any]:
+        """What yt-dlp knows about the video, its formats included, without downloading it."""
+        output = self._run(["--dump-single-json", "--skip-download", url], capture=True)
+        try:
+            metadata: dict[str, Any] = json.loads(output)
+        except json.JSONDecodeError:
+            raise YouTubeError("O YouTube devolveu dados ilegíveis sobre o vídeo.") from None
+        return metadata
+
+    def download_audio(self, url: str, output: Path) -> Path:
+        """Only the audio of the whole video, in its lowest quality, in its own format."""
+        self._run(["-f", LOWEST_AUDIO_FORMAT, "-o", str(output), url])
+        return output
+
+    @staticmethod
+    def fetch(url: str, output: Path) -> Path:
+        """The file at ``url``, such as an image of a storyboard, saved as ``output``."""
+        try:
+            response = httpx.get(url, timeout=FETCH_TIMEOUT_SECONDS, follow_redirects=True)
+            response.raise_for_status()
+        except httpx.HTTPError:
+            raise YouTubeError(REFUSED) from None
+        output.write_bytes(response.content)
+        return output
 
     def download_audio_window(
         self,

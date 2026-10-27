@@ -1,4 +1,5 @@
-"""Sermons: create from the live's link, list, show, trim and download (docs/api.md)."""
+"""Sermons: create from the live's link, list, show, trim and download, and the media of
+their timeline (docs/api.md)."""
 
 from __future__ import annotations
 
@@ -14,12 +15,18 @@ from wordcut.service.processing import start_processing
 from wordcut.service.sermons import (
     create_sermon,
     list_sermons,
+    prepare_sermon_timeline,
     sermon_video,
     show_sermon,
     trim_sermon,
 )
 from wordcut.service.suggestion import start_suggestion
 from wordcut.service.tasks import launched_task
+from wordcut.service.timeline import (
+    timeline_thumbnails,
+    timeline_thumbnails_layout,
+    timeline_waveform,
+)
 from wordcut_api import deps
 from wordcut_api.auth import require
 
@@ -52,8 +59,9 @@ class SuggestionOptions(BaseModel):
 @router.post("", status_code=201)
 def create(body: NewSermon) -> JSONResponse:
     """201 with the new sermon; 200 with ``created: false`` when the video already has one."""
-    with closing(db.connect(deps.home())) as connection:
-        sermon: dict[str, Any] = create_sermon(connection, deps.live_source(), body.url)
+    home = deps.home()
+    with closing(db.connect(home)) as connection:
+        sermon: dict[str, Any] = create_sermon(connection, deps.live_source(), body.url, home=home)
     return JSONResponse(sermon, status_code=201 if sermon["created"] else 200)
 
 
@@ -113,3 +121,35 @@ def suggest(
     options = body or SuggestionOptions()
     task = start_suggestion(deps.home(), sermon_id, options.preset_id, detach=True)
     return launched_task(task)
+
+
+@router.post("/{sermon_id}/prepare", status_code=202)
+def prepare(sermon_id: int) -> dict[str, Any]:
+    """Launch the ``prepare`` task detached: thumbnails and waveform of the timeline."""
+    task = prepare_sermon_timeline(deps.home(), sermon_id, detach=True)
+    return launched_task(task)
+
+
+@router.get("/{sermon_id}/thumbnails")
+def thumbnails(sermon_id: int) -> FileResponse:
+    """The JPEG strip of the thumbnails of the live, side by side in time order."""
+    home = deps.home()
+    with closing(db.connect(home)) as connection:
+        strip = timeline_thumbnails(connection, home, sermon_id)
+    return FileResponse(strip, media_type="image/jpeg")
+
+
+@router.get("/{sermon_id}/thumbnails.json")
+def thumbnails_layout(sermon_id: int) -> dict[str, Any]:
+    """The size of a thumbnail of the strip and the second of the live each one shows."""
+    home = deps.home()
+    with closing(db.connect(home)) as connection:
+        return timeline_thumbnails_layout(connection, home, sermon_id)
+
+
+@router.get("/{sermon_id}/waveform")
+def waveform(sermon_id: int) -> dict[str, Any]:
+    """The peaks of the whole live, from 0 to 1, in time order."""
+    home = deps.home()
+    with closing(db.connect(home)) as connection:
+        return timeline_waveform(connection, home, sermon_id)

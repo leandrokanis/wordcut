@@ -187,6 +187,7 @@ video.frame { object-fit: contain; }
 .th > svg { width: 15px; height: 15px; flex: none; }
 .th.ruler-head { height: 26px; }
 .th.video-head { height: 58px; }
+.th.audio-head { height: 40px; }
 .th.cut-head { height: 30px; min-width: 0; }
 .thn { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .tl-scroll { overflow-x: auto; overflow-y: hidden; min-width: 0; scrollbar-color: var(--line-2) transparent; }
@@ -194,13 +195,15 @@ video.frame { object-fit: contain; }
 .lane { position: relative; border-bottom: 1px solid var(--line); }
 .lane.ruler { height: 26px; background: var(--bg); cursor: pointer; }
 .lane.video { height: 58px; }
+.lane.audio { height: 40px; }
 .lane.cut { height: 30px; }
 .tick { position: absolute; bottom: 0; width: 1px; height: 5px; background: var(--line-2); }
 .tick.major { height: 9px; background: var(--faint); }
 .tick span { position: absolute; bottom: 10px; left: 4px; font: 10.5px var(--font-mono); color: var(--faint); white-space: nowrap; }
 .clip { position: absolute; top: 5px; bottom: 5px; min-width: 3px; border-radius: 6px; border: 1.5px solid transparent; overflow: hidden; display: flex; align-items: flex-end; font-size: 11px; }
 .clip .lbl { margin: 3px; padding: 1px 6px; border-radius: 4px; background: rgba(0,0,0,.66); color: #e8ebff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: calc(100% - 6px); }
-.clip.vid { background-color: #1d2440; border-color: #4d60b0; }
+.clip.vid { background-color: #1d2440; background-size: 100% 100%; border-color: #4d60b0; }
+.clip.aud { background-color: #18203a; background-size: 100% 100%; border-color: #34437d; }
 .clip.ghost { opacity: .22; filter: grayscale(.6); border-color: transparent; pointer-events: none; }
 .clip.trimclip { overflow: visible; border-color: #4d60b0; }
 .clip.trimclip.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
@@ -215,6 +218,7 @@ video.frame { object-fit: contain; }
 .trim:hover, .trim:focus-visible { filter: brightness(1.1); }
 .playhead { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--fg); pointer-events: none; z-index: 5; }
 .playhead::before { content: ""; position: absolute; top: 0; left: -5px; width: 12px; height: 12px; background: var(--fg); clip-path: polygon(0 0, 100% 0, 50% 100%); }
+.tl-note { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; margin: 0; padding: 4px 10px; color: var(--faint); font-size: 11.5px; }
 .tl-empty { grid-column: 1 / -1; display: grid; place-items: center; margin: 0; color: var(--faint); font-size: 12.5px; }
 
 /* Level 3: the Exportar menu and the Exportar 9:16 dialog (docs/prototype/wordcut.html) */
