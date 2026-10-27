@@ -69,6 +69,7 @@ As palavras-chave DEVE, NÃO DEVE e PODE seguem o BCP 14
 | `GET /api/tasks/{id}/events` | — | 200 `text/event-stream` (§3) | 404 em JSON, antes de abrir o fluxo | assistente |
 | `GET /api/status` | — | 200 `{"lock", "running_tasks"}` de `wordcut status` | — | assistente |
 | `GET /api/sermons/{id}/cuts[?status=]` | — | 200 `{"items"}` de `cut list`, os descartados por último, cada corte com `start` e `end` (vão dos trechos) e `range_start` e `range_end` (a faixa), em tempo da pregação | 400 `status` fora de `suggested`, `chosen`, `discarded`; 404 | assistente |
+| `POST /api/sermons/{id}/cuts` | `{"start", "end", "title"?}`, em segundos da pregação | 201 o corte criado, como o `GET /api/cuts/{id}` o mostra: `chosen`, `source` `admin` | 400 campo desconhecido ou faltando, valor que não é número (título que não é texto), regra de `cut create` (menos de 10 s depois de encostar, fim antes do início, fora da pregação); 404; 409 `sermon_not_processed` | administrador |
 | `GET /api/cuts/{id}` | — | 200 o corte de `cut show`, com as exportações sem `path` | 404 | assistente |
 | `GET /api/cuts/{id}/preview` | — | 200 a sequência de `cut preview`; nunca espera a trava | 404 | assistente |
 | `POST /api/cuts/{id}/choose` | — | 200 o corte como o `GET` o mostra | 404 | assistente |
@@ -126,6 +127,13 @@ Corpos de entrada:
   `PUT .../segments` troca a lista inteira de trechos, com as regras de `cut segments`
   (§8.10); a recusa não grava nada. A aba Texto da web, para o administrador, mostra essas
   frases com uma caixa cada e grava por essa rota.
+- O `POST /api/sermons/{id}/cuts` cria um corte do zero com as regras de `cut create`
+  ([docs/cli.md](cli.md) §8.8): a faixa encosta em frases, o corte toca todas elas, nasce
+  `chosen` com `source` `admin` e a nova sugestão nunca o substitui; a recusa não grava nada.
+  No painel de cortes do nível 2, o administrador tem "Novo corte", que cria a faixa de 60 s a
+  partir do cursor (em tempo da pregação), terminando no fim da pregação quando faltam menos
+  de 60 s e recuando o início para manter 10 s; com a resposta, a web abre o nível do corte.
+  O assistente não vê o botão.
 - O `PATCH .../range` redimensiona a faixa com `start` e `end` (um deles basta; o outro fica)
   ou a move com `by`, em segundos da pregação e como número, com as regras de `cut range` e
   `cut move` ([docs/cli.md](cli.md) §8.9); a recusa não grava nada. Na timeline do nível 2, o

@@ -3,6 +3,7 @@ import { useNavigate, type NavigateFunction } from "react-router-dom";
 
 import {
   chooseCut,
+  createCut,
   discardCut,
   listCuts,
   restoreCut,
@@ -10,7 +11,9 @@ import {
 } from "../../api/client";
 import type { ListedCut, SermonShown, Task } from "../../api/types";
 import { useResource, type Resource } from "../../api/useResource";
+import { PlusIcon } from "../../ui/icons";
 import { CutCard } from "./CutCard";
+import { MIN_RANGE_SECONDS } from "./CutLayers";
 import { processSteps } from "./stage";
 
 /** The cuts of the sermon, asked for again whenever the sermon is processed anew. */
@@ -28,17 +31,25 @@ interface CutsPanelProps {
   /** The sermon is processing: the panel shows the steps of ``task`` instead of the cuts. */
   processing: boolean;
   task?: Task;
+  /** Where the preview is, in sermon time: a new cut starts there. */
+  cursor: number;
+  /** Only the administrator creates cuts (2.1.c.4). */
+  admin: boolean;
 }
 
 /** Level 2's side panel: the cuts of the sermon, in the service's order. */
-export function CutsPanel({ sermon, cuts, processing, task }: CutsPanelProps) {
+export function CutsPanel({ sermon, cuts, processing, task, cursor, admin }: CutsPanelProps) {
   return (
     <aside className="side" aria-label="Cortes">
       <div className="side-h">
         <h2>Cortes</h2>
       </div>
       <div className="side-b">
-        {processing ? <ProcessingSteps task={task} /> : <PanelBody sermon={sermon} cuts={cuts} />}
+        {processing ? (
+          <ProcessingSteps task={task} />
+        ) : (
+          <PanelBody sermon={sermon} cuts={cuts} cursor={cursor} admin={admin} />
+        )}
       </div>
     </aside>
   );
@@ -89,10 +100,28 @@ export function openCut(
   return chosen.then(() => navigate(`/cuts/${cut.id}`));
 }
 
-function PanelBody({ sermon, cuts }: Pick<CutsPanelProps, "sermon" | "cuts">) {
+function PanelBody({
+  sermon,
+  cuts,
+  cursor,
+  admin,
+}: Pick<CutsPanelProps, "sermon" | "cuts" | "cursor" | "admin">) {
   const [menuOf, setMenuOf] = useState<number>();
   const [failure, setFailure] = useState<ApiError>();
+  const [creating, setCreating] = useState(false);
   const navigate = useNavigate();
+
+  function createAtCursor() {
+    setFailure(undefined);
+    setCreating(true);
+    createCut(sermon.id, newCutRange(cursor, sermonLength(sermon))).then(
+      (cut) => navigate(`/cuts/${cut.id}`),
+      (error: ApiError) => {
+        setCreating(false);
+        setFailure(error);
+      },
+    );
+  }
 
   function open(cut: ListedCut) {
     setFailure(undefined);
@@ -122,6 +151,14 @@ function PanelBody({ sermon, cuts }: Pick<CutsPanelProps, "sermon" | "cuts">) {
   }
   return (
     <>
+      {admin && (
+        <div className="row">
+          <button className="btn sm" type="button" onClick={createAtCursor} disabled={creating}>
+            <PlusIcon />
+            Novo corte
+          </button>
+        </div>
+      )}
       {failure && (
         <p className="ferr" role="alert">
           {failure.message}
@@ -153,6 +190,21 @@ function PanelBody({ sermon, cuts }: Pick<CutsPanelProps, "sermon" | "cuts">) {
       )}
     </>
   );
+}
+
+/** A new cut's range lasts this long from the cursor, inside the 40–75 s goal (2.1.c.4). */
+const NEW_CUT_SECONDS = 60;
+
+/** The range of a new cut at ``cursor``, in sermon time: 60 s from it, ending no later than
+ * the sermon, and started earlier near the end so it still lasts the 10 s minimum. */
+export function newCutRange(cursor: number, length: number): { start: number; end: number } {
+  const start = Math.max(0, Math.min(cursor, length - MIN_RANGE_SECONDS));
+  return { start, end: Math.min(start + NEW_CUT_SECONDS, length) };
+}
+
+/** How long the processed sermon lasts, the end of sermon time (ADR-0023). */
+function sermonLength(sermon: SermonShown): number {
+  return (sermon.sermon_end ?? 0) - (sermon.sermon_start ?? 0);
 }
 
 function EmptyPanel({ message }: { message: string }) {

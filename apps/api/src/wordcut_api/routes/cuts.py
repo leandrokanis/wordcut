@@ -1,6 +1,6 @@
-"""Cuts: list, show and preview them, choose, discard or restore them, fix the spelling of
-their words, set what they play, resize or move their range and set their caption style
-(docs/api.md)."""
+"""Cuts: list, show and preview them, create one, choose, discard or restore them, fix the
+spelling of their words, set what they play, resize or move their range and set their caption
+style (docs/api.md)."""
 
 from __future__ import annotations
 
@@ -17,6 +17,7 @@ from wordcut.errors import WordcutError
 from wordcut.service.cuts import (
     caption_of,
     choose_cut,
+    create_cut,
     discard_cut,
     fix_word,
     list_cuts,
@@ -37,6 +38,14 @@ router = APIRouter(prefix="/api")
 
 # docs/cli.md §8.1: the choices of ``cut list --status`` (CUT_STATES).
 CutState = Literal["suggested", "chosen", "discarded"]
+
+
+class NewCutRange(Body):
+    """The range of a new cut in sermon time and, optionally, its title (docs/cli.md §8.8)."""
+
+    start: StrictFloat | StrictInt
+    end: StrictFloat | StrictInt
+    title: str | None = None
 
 
 class FixedWord(Body):
@@ -86,6 +95,12 @@ class CaptionChanges(Changes):
 def listing(sermon_id: int, status: CutState | None = None) -> dict[str, Any]:
     with closing(db.connect(deps.home())) as connection:
         return list_cuts(connection, sermon_id, status)
+
+
+@router.post("/sermons/{sermon_id}/cuts", status_code=201, dependencies=[Depends(require("admin"))])
+def create(sermon_id: int, body: NewCutRange) -> dict[str, Any]:
+    with closing(db.connect(deps.home())) as connection:
+        return without_paths(create_cut(connection, sermon_id, body.start, body.end, body.title))
 
 
 @router.get("/cuts/{cut_id}")

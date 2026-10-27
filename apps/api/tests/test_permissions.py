@@ -38,6 +38,7 @@ PERMISSIONS: dict[tuple[str, str], str] = {
     ("GET", "/api/sermons/{sermon_id}/thumbnails.json"): ASSISTANT,
     ("GET", "/api/sermons/{sermon_id}/waveform"): ASSISTANT,
     ("GET", "/api/sermons/{sermon_id}/cuts"): ASSISTANT,
+    ("POST", "/api/sermons/{sermon_id}/cuts"): ADMIN,
     ("GET", "/api/tasks"): ASSISTANT,
     ("GET", "/api/tasks/{task_id}"): ASSISTANT,
     ("GET", "/api/tasks/{task_id}/events"): ASSISTANT,
@@ -82,6 +83,7 @@ FAKE_KEY = "sk-or-v1-ficticia-permissoes-0123456789abcdef-WXYZ"
 FAKE_COOKIES = ".youtube.com\tTRUE\t/\tTRUE\t1893456000\tSID-FICTICIO\tvalor-ficticio-perm\n"
 # Valid bodies that would change something, were the role allowed to.
 CHANGING_BODIES: dict[tuple[str, str], dict[str, Any]] = {
+    ("POST", "/api/sermons/{sermon_id}/cuts"): {"start": 0, "end": 30},
     ("PATCH", "/api/cuts/{cut_id}/range"): {"by": 5},
     ("PATCH", "/api/settings"): {"llm_model": "provedor/modelo-de-teste"},
     ("PUT", "/api/settings/llm-key"): {"value": FAKE_KEY},

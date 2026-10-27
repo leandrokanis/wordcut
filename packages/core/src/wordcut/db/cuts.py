@@ -182,9 +182,11 @@ def delete_of(connection: sqlite3.Connection, sermon_id: int) -> None:
 
 
 def delete_unedited_suggestions(connection: sqlite3.Connection, sermon_id: int) -> None:
-    """Remove the sermon's ``suggested`` cuts nobody has edited."""
+    """Remove the sermon's ``suggested`` cuts the LLM made that nobody has edited; a cut the
+    administrator created is never one of them, even restored to ``suggested``."""
     connection.execute(
-        "DELETE FROM cuts WHERE sermon_id = ? AND status = 'suggested' AND edited = 0",
+        "DELETE FROM cuts WHERE sermon_id = ? AND status = 'suggested' AND edited = 0"
+        " AND source = 'llm'",
         (sermon_id,),
     )
 

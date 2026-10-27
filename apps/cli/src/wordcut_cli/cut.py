@@ -1,7 +1,7 @@
-"""``wordcut cut <action>``: see and preview the suggested cuts of a sermon, choose, discard
-or restore them, fix the spelling of their caption words, set their caption style, set what
-they play, resize or move their range and export them (docs/cli.md §8.1–§8.7, §8.9,
-§8.10)."""
+"""``wordcut cut <action>``: see and preview the suggested cuts of a sermon, create one,
+choose, discard or restore them, fix the spelling of their caption words, set their caption
+style, set what they play, resize or move their range and export them (docs/cli.md
+§8.1–§8.10)."""
 
 from __future__ import annotations
 
@@ -23,6 +23,7 @@ from wordcut.rendering.options import CHOICES
 from wordcut.service.cuts import (
     caption_of,
     choose_cut,
+    create_cut,
     discard_cut,
     fix_word,
     list_cuts,
@@ -56,7 +57,7 @@ def register(commands: Commands) -> None:
     actions = add_group(
         commands,
         "cut",
-        help="cortes: ver, escolher, descartar, restaurar, corrigir a grafia, definir os"
+        help="cortes: ver, criar, escolher, descartar, restaurar, corrigir a grafia, definir os"
         " trechos, ajustar a faixa, ajustar o estilo da legenda e exportar",
     )
     listing = add_command(
@@ -120,6 +121,28 @@ def register(commands: Commands) -> None:
     fix.add_argument("id", type=int, help="ID do corte")
     fix.add_argument("word_id", type=int, help="ID da palavra, como no cut show")
     fix.add_argument("text", help="a palavra com a grafia corrigida")
+    create = add_command(
+        actions,
+        "create",
+        help="cria um corte do zero com todas as frases da faixa, encostada em início e fim de"
+        " frase, já escolhido — administrador",
+        run=_create,
+        render=_render_cut,
+        example='wordcut cut create --sermon 12 --start 12:30 --end 13:30 --title "Graça" --json',
+    )
+    create.add_argument("--sermon", type=int, required=True, help="ID da pregação")
+    create.add_argument(
+        "--start",
+        type=parse_timestamp,
+        required=True,
+        help="início na pregação, SS, MM:SS ou HH:MM:SS",
+    )
+    create.add_argument(
+        "--end", type=parse_timestamp, required=True, help="fim na pregação, SS, MM:SS ou HH:MM:SS"
+    )
+    create.add_argument(
+        "--title", help='título do corte; sem ele, "Novo corte · MM:SS" do início na pregação'
+    )
     segments = add_command(
         actions,
         "segments",
@@ -397,6 +420,11 @@ def _segments(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:
             if (error.details or {}).get("argument") != "segments":
                 raise
             raise WordcutError(error.code, error.message, {"argument": "file"}) from error
+
+
+def _create(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:
+    with closing(deps.connection()) as connection:
+        return create_cut(connection, args.sermon, args.start, args.end, args.title)
 
 
 def _range_command(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:

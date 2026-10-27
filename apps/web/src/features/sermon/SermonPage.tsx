@@ -86,7 +86,14 @@ export function SermonPage() {
   }
   return (
     <div className="l2">
-      <CutsPanel sermon={shown} cuts={cuts} processing={!editable} task={processing.task} />
+      <CutsPanel
+        sermon={shown}
+        cuts={cuts}
+        processing={!editable}
+        task={processing.task}
+        cursor={cursor - (shown.sermon_start ?? 0)}
+        admin={admin}
+      />
       <main className="work">
         <div className="l2-bar">
           <span className="spacer" />

@@ -1,5 +1,5 @@
-"""Cuts of a sermon: list, show, preview, choose them, fix the spelling of their words, set
-their caption style, their range and what they play (docs/cli.md §8.1–§8.6, §8.9, §8.10)."""
+"""Cuts of a sermon: list, show, preview, create, choose them, fix the spelling of their words,
+set their caption style, their range and what they play (docs/cli.md §8.1–§8.6, §8.8–§8.10)."""
 
 from __future__ import annotations
 
@@ -14,15 +14,16 @@ from wordcut.cuts.assembly import MILLISECOND_DIGITS, AssembledCut, AssembledSeg
 from wordcut.cuts.caption import DEFAULT_CAPTION, stored_caption, validated
 from wordcut.cuts.spelling import check_spelling
 from wordcut.db import cuts, renders, transcripts, word_fixes
-from wordcut.db.cuts import CutRow, Segment
+from wordcut.db.cuts import CutRow, NewCut, Segment
 from wordcut.db.renders import RenderRow
+from wordcut.db.sermons import SermonRow
 from wordcut.db.transcripts import WordRow
 from wordcut.edit.cut_range import Span, shift_selection, snap_range, trim_segments
 from wordcut.errors import WordcutError
 from wordcut.home import Home
 from wordcut.processing.sentences import Sentence
 from wordcut.rendering.options import merged
-from wordcut.service.sermons import existing_sermon, shown_cut
+from wordcut.service.sermons import existing_sermon, processed_row, shown_cut
 
 MIN_RANGE_S = 10
 
@@ -151,6 +152,48 @@ def fix_word(
     return {"cut_id": row.id, **_word(word, word_fixes.of_cut(connection, row.id))}
 
 
+def create_cut(
+    connection: sqlite3.Connection,
+    sermon_id: int,
+    start: float,
+    end: float,
+    title: str | None = None,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """Create a ``chosen`` cut of the administrator (``source = "admin"``) over the range
+    ``start`` to ``end`` (sermon time) snapped to sentences as ``set_range`` snaps it, playing
+    the whole range; give it as ``show_cut`` does (docs/cli.md §8.8). A title left out or
+    blank becomes "Novo corte · MM:SS"."""
+    if not all(math.isfinite(border) for border in (start, end)):
+        raise _invalid_range("Informe o início e o fim em segundos.")
+    if end <= start:
+        raise _invalid_range("O fim da faixa precisa vir depois do início.")
+    if start < 0 or end > _sermon_length(processed_row(connection, sermon_id)):
+        raise _invalid_range("A faixa precisa ficar dentro da pregação.")
+    spoken = _Spoken.of_sermon(connection, sermon_id)
+    wanted = spoken.checked(snap_range(spoken.sentences, start, end))
+    first, last = spoken.ids(wanted)
+    named = (title or "").strip() or _default_title(spoken.words[wanted[0]].start)
+    new = NewCut("chosen", named, (Segment(first, last),), first, last, "admin", None)
+    moment = now or datetime.now().astimezone()
+    with connection:
+        [cut_id] = cuts.insert_many(connection, sermon_id, [new], moment)
+    return show_cut(connection, cut_id)
+
+
+def _sermon_length(row: SermonRow) -> float:
+    """How long the processed sermon lasts, the end of sermon time."""
+    assert row.sermon_start is not None and row.sermon_end is not None
+    return row.sermon_end - row.sermon_start
+
+
+def _default_title(start: float) -> str:
+    """The title of a cut created without one: "Novo corte · MM:SS", where it starts in
+    sermon time; the minutes have no ceiling."""
+    minutes, seconds = divmod(int(start), 60)
+    return f"Novo corte · {minutes:02d}:{seconds:02d}"
+
+
 def set_segments(
     connection: sqlite3.Connection,
     cut_id: int,
@@ -248,7 +291,11 @@ class _Spoken:
 
     @classmethod
     def of(cls, connection: sqlite3.Connection, row: CutRow) -> _Spoken:
-        words = transcripts.words_of(connection, row.sermon_id)
+        return cls.of_sermon(connection, row.sermon_id)
+
+    @classmethod
+    def of_sermon(cls, connection: sqlite3.Connection, sermon_id: int) -> _Spoken:
+        words = transcripts.words_of(connection, sermon_id)
         place = {word.id: index for index, word in enumerate(words)}
         sentences = [
             Sentence(
@@ -258,7 +305,7 @@ class _Spoken:
                 sentence.end,
                 sentence.text,
             )
-            for sentence in transcripts.sentences_of(connection, row.sermon_id)
+            for sentence in transcripts.sentences_of(connection, sermon_id)
         ]
         return cls(words, sentences)
 

@@ -339,10 +339,22 @@ Formato de [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões
   recusa devolve a camada e mostra o erro; um clique sem arrastar abre o corte não descartado,
   para qualquer papel, e a camada do descartado, como o cartão, não abre
   ([#11](https://github.com/leandrokanis/wordcut/issues/11)).
+- Criar corte do zero (2.1.c.4): `wordcut cut create --sermon <id> --start T --end T
+  [--title TEXTO]` e `POST /api/sermons/{id}/cuts` (`{start, end, title?}`, 201, só
+  administrador). A faixa encosta em frases como em `cut range`, o corte toca todas elas e
+  nasce `chosen`, com origem `admin`; sem título, chama-se "Novo corte · MM:SS". Faixa com
+  menos de 10 s, invertida ou fora da pregação é recusada com `invalid_argument`, e pregação
+  não processada, com `sermon_not_processed`, sem gravar. No painel de cortes do nível 2, o
+  administrador tem "Novo corte", que cria a faixa de 60 s a partir do cursor (terminando no
+  fim da pregação, com ao menos 10 s) e abre o nível do corte
+  ([#12](https://github.com/leandrokanis/wordcut/issues/12)).
 
 ### Alterado
 
 - `last_task` do `sermon show` deixa de fora a tarefa `prepare`, que aparece em `timeline`.
+- `sermon suggest` substitui só os cortes sugeridos não editados que vieram do LLM: um corte
+  criado pelo administrador fica, mesmo descartado e restaurado
+  ([#12](https://github.com/leandrokanis/wordcut/issues/12)).
 - O progresso de `sermon process` avança dentro do download da faixa e da transcrição, não só
   na troca de etapa, na web, na CLI (`--wait`, `task wait`) e na SSE, sem mudança de contrato;
   nunca diminui e é gravado no máximo uma vez por segundo, além das trocas de etapa

@@ -431,8 +431,10 @@ título). Devolve o caminho de destino (1.1.d).
 Tarefa sem trava: pede nova sugestão ao LLM (2.1.b.2), com o preset indicado ou o padrão.
 O pedido e a validação da resposta são os do `sermon process` (§7.4).
 
-- Os cortes `suggested` não editados são substituídos, só no sucesso e numa transação.
-- Os cortes escolhidos, descartados ou editados permanecem.
+- Os cortes `suggested` não editados que vieram do LLM (`source` `llm`) são substituídos, só
+  no sucesso e numa transação.
+- Os cortes escolhidos, descartados ou editados permanecem, e os criados pelo administrador
+  (`source` `admin`, §8.8) também, em qualquer estado.
 - Recusas antes de criar a tarefa: pregação inexistente ou preset inexistente (`not_found`,
   com `details.sermon_id` ou `details.preset_id`); pregação não processada
   (`sermon_not_processed`); sem o modelo do LLM ou sem a chave (`llm_not_configured`, que não
@@ -671,9 +673,31 @@ Tarefa com trava: cria uma exportação 9:16 do estado atual do corte (1.1.h).
 - Uma falha da renderização deixa a tarefa `failed` (`internal_error`) e um Ctrl+C a deixa
   `interrupted`; nos dois casos nenhuma exportação é registrada e nenhum arquivo fica.
 
-### 8.8. `cut create --sermon <id> --start T --end T` — administrador
+### 8.8. `cut create --sermon <id> --start T --end T [--title TEXTO]` — administrador
 
-Cria um corte do zero com as frases da faixa, já `chosen` (2.1.c.4).
+Cria um corte do zero com as frases da faixa, já `chosen` (2.1.c.4). Os tempos são da
+pregação (0 no início dela); `T` aceita `SS`, `MM:SS` ou `HH:MM:SS`, como em `cut range`.
+
+- A faixa encosta em frases como em `cut range` (§8.9): o início no início de frase mais
+  próximo e o fim no fim de frase mais próximo. O corte toca a faixa inteira, num trecho só,
+  com todas as frases dela.
+- O corte nasce `chosen`, com `source` `admin`, `preset_id` `null` e `edited` `false`.
+  `sermon suggest` nunca o substitui, nem depois de descartado e restaurado (§7.6).
+- `--title`: o título, sem os espaços das pontas. Omitido ou só com espaços, o corte se chama
+  `Novo corte · MM:SS`, com o início da faixa encostada em tempo da pregação (os minutos
+  passam de 59, como em `75:03`).
+- Recusas, sem gravar nada: `invalid_argument` (`details.argument` é `range`) para tempo que
+  não é número finito, fim antes do início ou igual a ele, início antes de 0 ou fim depois
+  do fim da pregação, e faixa com menos de 10 s depois de encostar nas frases ou cujo fim,
+  ao encostar, cai antes do início; pregação inexistente: `not_found`; pregação não
+  processada: `sermon_not_processed`.
+- Não é tarefa nem toma a trava. A CLI roda no host e não confere papel, como `cut range`;
+  pela API, só o administrador (§5.3).
+- Saída: o corte como `cut show` (§8.2), em JSON ou em texto.
+
+```
+wordcut cut create --sermon 12 --start 12:30 --end 13:30 --title "Graça" --json
+```
 
 ### 8.9. `cut range <id> [--start T] [--end T]` · `cut move <id> --by ±S` — administrador
 

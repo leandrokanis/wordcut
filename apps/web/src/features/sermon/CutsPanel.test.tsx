@@ -5,7 +5,10 @@ import { afterEach } from "vitest";
 import type { ListedCut, SermonShown } from "../../api/types";
 import { apiError, type RecordedCall, type Reply } from "../../test/fakeApi";
 import { fakeEventSource } from "../../test/fakeEventSource";
+import { fakePlayers } from "../../test/fakePlayers";
 import {
+  admin,
+  assistant,
   cutPreview,
   listedCut,
   processedSermon,
@@ -389,5 +392,110 @@ describe("while the sermon processes", () => {
       within(panel).getByRole("status").getAttribute("aria-label"),
       within(panel).queryByText(/Os cortes aparecem/),
     ]).toEqual(["Processando a pregação", null]);
+  });
+});
+
+describe("Novo corte", () => {
+  // The processed sermon starts 1800 s into the live and lasts 2400 s.
+  const SERMON_START = 1800;
+  const LENGTH = 2400;
+
+  /** The panel of the processed sermon for ``me``, the cursor at ``sermonSeconds``. */
+  async function panelAt(
+    sermonSeconds: number,
+    routes: Parameters<typeof fakeShellApi>[0] = {},
+    me = admin(),
+  ): Promise<HTMLElement> {
+    const players = fakePlayers();
+    calls = fakeShellApi(
+      {
+        "GET /api/sermons/12": {
+          body: processedSermon({ sermon_start: SERMON_START, sermon_end: SERMON_START + LENGTH }),
+        },
+        "GET /api/sermons/12/cuts": { body: { items: [listedCut({ id: 35, status: "chosen" })] } },
+        "GET /api/cuts/34": { body: shownCut() },
+        "GET /api/cuts/34/preview": { body: cutPreview() },
+        ...routes,
+      },
+      me,
+    );
+    renderRoute("/sermons/12", players);
+    const panel = await screen.findByRole("complementary", { name: "Cortes" });
+    await within(panel).findByRole("listitem");
+    act(() => players.current().moveTo(SERMON_START + sermonSeconds));
+    return panel;
+  }
+
+  const created = { "POST /api/sermons/12/cuts": { status: 201, body: shownCut({ id: 34 }) } };
+
+  function bodiesSent(): unknown[] {
+    return calls.filter(({ method }) => method === "POST").map(({ body }) => body);
+  }
+
+  test("creates a cut of 60 s from the cursor, in sermon time, and opens its level", async () => {
+    const panel = await panelAt(600, created);
+
+    await userEvent.click(within(panel).getByRole("button", { name: "Novo corte" }));
+
+    expect({ cutLevel: await screen.findByLabelText(CUT_LEVEL), sent: bodiesSent() }).toEqual({
+      cutLevel: expect.anything(),
+      sent: [{ start: 600, end: 660 }],
+    });
+  });
+
+  test.each([
+    ["less than 60 s from the end", 2370, { start: 2370, end: 2400 }],
+    ["less than 10 s from the end", 2395, { start: 2390, end: 2400 }],
+  ])("near the end, %s, the range ends at the sermon's end and lasts 10 s at least", async (
+    _,
+    cursor,
+    range,
+  ) => {
+    const panel = await panelAt(cursor, created);
+
+    await userEvent.click(within(panel).getByRole("button", { name: "Novo corte" }));
+
+    await screen.findByLabelText(CUT_LEVEL);
+    expect(bodiesSent()).toEqual([range]);
+  });
+
+  test("is not offered to an assistant", async () => {
+    const panel = await panelAt(600, created, assistant());
+
+    expect(within(panel).queryByRole("button", { name: "Novo corte" })).toBeNull();
+  });
+
+  test("stays on the sermon with the API's message when the cut is refused", async () => {
+    const panel = await panelAt(600, {
+      "POST /api/sermons/12/cuts": apiError(
+        400,
+        "invalid_argument",
+        "A faixa precisa ter ao menos 10 s depois de encostar nas frases.",
+      ),
+    });
+
+    await userEvent.click(within(panel).getByRole("button", { name: "Novo corte" }));
+
+    expect({
+      alert: (await within(panel).findByRole("alert")).textContent,
+      cutLevel: screen.queryByLabelText(CUT_LEVEL),
+    }).toEqual({
+      alert: "A faixa precisa ter ao menos 10 s depois de encostar nas frases.",
+      cutLevel: null,
+    });
+  });
+
+  test("cannot be pressed again while the cut is being created", async () => {
+    const creating = held({ status: 201, body: shownCut({ id: 34 }) });
+    const panel = await panelAt(600, { "POST /api/sermons/12/cuts": creating.route });
+    const button = within(panel).getByRole("button", { name: "Novo corte" });
+
+    await userEvent.click(button);
+    await userEvent.click(button);
+
+    expect({ disabled: button.hasAttribute("disabled"), sent: bodiesSent().length }).toEqual({
+      disabled: true,
+      sent: 1,
+    });
   });
 });

@@ -164,6 +164,12 @@ export function putCutSegments(
   return send("PUT", `/api/cuts/${id}/segments`, { segments });
 }
 
+/** Creates a chosen cut of the sermon over ``{start, end}``, in sermon time, snapped to
+ * sentences; answers it as ``GET /api/cuts/{id}`` shows it (docs/cli.md §8.8). */
+export function createCut(sermonId: number, range: { start: number; end: number }): Promise<Cut> {
+  return post(`/api/sermons/${sermonId}/cuts`, range);
+}
+
 /** Resizes the cut's range to ``{start, end}`` or moves it ``{by}`` seconds, in sermon time;
  * answers the cut as ``GET /api/cuts/{id}`` shows it (docs/cli.md §8.9). */
 export function patchCutRange(

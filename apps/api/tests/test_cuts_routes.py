@@ -636,3 +636,117 @@ def test_changing_the_range_of_a_missing_cut_is_not_found(admin: TestClient) -> 
     response = admin.patch("/api/cuts/99/range", json={"by": 5})
 
     assert (response.status_code, response.json()["error"]["details"]) == (404, {"cut_id": 99})
+
+
+@pytest.fixture
+def long_sermon_id(home: Home) -> int:
+    """A processed ``LONG_SPOKEN`` sermon of 80 s, without cuts."""
+    return long_sermon(home)
+
+
+def long_sermon(home: Home, processed: bool = True) -> int:
+    """A ``LONG_SPOKEN`` sermon of 80 s without cuts, processed unless told otherwise."""
+    with closing(connect(home)) as connection, connection:
+        sermon = sermons.insert(
+            connection,
+            NewSermon(
+                youtube_id="Qq7_w-5MnBv",
+                url="https://youtu.be/Qq7_w-5MnBv",
+                title="Culto de sexta",
+                service_date=date(2026, 10, 23),
+                live_duration=7718.0,
+                live_finished=True,
+                created_at=datetime(2026, 10, 27, 3, 0, tzinfo=timezone.utc),
+            ),
+        )
+        transcripts.replace(connection, sermon.id, LONG_SPOKEN, split_sentences(LONG_SPOKEN))
+        if processed:
+            sermons.record_processed(
+                connection, sermon.id, 1000.0, 1080.0, "sermon.mp4", sermon.created_at
+            )
+    return sermon.id
+
+
+def test_an_admin_creates_a_chosen_cut_and_gets_201_with_it_as_get_shows_it(
+    admin: TestClient, long_sermon_id: int
+) -> None:
+    response = admin.post(
+        f"/api/sermons/{long_sermon_id}/cuts", json={"start": 17, "end": 41.0, "title": "Graça"}
+    )
+
+    created = response.json()
+    assert (
+        response.status_code,
+        created,
+        (created["status"], created["source"], created["title"]),
+    ) == (201, admin.get(f"/api/cuts/{created['id']}").json(), ("chosen", "admin", "Graça"))
+
+
+def test_an_assistant_is_forbidden_to_create_a_cut_and_nothing_is_created(
+    assistant: TestClient, long_sermon_id: int
+) -> None:
+    response = assistant.post(f"/api/sermons/{long_sermon_id}/cuts", json={"start": 0, "end": 30})
+
+    assert (
+        response.status_code,
+        response.json()["error"]["code"],
+        assistant.get(f"/api/sermons/{long_sermon_id}/cuts").json(),
+    ) == (403, "forbidden", {"items": []})
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"start": 0},
+        {"inicio": 0, "end": 30},
+        {"start": "segredo-digitado", "end": 30},
+        {"start": 0, "end": 30, "title": 7},
+        {"start": 19, "end": 31},
+        {"start": 40, "end": 20},
+        {"start": -1, "end": 30},
+        {"start": 50, "end": 81},
+    ],
+    ids=[
+        "no end",
+        "misspelt field",
+        "text for a time",
+        "a number for the title",
+        "shorter than 10 s",
+        "end before the start",
+        "before the sermon",
+        "after the sermon",
+    ],
+)
+def test_a_new_cut_that_breaks_a_rule_is_400_invalid_argument_and_nothing_is_created(
+    body: dict[str, Any], admin: TestClient, long_sermon_id: int
+) -> None:
+    response = admin.post(f"/api/sermons/{long_sermon_id}/cuts", json=body)
+
+    assert (
+        response.status_code,
+        response.json()["error"]["code"],
+        "segredo-digitado" in response.text,
+        admin.get(f"/api/sermons/{long_sermon_id}/cuts").json(),
+    ) == (400, "invalid_argument", False, {"items": []})
+
+
+def test_creating_a_cut_on_a_sermon_not_processed_is_409_sermon_not_processed(
+    admin: TestClient, home: Home
+) -> None:
+    sermon_id = long_sermon(home, processed=False)
+
+    response = admin.post(f"/api/sermons/{sermon_id}/cuts", json={"start": 17, "end": 41})
+
+    assert (response.status_code, response.json()["error"]["code"]) == (
+        409,
+        "sermon_not_processed",
+    )
+
+
+def test_creating_a_cut_on_a_missing_sermon_is_not_found(admin: TestClient) -> None:
+    response = admin.post("/api/sermons/99/cuts", json={"start": 17, "end": 41})
+
+    assert (response.status_code, response.json()["error"]["details"]) == (
+        404,
+        {"sermon_id": 99},
+    )
