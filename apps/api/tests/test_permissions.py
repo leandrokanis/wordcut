@@ -23,7 +23,8 @@ ASSISTANT = "assistant"
 ADMIN = "admin"
 
 # Feature 1.2.a: an assistant creates, processes, chooses, fixes the form of and exports cuts;
-# suggestions, settings, criteria, presets and the team are the administrator's (ADR-0021).
+# suggestions, settings, criteria, presets and the team are the administrator's (ADR-0021), and
+# so is deleting sermons and cuts (1.2.b.1).
 PERMISSIONS: dict[tuple[str, str], str] = {
     ("GET", "/api/me"): ASSISTANT,
     ("POST", "/api/sermons"): ASSISTANT,
@@ -37,6 +38,7 @@ PERMISSIONS: dict[tuple[str, str], str] = {
     ("GET", "/api/sermons/{sermon_id}/thumbnails"): ASSISTANT,
     ("GET", "/api/sermons/{sermon_id}/thumbnails.json"): ASSISTANT,
     ("GET", "/api/sermons/{sermon_id}/waveform"): ASSISTANT,
+    ("DELETE", "/api/sermons/{sermon_id}"): ADMIN,
     ("GET", "/api/sermons/{sermon_id}/cuts"): ASSISTANT,
     ("POST", "/api/sermons/{sermon_id}/cuts"): ADMIN,
     ("GET", "/api/tasks"): ASSISTANT,
@@ -51,6 +53,7 @@ PERMISSIONS: dict[tuple[str, str], str] = {
     ("PUT", "/api/cuts/{cut_id}/words/{word_id}"): ASSISTANT,
     ("PUT", "/api/cuts/{cut_id}/segments"): ADMIN,
     ("PATCH", "/api/cuts/{cut_id}/range"): ADMIN,
+    ("DELETE", "/api/cuts/{cut_id}"): ADMIN,
     ("GET", "/api/cuts/{cut_id}/caption"): ASSISTANT,
     ("PATCH", "/api/cuts/{cut_id}/caption"): ASSISTANT,
     ("DELETE", "/api/cuts/{cut_id}/caption"): ASSISTANT,

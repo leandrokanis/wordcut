@@ -1,12 +1,14 @@
 from contextlib import closing
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 
 import pytest
 
 from wordcut import processing
-from wordcut.db import connect, sermons, tasks
+from wordcut.db import connect, cuts, renders, sermons, tasks, transcripts
+from wordcut.db.cuts import NewCut, Segment
+from wordcut.db.renders import NewRender
 from wordcut.errors import WordcutError
 from wordcut.home import Home
 from wordcut.processing import OnProgress
@@ -229,3 +231,28 @@ def test_a_successful_reprocessing_after_a_border_change_clears_the_change(home:
 
     with closing(connect(home)) as connection:
         assert show_sermon(connection, sermon_id, home=home)["borders_changed"] is False
+
+
+def exported_cut_file(home: Home, sermon_id: int) -> Path:
+    """A cut of the processed sermon with one export, its file on disk."""
+    moment = datetime(2026, 10, 27, tzinfo=timezone.utc)
+    with closing(connect(home)) as connection, connection:
+        [first, *_, last] = [word.id for word in transcripts.words_of(connection, sermon_id)]
+        new = NewCut("chosen", "Corte", (Segment(first, last),), first, last, "admin", None)
+        [cut_id] = cuts.insert_many(connection, sermon_id, [new], moment)
+        render_id = renders.insert(connection, NewRender(cut_id, "", 31.5, {}, moment))
+        file = home.cut_media(cut_id) / f"{render_id}.mp4"
+        renders.set_path(connection, render_id, str(file.relative_to(home.root)))
+    file.parent.mkdir(parents=True)
+    file.write_bytes(b"exported cut")
+    return file
+
+
+def test_a_reprocessing_deletes_the_export_files_of_the_cuts_it_removes(home: Home) -> None:
+    sermon_id = trimmed_sermon(home)
+    run_task(home, sermon_id, detach=False)
+    file = exported_cut_file(home, sermon_id)
+
+    start(home, "process", Resource("sermon", sermon_id), {"force": True}, detach=False)
+
+    assert not file.parent.exists()

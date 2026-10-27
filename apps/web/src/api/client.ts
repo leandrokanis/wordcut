@@ -295,6 +295,16 @@ export function setDefaultPreset(id: number): Promise<Preset> {
   return post(`/api/presets/${id}/set-default`, {});
 }
 
+/** Deletes the sermon with its cuts, exports and files: 409 ``busy`` while one of its tasks
+ * runs. */
+export function deleteSermon(id: number): Promise<{ id: number; deleted: true }> {
+  return request(`/api/sermons/${id}`, { method: "DELETE" });
+}
+
+export function deleteCut(id: number): Promise<{ id: number; deleted: true }> {
+  return request(`/api/cuts/${id}`, { method: "DELETE" });
+}
+
 /** The default preset cannot be deleted: 409 ``default_preset``. */
 export function deletePreset(id: number): Promise<{ id: number; deleted: true }> {
   return request(`/api/presets/${id}`, { method: "DELETE" });

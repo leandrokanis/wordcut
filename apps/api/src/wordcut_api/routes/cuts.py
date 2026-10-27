@@ -1,6 +1,6 @@
 """Cuts: list, show and preview them, create one, choose, discard or restore them, fix the
-spelling of their words, set what they play, resize or move their range and set their caption
-style (docs/api.md)."""
+spelling of their words, set what they play, resize or move their range, set their caption
+style and delete them (docs/api.md)."""
 
 from __future__ import annotations
 
@@ -18,6 +18,7 @@ from wordcut.service.cuts import (
     caption_of,
     choose_cut,
     create_cut,
+    delete_cut,
     discard_cut,
     fix_word,
     list_cuts,
@@ -108,6 +109,15 @@ def show(cut_id: int) -> dict[str, Any]:
     home = deps.home()
     with closing(db.connect(home)) as connection:
         return without_paths(show_cut(connection, cut_id, home=home))
+
+
+@router.delete("/cuts/{cut_id}", dependencies=[Depends(require("admin"))])
+def delete(cut_id: int) -> dict[str, Any]:
+    """``{"id", "deleted": true}``, as ``DELETE /api/presets/{id}``; ``busy`` while the cut is
+    exported or its sermon processed or suggested."""
+    home = deps.home()
+    with closing(db.connect(home)) as connection:
+        return delete_cut(home, connection, cut_id)
 
 
 @router.get("/cuts/{cut_id}/preview")

@@ -1,3 +1,5 @@
+import os
+import socket
 from contextlib import closing
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
@@ -6,8 +8,9 @@ from urllib.parse import quote
 import pytest
 from fastapi.testclient import TestClient
 
-from wordcut.db import connect, sermons, transcripts
+from wordcut.db import connect, sermons, tasks, transcripts
 from wordcut.db.sermons import NewSermon
+from wordcut.db.tasks import NewTask
 from wordcut.home import Home
 from wordcut.lock import ProcessingLock
 from wordcut.processing.sentences import Sentence
@@ -599,3 +602,58 @@ def test_show_list_and_trim_tell_whether_the_borders_changed_since_processing(
         [item["borders_changed"] for item in listed],
         put_back.json()["borders_changed"],
     ) == (True, True, [True], False)
+
+
+def test_an_admin_deletes_a_sermon_with_its_media_and_then_it_is_not_found(
+    admin: TestClient, home: Home
+) -> None:
+    sermon_id = processed_sermon(home)
+
+    deleted = admin.delete(f"/api/sermons/{sermon_id}")
+    shown = admin.get(f"/api/sermons/{sermon_id}")
+
+    assert (
+        deleted.status_code,
+        deleted.json(),
+        shown.status_code,
+        home.sermon_media(sermon_id).exists(),
+    ) == (200, {"id": sermon_id, "deleted": True}, 404, False)
+
+
+def test_an_assistant_is_forbidden_to_delete_a_sermon_and_it_stays(
+    assistant: TestClient, home: Home
+) -> None:
+    sermon_id = processed_sermon(home)
+
+    answer = assistant.delete(f"/api/sermons/{sermon_id}")
+
+    assert (
+        answer.status_code,
+        answer.json()["error"]["code"],
+        assistant.get(f"/api/sermons/{sermon_id}").status_code,
+        home.sermon_media(sermon_id).is_dir(),
+    ) == (403, "forbidden", 200, True)
+
+
+def test_deleting_a_missing_sermon_is_not_found(admin: TestClient) -> None:
+    answer = admin.delete("/api/sermons/99")
+
+    assert (answer.status_code, answer.json()["error"]["code"]) == (404, "not_found")
+
+
+def test_deleting_a_sermon_with_a_task_running_is_busy_and_keeps_it(
+    admin: TestClient, home: Home
+) -> None:
+    sermon_id = processed_sermon(home)
+    new = NewTask("suggest", "sermon", sermon_id, {}, os.getpid(), socket.gethostname(), NOW)
+    with closing(connect(home)) as connection:
+        task_id = tasks.insert(connection, new).id
+
+    answer = admin.delete(f"/api/sermons/{sermon_id}")
+
+    assert (
+        answer.status_code,
+        answer.json()["error"]["code"],
+        answer.json()["error"]["details"]["task_id"],
+        admin.get(f"/api/sermons/{sermon_id}").status_code,
+    ) == (409, "busy", task_id, 200)

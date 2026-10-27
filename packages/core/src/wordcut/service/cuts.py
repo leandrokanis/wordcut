@@ -13,19 +13,24 @@ from typing import Any
 from wordcut.cuts.assembly import MILLISECOND_DIGITS, AssembledCut, AssembledSegment, assemble
 from wordcut.cuts.caption import DEFAULT_CAPTION, stored_caption, validated
 from wordcut.cuts.spelling import check_spelling
-from wordcut.db import cuts, renders, transcripts, word_fixes
+from wordcut.db import cuts, renders, tasks, transcripts, word_fixes
 from wordcut.db.cuts import CutRow, NewCut, Segment
 from wordcut.db.renders import RenderRow
 from wordcut.db.sermons import SermonRow
 from wordcut.db.transcripts import WordRow
 from wordcut.edit.cut_range import Span, shift_selection, snap_range, trim_segments
 from wordcut.errors import WordcutError
+from wordcut.files import remove_within
 from wordcut.home import Home
 from wordcut.processing.sentences import Sentence
 from wordcut.rendering.options import merged
+from wordcut.service.media_files import cut_files
 from wordcut.service.sermons import existing_sermon, processed_row, shown_cut
+from wordcut.service.tasks import busy, running_tasks
 
 MIN_RANGE_S = 10
+# The tasks of a sermon that delete or write its cuts.
+CUT_WRITING_KINDS = ("process", "suggest")
 
 
 def list_cuts(
@@ -179,6 +184,34 @@ def create_cut(
     with connection:
         [cut_id] = cuts.insert_many(connection, sermon_id, [new], moment)
     return show_cut(connection, cut_id)
+
+
+def delete_cut(home: Home, connection: sqlite3.Connection, cut_id: int) -> dict[str, Any]:
+    """Delete the cut with its exports, spelling fixes and export tasks, then, once that is
+    committed, its media folder and the logs of those tasks in ``home`` (docs/cli.md §8.11)."""
+    row = existing_cut(connection, cut_id)
+    _refuse_while_running(home, connection, row)
+    files = cut_files(home, connection, row.id)
+    with connection:
+        cuts.delete(connection, row.id)
+        tasks.delete_of_resource(connection, "cut", row.id)
+    remove_within(home.root, files)
+    return {"id": row.id, "deleted": True}
+
+
+def _refuse_while_running(home: Home, connection: sqlite3.Connection, row: CutRow) -> None:
+    """``busy`` while the cut is exported or its sermon processed or suggested, which may
+    write the cut. The check and the delete are not atomic: a task launched at the same
+    instant may pass."""
+    for task in running_tasks(home, connection, "cut", row.id):
+        raise busy(f"O corte {row.id} está sendo exportado (tarefa {task.id}).", task)
+    for task in running_tasks(home, connection, "sermon", row.sermon_id):
+        if task.kind in CUT_WRITING_KINDS:
+            raise busy(
+                f"A pregação {row.sermon_id} do corte {row.id} tem uma tarefa {task.kind}"
+                f" em andamento (tarefa {task.id}).",
+                task,
+            )
 
 
 def _sermon_length(row: SermonRow) -> float:

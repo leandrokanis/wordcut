@@ -4,6 +4,7 @@ import { useNavigate, type NavigateFunction } from "react-router-dom";
 import {
   chooseCut,
   createCut,
+  deleteCut,
   discardCut,
   listCuts,
   restoreCut,
@@ -17,7 +18,9 @@ import { MIN_RANGE_SECONDS } from "./CutLayers";
 import { processSteps } from "./stage";
 
 /** The cuts of the sermon, asked for again whenever the sermon is processed anew. */
-export function useSermonCuts(sermon: SermonShown | undefined): Resource<ListedCut[]> {
+export function useSermonCuts(
+  sermon: SermonShown | undefined,
+): Resource<ListedCut[]> {
   const processed = sermon?.status === "processed";
   return useResource(
     () => (processed && sermon ? listCuts(sermon.id) : Promise.resolve([])),
@@ -38,7 +41,14 @@ interface CutsPanelProps {
 }
 
 /** Level 2's side panel: the cuts of the sermon, in the service's order. */
-export function CutsPanel({ sermon, cuts, processing, task, cursor, admin }: CutsPanelProps) {
+export function CutsPanel({
+  sermon,
+  cuts,
+  processing,
+  task,
+  cursor,
+  admin,
+}: CutsPanelProps) {
   return (
     <aside className="side" aria-label="Cortes">
       <div className="side-h">
@@ -48,7 +58,12 @@ export function CutsPanel({ sermon, cuts, processing, task, cursor, admin }: Cut
         {processing ? (
           <ProcessingSteps task={task} />
         ) : (
-          <PanelBody sermon={sermon} cuts={cuts} cursor={cursor} admin={admin} />
+          <PanelBody
+            sermon={sermon}
+            cuts={cuts}
+            cursor={cursor}
+            admin={admin}
+          />
         )}
       </div>
     </aside>
@@ -96,7 +111,8 @@ export function openCut(
   cut: { id: number; status: ListedCut["status"] },
   navigate: NavigateFunction,
 ): Promise<void> {
-  const chosen = cut.status === "suggested" ? chooseCut(cut.id) : Promise.resolve();
+  const chosen =
+    cut.status === "suggested" ? chooseCut(cut.id) : Promise.resolve();
   return chosen.then(() => navigate(`/cuts/${cut.id}`));
 }
 
@@ -136,6 +152,11 @@ function PanelBody({
     change(cut.id).then(cuts.reload, (error: ApiError) => setFailure(error));
   }
 
+  function remove(cut: ListedCut) {
+    setFailure(undefined);
+    deleteCut(cut.id).then(cuts.reload, (error: ApiError) => setFailure(error));
+  }
+
   if (sermon.status !== "processed") {
     return <EmptyPanel message="Os cortes aparecem depois do processamento." />;
   }
@@ -153,7 +174,12 @@ function PanelBody({
     <>
       {admin && (
         <div className="row">
-          <button className="btn sm" type="button" onClick={createAtCursor} disabled={creating}>
+          <button
+            className="btn sm"
+            type="button"
+            onClick={createAtCursor}
+            disabled={creating}
+          >
             <PlusIcon />
             Novo corte
           </button>
@@ -181,9 +207,12 @@ function PanelBody({
               number={index + 1}
               onOpen={cut.status === "discarded" ? null : () => open(cut)}
               menuOpen={menuOf === cut.id}
-              onToggleMenu={() => setMenuOf(menuOf === cut.id ? undefined : cut.id)}
+              onToggleMenu={() =>
+                setMenuOf(menuOf === cut.id ? undefined : cut.id)
+              }
               onCloseMenu={() => setMenuOf(undefined)}
               onToggleDiscard={() => toggleDiscard(cut)}
+              onDelete={admin ? () => remove(cut) : null}
             />
           ))}
         </ul>
@@ -197,7 +226,10 @@ const NEW_CUT_SECONDS = 60;
 
 /** The range of a new cut at ``cursor``, in sermon time: 60 s from it, ending no later than
  * the sermon, and started earlier near the end so it still lasts the 10 s minimum. */
-export function newCutRange(cursor: number, length: number): { start: number; end: number } {
+export function newCutRange(
+  cursor: number,
+  length: number,
+): { start: number; end: number } {
   const start = Math.max(0, Math.min(cursor, length - MIN_RANGE_SECONDS));
   return { start, end: Math.min(start + NEW_CUT_SECONDS, length) };
 }

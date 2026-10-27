@@ -1,5 +1,5 @@
 """``wordcut sermon <action>``: create, list, show, trim, process, download, suggest the cuts
-of sermons and prepare the media of their timeline (docs/cli.md §7)."""
+of sermons, prepare the media of their timeline and delete them (docs/cli.md §7)."""
 
 from __future__ import annotations
 
@@ -17,6 +17,7 @@ from wordcut.service.processing import start_processing
 from wordcut.service.sermons import (
     SERMON_STATES,
     create_sermon,
+    delete_sermon,
     list_sermons,
     prepare_sermon_timeline,
     sermon_video,
@@ -158,6 +159,18 @@ def register(commands: Commands) -> None:
     )
     prepare.add_argument("id", type=int, help="ID da pregação")
     add_wait_option(prepare)
+    delete = add_command(
+        actions,
+        "delete",
+        help=(
+            "apaga a pregação com seus cortes, exportações, transcrição, tarefas e arquivos,"
+            " sem pedir confirmação; recusa com busy se uma tarefa dela roda — administrador"
+        ),
+        run=_delete,
+        render=_render_deleted,
+        example="wordcut sermon delete 12 --json",
+    )
+    delete.add_argument("id", type=int, help="ID da pregação")
     download.add_argument(
         "-o",
         "--output",
@@ -318,6 +331,15 @@ def _render_suggestion(result: dict[str, Any]) -> str:
         *(warning["message"] for warning in result["suggestion_warnings"]),
     ]
     return "\n".join(lines)
+
+
+def _delete(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:
+    with closing(deps.connection()) as connection:
+        return delete_sermon(Home.from_environment(), connection, args.id)
+
+
+def _render_deleted(result: dict[str, Any]) -> str:
+    return f"Pregação {result['id']} apagada, com seus cortes e arquivos."
 
 
 def _render_preparation(result: dict[str, Any]) -> str:

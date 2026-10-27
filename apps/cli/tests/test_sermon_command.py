@@ -292,13 +292,8 @@ def test_show_without_json_describes_the_sermon_in_portuguese(
 def test_sermon_help_lists_its_actions(capsys: pytest.CaptureFixture[str]) -> None:
     exit_code = main(["sermon", "--help"])
 
-    assert (
-        exit_code,
-        "{create,list,show,trim,process,download,suggest,prepare}" in capsys.readouterr().out,
-    ) == (
-        0,
-        True,
-    )
+    actions = "{create,list,show,trim,process,download,suggest,prepare,delete}"
+    assert (exit_code, actions in capsys.readouterr().out) == (0, True)
 
 
 @pytest.mark.parametrize(

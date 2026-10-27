@@ -1,5 +1,6 @@
 """Sermons: create one from the live's link, list, show and trim them, prepare the media of
-their timeline, and find the video to download (docs/cli.md §7.1-§7.3, §7.5, §7.7)."""
+their timeline, find the video to download and delete them (docs/cli.md §7.1-§7.3, §7.5,
+§7.7, §7.8)."""
 
 from __future__ import annotations
 
@@ -17,10 +18,11 @@ from wordcut.db.sermons import NewSermon, SermonRow, SuggestionError
 from wordcut.db.tasks import TaskRow
 from wordcut.db.transcripts import SentenceRow
 from wordcut.errors import WordcutError
-from wordcut.files import folder_name
+from wordcut.files import folder_name, remove_within
 from wordcut.home import Home
 from wordcut.lock import ProcessingLock
-from wordcut.service.tasks import reconcile, running_task, shown_task
+from wordcut.service.media_files import sermon_files
+from wordcut.service.tasks import busy, reconcile, running_task, running_tasks, shown_task
 from wordcut.tasks import ProgressListener, Resource, execution
 from wordcut.youtube import LiveInfo, LiveSource, YouTubeError, video_id
 
@@ -317,6 +319,43 @@ def existing_sermon(connection: sqlite3.Connection, sermon_id: int) -> SermonRow
             "not_found", f"Pregação {sermon_id} não existe.", {"sermon_id": sermon_id}
         )
     return row
+
+
+def delete_sermon(home: Home, connection: sqlite3.Connection, sermon_id: int) -> dict[str, Any]:
+    """Delete the sermon with its cuts, their exports and spelling fixes, its transcript and
+    the tasks of the sermon and of its cuts, then, once that is committed, their files in
+    ``home``: the sermon's media folder, the cuts' folders and the tasks' logs
+    (docs/cli.md §7.8)."""
+    row = existing_sermon(connection, sermon_id)
+    cut_ids = [cut.id for cut in cuts.of_sermon(connection, row.id)]
+    _refuse_while_running(home, connection, row.id, cut_ids)
+    files = sermon_files(home, connection, row.id)
+    with connection:
+        tasks.delete_of_resource(connection, "sermon", row.id)
+        for cut_id in cut_ids:
+            tasks.delete_of_resource(connection, "cut", cut_id)
+        sermons.delete(connection, row.id)
+    remove_within(home.root, files)
+    return {"id": row.id, "deleted": True}
+
+
+def _refuse_while_running(
+    home: Home, connection: sqlite3.Connection, sermon_id: int, cut_ids: list[int]
+) -> None:
+    """``busy`` while a task of the sermon or an export of one of its cuts runs. The check
+    and the delete are not atomic: a task launched at the same instant may pass."""
+    for task in running_tasks(home, connection, "sermon", sermon_id):
+        raise busy(
+            f"A pregação {sermon_id} tem uma tarefa {task.kind} em andamento (tarefa {task.id}).",
+            task,
+        )
+    for cut_id in cut_ids:
+        for task in running_tasks(home, connection, "cut", cut_id):
+            raise busy(
+                f"O corte {cut_id} da pregação {sermon_id} está sendo exportado"
+                f" (tarefa {task.id}).",
+                task,
+            )
 
 
 def trim_sermon(

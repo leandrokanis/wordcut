@@ -176,6 +176,11 @@ def counts_of(connection: sqlite3.Connection, sermon_id: int) -> dict[str, int]:
     return {status: count for status, count in found}
 
 
+def delete(connection: sqlite3.Connection, cut_id: int) -> None:
+    """Remove the cut; its exports and spelling fixes go with it (ON DELETE CASCADE)."""
+    connection.execute("DELETE FROM cuts WHERE id = ?", (cut_id,))
+
+
 def delete_of(connection: sqlite3.Connection, sermon_id: int) -> None:
     """Remove every cut of the sermon."""
     connection.execute("DELETE FROM cuts WHERE sermon_id = ?", (sermon_id,))

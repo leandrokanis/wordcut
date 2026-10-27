@@ -164,6 +164,12 @@ def record_suggestion_error(
     )
 
 
+def delete(connection: sqlite3.Connection, sermon_id: int) -> None:
+    """Remove the sermon; its cuts, transcript and timeline state go with it (ON DELETE
+    CASCADE), and with the cuts their exports and spelling fixes."""
+    connection.execute("DELETE FROM sermons WHERE id = ?", (sermon_id,))
+
+
 def by_id(connection: sqlite3.Connection, sermon_id: int) -> SermonRow | None:
     return _one(connection, "id = ?", sermon_id)
 

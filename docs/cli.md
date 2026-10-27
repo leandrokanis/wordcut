@@ -230,7 +230,7 @@ Sem `--json`, o `message` vai para o stderr.
 | `forbidden` | 1 | só na API (HTTP 403): e-mail fora da equipe, ou papel sem permissão para a rota; a mensagem nunca traz o e-mail (ADR-0015, ADR-0019) |
 | `invalid_argument` | 2 | argumento inválido; `details.argument` diz qual opção do comando, quando identificável, com o nome que o parser define, e `details.choices` lista as opções válidas de uma escolha; argumento não reconhecido não traz `details`; a mensagem nunca repete o que foi digitado, nem como nome de opção (ADR-0015) |
 | `not_found` | 3 | ID ou e-mail inexistente |
-| `busy` | 4 | outra tarefa segura a trava, ou já há uma sugestão (§7.6) ou uma preparação da timeline (§7.7) da mesma pregação em andamento; `details` traz a tarefa (`task_id`, `kind`, `started_at`) |
+| `busy` | 4 | outra tarefa segura a trava, ou já há uma sugestão (§7.6) ou uma preparação da timeline (§7.7) da mesma pregação em andamento, ou o que se quer apagar tem tarefa rodando (§7.8, §8.11); `details` traz a tarefa (`task_id`, `kind`, `started_at`) |
 | `live_not_finished` | 5 | processar uma live que ainda não terminou |
 | `sermon_not_trimmed` | 5 | processar sem bordas definidas |
 | `sermon_too_short` | 5 | bordas com menos de 1 minuto |
@@ -394,7 +394,8 @@ pede as sugestões ao LLM com o preset padrão (2.1.b.1).
   criada com a live no ar é consultada de novo no YouTube antes da recusa.
 - Numa pregação já processada, MUST exigir `--force`, porque os cortes e suas edições são
   refeitos (1.1.b.3); sem ele, `would_discard_edits`. Com `--force`, os cortes da pregação
-  são apagados junto com as palavras e as frases.
+  são apagados junto com as palavras e as frases, e depois os arquivos das exportações deles
+  (1.2.b.1).
 - Uma pregação `failed` é refeita pelo mesmo comando (1.1.c.3).
 - A pregação fica `processing` desde o lançamento e termina `processed` ou `failed`. O
   sucesso guarda as bordas na live usadas como as processadas, e `borders_changed` (§7.2)
@@ -432,7 +433,8 @@ Tarefa sem trava: pede nova sugestão ao LLM (2.1.b.2), com o preset indicado ou
 O pedido e a validação da resposta são os do `sermon process` (§7.4).
 
 - Os cortes `suggested` não editados que vieram do LLM (`source` `llm`) são substituídos, só
-  no sucesso e numa transação.
+  no sucesso e numa transação; depois dela, os arquivos das exportações deles são apagados
+  (1.2.b.1).
 - Os cortes escolhidos, descartados ou editados permanecem, e os criados pelo administrador
   (`source` `admin`, §8.8) também, em qualquer estado.
 - Recusas antes de criar a tarefa: pregação inexistente ou preset inexistente (`not_found`,
@@ -501,8 +503,23 @@ wordcut sermon prepare 12 --wait --json
 
 ### 7.8. `sermon delete <id>` — administrador
 
-Apaga a pregação, seus cortes, exportações e mídias (1.2.b). Falha com `busy` se uma tarefa
-da pregação estiver rodando.
+Apaga a pregação de vez, sem pedir confirmação (1.2.b.1): os cortes dela (sugeridos,
+escolhidos e descartados), as correções de grafia, as exportações, a transcrição, o estado da
+timeline e as tarefas da pregação e dos cortes. Depois de gravar no banco, apaga os arquivos:
+a pasta de mídia da pregação inteira (vídeo 16:9, miniaturas, forma de onda e pasta de
+trabalho), a pasta de cada corte com as exportações e os logs das tarefas. Arquivo que já
+não existe não impede; caminho que sairia da pasta de dados (§14) nunca é apagado.
+
+- Saída: `{"id": 12, "deleted": true}`; em texto, `Pregação 12 apagada, com seus cortes e
+  arquivos.`
+- Pregação inexistente: `not_found` (saída 3), com `details.sermon_id`.
+- Tarefa da pregação rodando (`process`, `suggest` ou `prepare`), ou exportação (`render`)
+  de um corte dela: `busy` (saída 4), com `task_id`, `kind` e `started_at` da tarefa, e nada
+  é apagado. A tarefa órfã (§6.5) não impede.
+
+```
+wordcut sermon delete 12 --json
+```
 
 ## 8. Cortes (`cut`)
 
@@ -770,7 +787,20 @@ wordcut cut segments 34 --file - --json < trechos.json
 
 ### 8.11. `cut delete <id>` — administrador
 
-Apaga o corte e suas exportações (1.2.b).
+Apaga o corte de vez, sem pedir confirmação (1.2.b.1): as exportações, as correções de grafia
+e as tarefas de exportação dele. Depois de gravar no banco, apaga a pasta do corte com os
+arquivos das exportações e os logs dessas tarefas, com as mesmas regras de arquivo ausente e
+de pasta de dados do `sermon delete` (§7.8). Os outros cortes da pregação ficam.
+
+- Saída: `{"id": 34, "deleted": true}`; em texto, `Corte 34 apagado, com suas exportações.`
+- Corte inexistente: `not_found` (saída 3), com `details.cut_id`.
+- Corte exportando (`render`), ou pregação dele processando (`process`) ou sugerindo
+  (`suggest`): `busy` (saída 4), com `task_id`, `kind` e `started_at` da tarefa, e nada é
+  apagado. A tarefa órfã (§6.5) não impede.
+
+```
+wordcut cut delete 34 --json
+```
 
 ## 9. Exportações (`render`)
 

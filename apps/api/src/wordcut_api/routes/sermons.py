@@ -1,5 +1,5 @@
-"""Sermons: create from the live's link, list, show, trim and download, and the media of
-their timeline (docs/api.md)."""
+"""Sermons: create from the live's link, list, show, trim, download and delete, and the media
+of their timeline (docs/api.md)."""
 
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ from wordcut import db
 from wordcut.service.processing import start_processing
 from wordcut.service.sermons import (
     create_sermon,
+    delete_sermon,
     list_sermons,
     prepare_sermon_timeline,
     sermon_video,
@@ -90,6 +91,15 @@ def trim(sermon_id: int, body: Borders) -> dict[str, Any]:
         sermon = trim_sermon(connection, sermon_id, body.start, body.end)
     del sermon["needs_reprocess"]
     return sermon
+
+
+@router.delete("/{sermon_id}", dependencies=[Depends(require("admin"))])
+def delete(sermon_id: int) -> dict[str, Any]:
+    """``{"id", "deleted": true}``, as ``DELETE /api/presets/{id}``; ``busy`` while a task of
+    the sermon or an export of one of its cuts runs."""
+    home = deps.home()
+    with closing(db.connect(home)) as connection:
+        return delete_sermon(home, connection, sermon_id)
 
 
 @router.get("/{sermon_id}/video")

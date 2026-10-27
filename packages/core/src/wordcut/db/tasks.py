@@ -145,6 +145,16 @@ def of_resource(
     return [_row(values) for values in found]
 
 
+def delete_of_resource(
+    connection: sqlite3.Connection, resource_type: str, resource_id: int
+) -> None:
+    """Remove the tasks of the resource, in the caller's transaction."""
+    connection.execute(
+        "DELETE FROM tasks WHERE resource_type = ? AND resource_id = ?",
+        (resource_type, resource_id),
+    )
+
+
 def _row(values: tuple[Any, ...]) -> TaskRow:
     (
         task_id,

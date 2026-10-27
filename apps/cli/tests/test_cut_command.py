@@ -295,7 +295,7 @@ def test_cut_help_lists_its_actions(capsys: pytest.CaptureFixture[str]) -> None:
     # The list may wrap after a comma to fit the terminal.
     assert (
         exit_code,
-        "{list,show,preview,choose,discard,restore,fix-word,create,segments,range,move,caption,render}"
+        "{list,show,preview,choose,discard,restore,fix-word,create,segments,range,move,caption,render,delete}"
         in "".join(capsys.readouterr().out.split()),
     ) == (
         0,

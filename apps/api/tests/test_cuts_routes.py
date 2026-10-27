@@ -1,3 +1,5 @@
+import os
+import socket
 from contextlib import closing
 from datetime import date, datetime, timezone
 from typing import Any
@@ -6,9 +8,10 @@ import pytest
 from fastapi.testclient import TestClient
 
 from wordcut.cuts.caption import DEFAULT_CAPTION
-from wordcut.db import connect, cuts, sermons, transcripts
+from wordcut.db import connect, cuts, sermons, tasks, transcripts
 from wordcut.db.cuts import NewCut, Segment
 from wordcut.db.sermons import NewSermon
+from wordcut.db.tasks import NewTask
 from wordcut.home import Home
 from wordcut.processing.sentences import split_sentences
 from wordcut.service.cuts import (
@@ -750,3 +753,62 @@ def test_creating_a_cut_on_a_missing_sermon_is_not_found(admin: TestClient) -> N
         404,
         {"sermon_id": 99},
     )
+
+
+def running_task(home: Home, kind: str, resource_type: str, resource_id: int) -> int:
+    """A task recorded ``running`` in this process, so it is not taken for an orphan."""
+    started = datetime(2026, 10, 27, 9, 30, tzinfo=timezone.utc)
+    new = NewTask(kind, resource_type, resource_id, {}, os.getpid(), socket.gethostname(), started)
+    with closing(connect(home)) as connection:
+        return tasks.insert(connection, new).id
+
+
+def test_an_admin_deletes_a_cut_with_its_exports_and_then_it_is_not_found(
+    admin: TestClient, home: Home, cut_id: int, export: Any
+) -> None:
+    export(cut_id)
+
+    deleted = admin.delete(f"/api/cuts/{cut_id}")
+    shown = admin.get(f"/api/cuts/{cut_id}")
+
+    assert (
+        deleted.status_code,
+        deleted.json(),
+        shown.status_code,
+        home.cut_media(cut_id).exists(),
+    ) == (
+        200,
+        {"id": cut_id, "deleted": True},
+        404,
+        False,
+    )
+
+
+def test_an_assistant_is_forbidden_to_delete_a_cut_and_it_stays(
+    assistant: TestClient, cut_id: int
+) -> None:
+    answer = assistant.delete(f"/api/cuts/{cut_id}")
+
+    assert (answer.status_code, answer.json()["error"]["code"]) == (403, "forbidden")
+    assert assistant.get(f"/api/cuts/{cut_id}").status_code == 200
+
+
+def test_deleting_a_missing_cut_is_not_found(admin: TestClient) -> None:
+    answer = admin.delete("/api/cuts/99")
+
+    assert (answer.status_code, answer.json()["error"]["code"]) == (404, "not_found")
+
+
+def test_deleting_a_cut_being_exported_is_busy_and_keeps_it(
+    admin: TestClient, home: Home, cut_id: int
+) -> None:
+    task_id = running_task(home, "render", "cut", cut_id)
+
+    answer = admin.delete(f"/api/cuts/{cut_id}")
+
+    assert (
+        answer.status_code,
+        answer.json()["error"]["code"],
+        answer.json()["error"]["details"]["task_id"],
+        admin.get(f"/api/cuts/{cut_id}").status_code,
+    ) == (409, "busy", task_id, 200)

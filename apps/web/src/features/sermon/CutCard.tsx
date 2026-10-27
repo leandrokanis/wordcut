@@ -1,8 +1,11 @@
-import { useEffect, useRef, type CSSProperties, type RefObject } from "react";
+import { useRef, useState, type CSSProperties } from "react";
 
+import { listRenders } from "../../api/client";
 import type { CutStatus, ListedCut } from "../../api/types";
+import { useResource } from "../../api/useResource";
 import { formatDuration } from "../../ui/format";
 import { DotsIcon } from "../../ui/icons";
+import { useDismiss } from "../../ui/useDismiss";
 
 const STATUS_LABELS: Record<CutStatus, string> = {
   suggested: "Sugerido",
@@ -29,6 +32,8 @@ interface CutCardProps {
   onCloseMenu: () => void;
   /** Discards the cut, or restores it when it is discarded. */
   onToggleDiscard: () => void;
+  /** Deletes the cut once confirmed; null when the caller may not (1.2.b.1). */
+  onDelete: (() => void) | null;
 }
 
 /** One cut in the panel: its number, title, assembled text, duration and state. A discarded
@@ -41,10 +46,17 @@ export function CutCard({
   onToggleMenu,
   onCloseMenu,
   onToggleDiscard,
+  onDelete,
 }: CutCardProps) {
   const discarded = cut.status === "discarded";
   const top = useRef<HTMLDivElement>(null);
   useDismiss(top, menuOpen, onCloseMenu);
+  const [confirming, setConfirming] = useState(false);
+
+  function askToDelete() {
+    onCloseMenu();
+    setConfirming(true);
+  }
   return (
     <li
       className="cc"
@@ -53,7 +65,12 @@ export function CutCard({
       style={{ "--c": cutColor(number - 1) } as CSSProperties}
     >
       <div className="cc-top" ref={top}>
-        <button className="cc-main" type="button" disabled={!onOpen} onClick={onOpen ?? undefined}>
+        <button
+          className="cc-main"
+          type="button"
+          disabled={!onOpen}
+          onClick={onOpen ?? undefined}
+        >
           <i className="rnum">{number}</i>
           <span className="cc-title">{cut.title}</span>
         </button>
@@ -69,12 +86,37 @@ export function CutCard({
         </button>
         {menuOpen && (
           <div className="cmenu" role="menu">
-            <button className="mi" type="button" role="menuitem" onClick={onToggleDiscard}>
+            <button
+              className="mi"
+              type="button"
+              role="menuitem"
+              onClick={onToggleDiscard}
+            >
               <b>{discarded ? "Restaurar" : "Descartar"}</b>
             </button>
+            {onDelete && (
+              <button
+                className="mi danger"
+                type="button"
+                role="menuitem"
+                onClick={askToDelete}
+              >
+                <b>Apagar</b>
+              </button>
+            )}
           </div>
         )}
       </div>
+      {confirming && onDelete && (
+        <DeleteConfirmation
+          cutId={cut.id}
+          onConfirm={() => {
+            setConfirming(false);
+            onDelete();
+          }}
+          onCancel={() => setConfirming(false)}
+        />
+      )}
       <p className="cc-quote">{cut.text}</p>
       <div className="cc-meta">
         <span className="mono">{formatDuration(cut.duration)}</span>
@@ -84,30 +126,45 @@ export function CutCard({
   );
 }
 
-/** Closes an open menu on Escape or on a press outside ``area``, as the prototype's menus do. */
-function useDismiss(area: RefObject<HTMLElement>, open: boolean, close: () => void) {
-  const latestClose = useRef(close);
-  latestClose.current = close;
+interface DeleteConfirmationProps {
+  cutId: number;
+  onConfirm: () => void;
+  onCancel: () => void;
+}
 
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        latestClose.current();
-      }
-    }
-    function onPointerDown(event: PointerEvent) {
-      if (!area.current?.contains(event.target as Node)) {
-        latestClose.current();
-      }
-    }
-    document.addEventListener("keydown", onKeyDown);
-    document.addEventListener("pointerdown", onPointerDown);
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-      document.removeEventListener("pointerdown", onPointerDown);
-    };
-  }, [area, open]);
+/** Asks before deleting the cut, saying how many exports go with it, as the sermon's card asks
+ * (plan of 1.2.b.1, gap L6); it waits for the count before offering Apagar. */
+function DeleteConfirmation({
+  cutId,
+  onConfirm,
+  onCancel,
+}: DeleteConfirmationProps) {
+  const exports = useResource(() => listRenders(cutId), `renders:${cutId}`);
+  if (!exports.data && !exports.error) {
+    return null;
+  }
+  return (
+    <div className="cc-confirm">
+      <span>{question(exports.data?.length)}</span>
+      <div className="row">
+        <button className="btn sm danger" type="button" onClick={onConfirm}>
+          Apagar
+        </button>
+        <button className="btn sm ghost" type="button" onClick={onCancel}>
+          Cancelar
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** The question for a cut with ``exports`` exports; unknown when they could not be listed. */
+function question(exports: number | undefined): string {
+  if (exports === undefined) {
+    return "Apagar o corte e as exportações dele?";
+  }
+  if (exports === 0) {
+    return "Apagar o corte?";
+  }
+  return `Apagar o corte e ${exports} ${exports === 1 ? "exportação" : "exportações"}?`;
 }

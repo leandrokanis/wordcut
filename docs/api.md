@@ -63,6 +63,7 @@ As palavras-chave DEVE, NÃO DEVE e PODE seguem o BCP 14
 | `GET /api/sermons/{id}/thumbnails` | — | 200 a faixa de miniaturas (`image/jpeg`), lado a lado na ordem do tempo | 404 pregação inexistente ou miniaturas indisponíveis | assistente |
 | `GET /api/sermons/{id}/thumbnails.json` | — | 200 `{"width", "height", "times"}`: tamanho de uma miniatura da faixa e o segundo da live de cada uma | 404 como `thumbnails` | assistente |
 | `GET /api/sermons/{id}/waveform` | — | 200 `{"buckets", "peaks"}`: os picos da live inteira, de 0 a 1, na ordem do tempo | 404 pregação inexistente ou forma de onda indisponível | assistente |
+| `DELETE /api/sermons/{id}` | — | 200 `{"id", "deleted": true}`, como `DELETE /api/presets/{id}`; apaga a pregação com cortes, exportações, transcrição, tarefas e arquivos, como `sermon delete` (CLI §7.8); depois dele o `GET` dá 404 | 404; 409 `busy` com tarefa da pregação (`process`, `suggest`, `prepare`) ou exportação de um corte dela rodando, nada apagado | administrador |
 | `GET /api/sermons/{id}/video` | — | 200 o vídeo 16:9 (`video/mp4`), `Content-Disposition: attachment` com o nome `AAAA-MM-DD - Título.mp4` | 404; 409 `sermon_not_processed` | assistente |
 | `GET /api/tasks[?status=&kind=]` | — | 200 `{"items"}` de `task list` | 400 `status` fora de `running`, `succeeded`, `failed`; `kind` fora de `process`, `render`, `suggest`, `prepare` | assistente |
 | `GET /api/tasks/{id}` | — | 200 a tarefa de `task show` | 404 | assistente |
@@ -71,6 +72,7 @@ As palavras-chave DEVE, NÃO DEVE e PODE seguem o BCP 14
 | `GET /api/sermons/{id}/cuts[?status=]` | — | 200 `{"items"}` de `cut list`, os descartados por último, cada corte com `start` e `end` (vão dos trechos) e `range_start` e `range_end` (a faixa), em tempo da pregação | 400 `status` fora de `suggested`, `chosen`, `discarded`; 404 | assistente |
 | `POST /api/sermons/{id}/cuts` | `{"start", "end", "title"?}`, em segundos da pregação | 201 o corte criado, como o `GET /api/cuts/{id}` o mostra: `chosen`, `source` `admin` | 400 campo desconhecido ou faltando, valor que não é número (título que não é texto), regra de `cut create` (menos de 10 s depois de encostar, fim antes do início, fora da pregação); 404; 409 `sermon_not_processed` | administrador |
 | `GET /api/cuts/{id}` | — | 200 o corte de `cut show`, com as exportações sem `path` | 404 | assistente |
+| `DELETE /api/cuts/{id}` | — | 200 `{"id", "deleted": true}`; apaga o corte com exportações e arquivos, como `cut delete` (CLI §8.11); depois dele o `GET` dá 404 | 404; 409 `busy` com o corte exportando ou a pregação dele processando ou sugerindo, nada apagado | administrador |
 | `GET /api/cuts/{id}/preview` | — | 200 a sequência de `cut preview`; nunca espera a trava | 404 | assistente |
 | `POST /api/cuts/{id}/choose` | — | 200 o corte como o `GET` o mostra | 404 | assistente |
 | `POST /api/cuts/{id}/discard` | — | 200 o corte como o `GET` o mostra | 404 | assistente |

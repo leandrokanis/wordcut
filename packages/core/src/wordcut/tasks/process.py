@@ -1,7 +1,8 @@
 """The ``process`` task: download, transcribe and cut a trimmed sermon, then have the LLM
 suggest its cuts (docs/cli.md §7.4).
 
-Parameters: ``force`` true to redo a processed sermon, its cuts included. The sermon is
+Parameters: ``force`` true to redo a processed sermon, its cuts included, whose export
+files are removed once the cuts are (1.2.b.1). The sermon is
 ``processing`` while the task runs and ends ``processed`` or ``failed``.
 ``service.processing.start_processing`` checks, under the lock, that the sermon can be
 processed before the task is recorded. The transcription uses the WhisperX model of the
@@ -26,6 +27,7 @@ from wordcut.db.sermons import SermonRow
 from wordcut.errors import WordcutError
 from wordcut.processing import pipeline
 from wordcut.processing.pipeline import Processed
+from wordcut.service.media_files import exports_by_cut, remove_exports_of_gone_cuts
 from wordcut.service.presets import default_preset
 from wordcut.service.sermons import processed_sermon
 from wordcut.service.settings import whisper_model
@@ -44,11 +46,13 @@ def _run(ctx: TaskContext) -> Result:
         sermon = sermons.by_id(connection, sermon_id)
         assert sermon is not None, "start_processing admits only an existing sermon"
         model = whisper_model(connection)
+        exports = exports_by_cut(ctx.home, connection, sermon_id) if force else {}
         with connection:
             if force:
                 cuts.delete_of(connection, sermon_id)
                 transcripts.delete_of(connection, sermon_id)
             sermons.set_status(connection, sermon_id, "processing", _now())
+        remove_exports_of_gone_cuts(ctx.home, connection, sermon_id, exports)
     try:
         return _processed(ctx, sermon, model)
     except BaseException:

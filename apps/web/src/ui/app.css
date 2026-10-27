@@ -76,9 +76,14 @@ a.cr:hover { background: var(--raised); color: var(--fg); }
 .l1-head { display: flex; align-items: center; gap: 12px; }
 .l1-head h1 { margin: 0; font-size: 24px; font-weight: 600; letter-spacing: -0.02em; }
 .pgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; margin: 0; padding: 0; list-style: none; }
-.pcard { border: 1px solid var(--line); border-radius: 12px; background: var(--panel); overflow: hidden; }
+.pcard { position: relative; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); overflow: hidden; }
 .pcard:hover { border-color: var(--line-2); }
 .pc-main { display: grid; gap: 2px; padding: 12px 14px 14px; }
+.pc-more { position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,.55); color: var(--fg); }
+.pc-more:hover:not(:disabled) { background: rgba(0,0,0,.8); }
+.pc-menu { top: 40px; right: 8px; }
+.pc-confirm { position: absolute; inset: auto 0 0 0; display: grid; gap: 8px; padding: 12px 14px; background: var(--raised); border-top: 1px solid var(--line-2); font-size: 13px; }
+.pc-err { padding: 0 14px 12px; }
 .pdate { color: var(--muted); font-size: 12.5px; }
 .pt { font-weight: 500; overflow-wrap: anywhere; }
 .pmeta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 6px; color: var(--muted); font-size: 12.5px; }
@@ -151,6 +156,7 @@ a.cr:hover { background: var(--raised); color: var(--fg); }
 .cc-title { font-weight: 500; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .cc-quote { margin: 0; padding-left: 28px; font-size: 13px; line-height: 1.55; color: var(--fg); display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
 .cc-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding-left: 28px; font-size: 12.5px; color: var(--muted); }
+.cc-confirm { display: grid; gap: 8px; margin-left: 28px; padding: 10px 12px; border: 1px solid var(--line-2); border-radius: 8px; background: var(--raised); font-size: 13px; }
 .cc-st { color: var(--accent); }
 .rnum { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 5px; background: var(--c); color: #111; font: 600 11px var(--font-mono); font-style: normal; flex: none; }
 .cmenu { position: absolute; z-index: 25; right: 0; top: calc(100% + 4px); min-width: 210px; background: var(--raised); border: 1px solid var(--line-2); border-radius: 10px; padding: 4px; box-shadow: 0 14px 36px rgba(0,0,0,.55); display: grid; gap: 2px; }
@@ -159,6 +165,7 @@ a.cr:hover { background: var(--raised); color: var(--fg); }
 .mi b { font-weight: 500; font-size: 13.5px; }
 .mi small { color: var(--muted); font-size: 12px; }
 .mi:disabled { opacity: .45; cursor: not-allowed; }
+.mi.danger b { color: var(--danger); }
 a.mi { color: inherit; text-decoration: none; }
 .work { display: grid; grid-template-rows: auto minmax(0, 1fr) auto auto auto; min-width: 0; min-height: 0; }
 .l2-bar { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-bottom: 1px solid var(--line); min-width: 0; }

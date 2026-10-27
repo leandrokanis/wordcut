@@ -101,6 +101,24 @@ def running_task(
     return next((task for task in found if task.kind == kind and task.status == "running"), None)
 
 
+def running_tasks(
+    home: Home, connection: sqlite3.Connection, resource_type: str, resource_id: int
+) -> list[TaskRow]:
+    """The tasks that still run on the resource, once orphans are failed."""
+    reconcile(home, connection, tasks.of_resource(connection, resource_type, resource_id))
+    found = tasks.of_resource(connection, resource_type, resource_id)
+    return [task for task in found if task.status == "running"]
+
+
+def busy(message: str, task: TaskRow) -> WordcutError:
+    """``busy`` because of ``task``, which the details name (docs/cli.md §5.3)."""
+    return WordcutError(
+        "busy",
+        message,
+        {"task_id": task.id, "kind": task.kind, "started_at": task.started_at.isoformat()},
+    )
+
+
 def reconcile(home: Home, connection: sqlite3.Connection, found: list[TaskRow]) -> bool:
     """Mark ``failed`` (``interrupted``) the tasks of ``found`` still recorded running whose
     process is gone; true if there was one."""

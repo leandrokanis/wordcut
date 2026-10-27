@@ -348,6 +348,15 @@ Formato de [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões
   administrador tem "Novo corte", que cria a faixa de 60 s a partir do cursor (terminando no
   fim da pregação, com ao menos 10 s) e abre o nível do corte
   ([#12](https://github.com/leandrokanis/wordcut/issues/12)).
+- Apagar pregações e cortes (1.2.b.1): `wordcut sermon delete <id>` e `wordcut cut delete
+  <id>`, `DELETE /api/sermons/{id}` e `DELETE /api/cuts/{id}` (200 `{"id", "deleted": true}`,
+  só administrador). A pregação vai com cortes, correções, exportações, transcrição, tarefas e
+  a pasta de mídia inteira; o corte, com exportações, correções e tarefas de exportação. Os
+  arquivos são apagados depois de gravar no banco, só dentro da pasta de dados e sem falhar
+  por arquivo já ausente. Tarefa rodando recusa com `busy` (saída 4, 409). Na web, o
+  administrador tem "Mais ações" > Apagar no card da pregação ("Apagar a pregação e N
+  cortes?") e Apagar no menu do cartão do corte ("Apagar o corte e N exportações?"), com
+  Apagar e Cancelar ([#13](https://github.com/leandrokanis/wordcut/issues/13)).
 
 ### Alterado
 
@@ -419,6 +428,9 @@ Formato de [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões
 
 ### Corrigido
 
+- Os arquivos das exportações de um corte apagado por `sermon suggest` ou por `sermon process
+  --force` deixam de ficar órfãos no disco: são apagados depois que os cortes saem do banco
+  ([#13](https://github.com/leandrokanis/wordcut/issues/13)).
 - Web: a chave da API do LLM nas configurações passa a ser gravada também ao sair do campo,
   não só com Enter, com uma gravação só por envio, o "Salvo" e "••••" com os 4 últimos
   caracteres na confirmação, e o erro ao lado do campo na falha

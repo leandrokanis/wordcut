@@ -1,7 +1,7 @@
 """``wordcut cut <action>``: see and preview the suggested cuts of a sermon, create one,
 choose, discard or restore them, fix the spelling of their caption words, set their caption
-style, set what they play, resize or move their range and export them (docs/cli.md
-§8.1–§8.10)."""
+style, set what they play, resize or move their range, export and delete them (docs/cli.md
+§8.1–§8.11)."""
 
 from __future__ import annotations
 
@@ -24,6 +24,7 @@ from wordcut.service.cuts import (
     caption_of,
     choose_cut,
     create_cut,
+    delete_cut,
     discard_cut,
     fix_word,
     list_cuts,
@@ -207,6 +208,18 @@ def register(commands: Commands) -> None:
     )
     export.add_argument("id", type=int, help="ID do corte")
     _add_render_options(export)
+    delete = add_command(
+        actions,
+        "delete",
+        help=(
+            "apaga o corte com suas exportações e arquivos, sem pedir confirmação; recusa com"
+            " busy enquanto ele exporta ou a pregação dele processa ou sugere — administrador"
+        ),
+        run=_delete,
+        render=_render_deleted,
+        example="wordcut cut delete 34 --json",
+    )
+    delete.add_argument("id", type=int, help="ID do corte")
 
 
 def _add_caption_options(caption: argparse.ArgumentParser) -> None:
@@ -394,6 +407,15 @@ def _render_caption(style: dict[str, Any]) -> str:
 def _list(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:
     with closing(deps.connection()) as connection:
         return list_cuts(connection, args.sermon, args.status)
+
+
+def _delete(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:
+    with closing(deps.connection()) as connection:
+        return delete_cut(Home.from_environment(), connection, args.id)
+
+
+def _render_deleted(result: dict[str, Any]) -> str:
+    return f"Corte {result['id']} apagado, com suas exportações."
 
 
 def _show(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:
