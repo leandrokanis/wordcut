@@ -87,7 +87,7 @@ test("draws each segment on the cut's timeline in proportion to the cut's durati
   await openCut();
 
   const widths = within(timelineOf())
-    .getAllByRole("group", { name: /^Trecho/ })
+    .getAllByRole("button", { name: /^Trecho/ })
     .map((clip) => parseFloat(clip.style.width));
 
   expect(widths.map((width) => width.toFixed(3))).toEqual(
@@ -221,4 +221,43 @@ test("draws the caption with the cut's style", async () => {
   expect(
     ["--cap-size", "--cap-top", "--cap-color"].map((name) => caption.style.getPropertyValue(name)),
   ).toEqual(["10cqw", "20%", "#FFFFFF"]);
+});
+
+/** The segments of the "Vídeo" track pressed as selected. */
+function selectedClips(): string[] {
+  return within(screen.getByRole("region", { name: "Timeline" }))
+    .queryAllByRole("button", { name: /^Trecho/, pressed: true })
+    .map((clip) => clip.getAttribute("aria-label") ?? "");
+}
+
+test("selects the segment clicked on the timeline, and only it", async () => {
+  await openCut();
+
+  await userEvent.click(screen.getByRole("button", { name: /^Trecho 2/ }));
+
+  expect(selectedClips()).toEqual([expect.stringMatching(/^Trecho 2/)]);
+});
+
+test("marks only the last segment clicked as selected", async () => {
+  await openCut();
+
+  await userEvent.click(screen.getByRole("button", { name: /^Trecho 2/ }));
+  await userEvent.click(screen.getByRole("button", { name: /^Trecho 3/ }));
+
+  expect(
+    Array.from(document.querySelectorAll(".clip.vid.sel")).map((clip) =>
+      clip.getAttribute("aria-label"),
+    ),
+  ).toEqual([expect.stringMatching(/^Trecho 3/)]);
+});
+
+test("still takes the preview to the point clicked on a segment of the timeline", async () => {
+  await openCut();
+
+  fireEvent.pointerDown(within(timelineOf()).getByRole("button", { name: /^Trecho 3/ }), {
+    clientX: atCut(2.05),
+  });
+
+  const seeks = players.current().seeks;
+  expect(seeks[seeks.length - 1]).toBeCloseTo(live(1.6), 6);
 });

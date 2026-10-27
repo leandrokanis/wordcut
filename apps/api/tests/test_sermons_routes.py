@@ -1,3 +1,5 @@
+import os
+import socket
 from contextlib import closing
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
@@ -6,8 +8,9 @@ from urllib.parse import quote
 import pytest
 from fastapi.testclient import TestClient
 
-from wordcut.db import connect, sermons, transcripts
+from wordcut.db import connect, sermons, tasks, transcripts
 from wordcut.db.sermons import NewSermon
+from wordcut.db.tasks import NewTask
 from wordcut.home import Home
 from wordcut.lock import ProcessingLock
 from wordcut.processing.sentences import Sentence
@@ -87,7 +90,7 @@ def test_creating_a_sermon_answers_201_with_the_sermon_the_cli_shows(
     response = assistant.post("/api/sermons", json={"url": LINK})
 
     with closing(connect(home)) as connection:
-        again = create_sermon(connection, live, LINK)
+        again = create_sermon(connection, live, LINK, home=home)
     assert (response.status_code, response.json()) == (201, {**again, "created": True})
 
 
@@ -327,6 +330,17 @@ def test_the_video_of_a_processed_sermon_downloads_with_the_readable_name(
     )
 
 
+def test_the_video_of_a_processed_sermon_downloads_even_with_the_lock_held(
+    assistant: TestClient, home: Home, lock_owner: Any
+) -> None:
+    sermon_id = processed_sermon(home)
+    lock_owner("process", "sermon 99")
+
+    response = assistant.get(f"/api/sermons/{sermon_id}/video")
+
+    assert (response.status_code, response.content) == (200, VIDEO)
+
+
 def test_the_video_of_a_sermon_not_processed_is_refused(
     assistant: TestClient, live: FakeLive
 ) -> None:
@@ -351,6 +365,7 @@ def test_processing_answers_202_with_the_launched_task_and_the_sermon_is_process
     assistant: TestClient, live: FakeLive, harmless_tasks: list[Any]
 ) -> None:
     sermon_id = trimmed_sermon(assistant)
+    preparing = len(harmless_tasks)
 
     response = assistant.post(f"/api/sermons/{sermon_id}/process")
 
@@ -359,7 +374,7 @@ def test_processing_answers_202_with_the_launched_task_and_the_sermon_is_process
     assert (
         response.status_code,
         task,
-        len(harmless_tasks),
+        len(harmless_tasks) - preparing,
         shown["status"],
         shown["last_task"]["id"],
     ) == (
@@ -396,13 +411,14 @@ def test_processing_a_sermon_without_borders_is_refused(
     assistant: TestClient, live: FakeLive, harmless_tasks: list[Any]
 ) -> None:
     created = assistant.post("/api/sermons", json={"url": LINK}).json()
+    preparing = len(harmless_tasks)
 
     response = assistant.post(f"/api/sermons/{created['id']}/process")
 
-    assert (response.status_code, response.json()["error"]["code"], harmless_tasks) == (
+    assert (response.status_code, response.json()["error"]["code"], len(harmless_tasks)) == (
         409,
         "sermon_not_trimmed",
-        [],
+        preparing,
     )
 
 
@@ -411,13 +427,14 @@ def test_processing_while_the_live_is_still_on_air_is_refused(
 ) -> None:
     live.info_answer = LiveInfo("Culto ao vivo", date(2026, 10, 25), 7200.0, "is_live")
     sermon_id = trimmed_sermon(assistant)
+    preparing = len(harmless_tasks)
 
     response = assistant.post(f"/api/sermons/{sermon_id}/process")
 
-    assert (response.status_code, response.json()["error"]["code"], harmless_tasks) == (
+    assert (response.status_code, response.json()["error"]["code"], len(harmless_tasks)) == (
         409,
         "live_not_finished",
-        [],
+        preparing,
     )
 
 
@@ -425,6 +442,7 @@ def test_processing_while_the_machine_is_busy_records_no_task(
     assistant: TestClient, live: FakeLive, home: Home, lock_owner: Any, harmless_tasks: list[Any]
 ) -> None:
     sermon_id = trimmed_sermon(assistant)
+    preparing = len(harmless_tasks)
     lock_owner("process", "sermon 99")
 
     response = assistant.post(f"/api/sermons/{sermon_id}/process")
@@ -434,9 +452,9 @@ def test_processing_while_the_machine_is_busy_records_no_task(
         response.status_code,
         error["code"],
         error["details"]["resource"],
-        list_tasks(home),
-        harmless_tasks,
-    ) == (409, "busy", "sermon 99", {"items": []}, [])
+        list_tasks(home, kind="process"),
+        len(harmless_tasks),
+    ) == (409, "busy", "sermon 99", {"items": []}, preparing)
 
 
 def test_processing_while_another_processing_runs_is_busy_naming_that_task(
@@ -445,6 +463,7 @@ def test_processing_while_another_processing_runs_is_busy_naming_that_task(
     first = assistant.post(f"/api/sermons/{trimmed_sermon(assistant)}/process").json()
     other = assistant.post("/api/sermons", json={"url": OTHER_LINK}).json()
     assistant.patch(f"/api/sermons/{other['id']}", json={"start": 1000, "end": 1100})
+    launched = len(harmless_tasks)
 
     response = assistant.post(f"/api/sermons/{other['id']}/process")
 
@@ -453,9 +472,9 @@ def test_processing_while_another_processing_runs_is_busy_naming_that_task(
         response.status_code,
         error["code"],
         error["details"]["task_id"],
-        len(list_tasks(home)["items"]),
+        len(list_tasks(home, kind="process")["items"]),
         len(harmless_tasks),
-    ) == (409, "busy", first["task_id"], 1, 1)
+    ) == (409, "busy", first["task_id"], 1, launched)
 
 
 # Fictitious; while the suite runs, the real LLM refuses to be built (ADR-0017).
@@ -528,13 +547,14 @@ def test_a_suggestion_for_a_sermon_not_processed_is_refused(
 ) -> None:
     configure_llm(home)
     created = admin.post("/api/sermons", json={"url": LINK}).json()
+    preparing = len(harmless_tasks)
 
     response = admin.post(f"/api/sermons/{created['id']}/suggest")
 
-    assert (response.status_code, response.json()["error"]["code"], harmless_tasks) == (
+    assert (response.status_code, response.json()["error"]["code"], len(harmless_tasks)) == (
         409,
         "sermon_not_processed",
-        [],
+        preparing,
     )
 
 
@@ -564,3 +584,76 @@ def test_the_task_a_processing_launched_is_found_among_the_tasks(
         "running",
         launched["sermon_id"],
     )
+
+
+def test_show_list_and_trim_tell_whether_the_borders_changed_since_processing(
+    assistant: TestClient, home: Home
+) -> None:
+    sermon_id = processed_sermon(home)
+
+    changed = assistant.patch(f"/api/sermons/{sermon_id}", json={"start": 990, "end": 1110})
+    shown = assistant.get(f"/api/sermons/{sermon_id}").json()
+    listed = assistant.get("/api/sermons").json()["items"]
+    put_back = assistant.patch(f"/api/sermons/{sermon_id}", json={"start": 1000, "end": 1100})
+
+    assert (
+        changed.json()["borders_changed"],
+        shown["borders_changed"],
+        [item["borders_changed"] for item in listed],
+        put_back.json()["borders_changed"],
+    ) == (True, True, [True], False)
+
+
+def test_an_admin_deletes_a_sermon_with_its_media_and_then_it_is_not_found(
+    admin: TestClient, home: Home
+) -> None:
+    sermon_id = processed_sermon(home)
+
+    deleted = admin.delete(f"/api/sermons/{sermon_id}")
+    shown = admin.get(f"/api/sermons/{sermon_id}")
+
+    assert (
+        deleted.status_code,
+        deleted.json(),
+        shown.status_code,
+        home.sermon_media(sermon_id).exists(),
+    ) == (200, {"id": sermon_id, "deleted": True}, 404, False)
+
+
+def test_an_assistant_is_forbidden_to_delete_a_sermon_and_it_stays(
+    assistant: TestClient, home: Home
+) -> None:
+    sermon_id = processed_sermon(home)
+
+    answer = assistant.delete(f"/api/sermons/{sermon_id}")
+
+    assert (
+        answer.status_code,
+        answer.json()["error"]["code"],
+        assistant.get(f"/api/sermons/{sermon_id}").status_code,
+        home.sermon_media(sermon_id).is_dir(),
+    ) == (403, "forbidden", 200, True)
+
+
+def test_deleting_a_missing_sermon_is_not_found(admin: TestClient) -> None:
+    answer = admin.delete("/api/sermons/99")
+
+    assert (answer.status_code, answer.json()["error"]["code"]) == (404, "not_found")
+
+
+def test_deleting_a_sermon_with_a_task_running_is_busy_and_keeps_it(
+    admin: TestClient, home: Home
+) -> None:
+    sermon_id = processed_sermon(home)
+    new = NewTask("suggest", "sermon", sermon_id, {}, os.getpid(), socket.gethostname(), NOW)
+    with closing(connect(home)) as connection:
+        task_id = tasks.insert(connection, new).id
+
+    answer = admin.delete(f"/api/sermons/{sermon_id}")
+
+    assert (
+        answer.status_code,
+        answer.json()["error"]["code"],
+        answer.json()["error"]["details"]["task_id"],
+        admin.get(f"/api/sermons/{sermon_id}").status_code,
+    ) == (409, "busy", task_id, 200)

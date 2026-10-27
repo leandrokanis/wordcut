@@ -1,24 +1,29 @@
-"""Sermons: create one from the live's link, list, show and trim them, and find the video
-to download (docs/cli.md §7.1-§7.3, §7.5)."""
+"""Sermons: create one from the live's link, list, show and trim them, prepare the media of
+their timeline, find the video to download and delete them (docs/cli.md §7.1-§7.3, §7.5,
+§7.7, §7.8)."""
 
 from __future__ import annotations
 
 import sqlite3
+from contextlib import closing
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from wordcut.db import cuts, sermons, tasks, transcripts
+from wordcut.db import connect, cuts, sermons, tasks, transcripts
+from wordcut.db import timeline_media as timelines
 from wordcut.db.cuts import CutRow
 from wordcut.db.sermons import NewSermon, SermonRow, SuggestionError
+from wordcut.db.tasks import TaskRow
 from wordcut.db.transcripts import SentenceRow
 from wordcut.errors import WordcutError
-from wordcut.files import folder_name
+from wordcut.files import folder_name, remove_within
 from wordcut.home import Home
 from wordcut.lock import ProcessingLock
-from wordcut.service.tasks import reconcile, shown_task
-from wordcut.tasks import Resource
+from wordcut.service.media_files import sermon_files
+from wordcut.service.tasks import busy, reconcile, running_task, running_tasks, shown_task
+from wordcut.tasks import ProgressListener, Resource, execution
 from wordcut.youtube import LiveInfo, LiveSource, YouTubeError, video_id
 
 # docs/cli.md §7; the CHECK of migration 0002 lists the same states.
@@ -30,6 +35,14 @@ MIN_SERMON_SECONDS = 60
 # Borders are kept to the millisecond, the precision of HH:MM:SS.mmm (docs/cli.md §2).
 MILLISECOND_DIGITS = 3
 
+# The task that prepares the thumbnails and waveform of the timeline (1.1.b.1).
+PREPARE_KIND = "prepare"
+# A sermon whose preparation neither runs nor ended: created before 1.1.b.1, or its task died.
+NOT_PREPARED = {
+    "code": "interrupted",
+    "message": "A preparação da timeline não terminou; tente de novo.",
+}
+
 # Start and end of the sermon, in seconds of the live.
 Borders = tuple[float, float]
 
@@ -40,15 +53,17 @@ def create_sermon(
     url: str,
     now: datetime | None = None,
     *,
+    home: Home,
     start: float | None = None,
     end: float | None = None,
 ) -> dict[str, Any]:
     """Create the sermon of the video ``url`` points to; ``now`` defaults to the clock.
 
-    The same video again returns the existing sermon with ``created: false`` and without
-    asking YouTube. With ``start`` and ``end`` (both or neither), the new or existing
-    sermon is trimmed as ``trim_sermon`` does, and the answer carries its
-    ``needs_reprocess``.
+    A new sermon has the media of its timeline prepared by a detached ``prepare`` task
+    (``prepare_sermon_timeline``). The same video again returns the existing sermon with
+    ``created: false``, without asking YouTube nor preparing again. With ``start`` and ``end``
+    (both or neither), the new or existing sermon is trimmed as ``trim_sermon`` does, and the
+    answer carries its ``needs_reprocess``.
     """
     borders = _requested_borders(start, end)
     moment = now or datetime.now().astimezone()
@@ -58,6 +73,8 @@ def create_sermon(
         row, created = _inserted(connection, live, youtube_id, url, moment, borders)
     else:
         row, created = existing, False
+    if created:
+        _launch_preparation(home, row.id)
     if borders is None:
         return _created(row, created=created)
     trimmed = _record_range(connection, row, *borders, moment)
@@ -97,6 +114,62 @@ def _inserted(
         if winner is None:
             raise
         return winner, False
+
+
+def _launch_preparation(home: Home, sermon_id: int) -> None:
+    """Start preparing the new sermon's timeline; a launch that fails leaves the sermon
+    created, its timeline shown as not prepared, to be prepared again."""
+    try:
+        prepare_sermon_timeline(home, sermon_id, detach=True)
+    except (OSError, WordcutError):
+        return
+
+
+def prepare_sermon_timeline(
+    home: Home,
+    sermon_id: int,
+    *,
+    detach: bool,
+    on_progress: ProgressListener | None = None,
+) -> TaskRow:
+    """Start the ``prepare`` task of the sermon, as ``tasks.execution.start`` does.
+
+    It runs whatever the state of the timeline, ready included, and without the processing
+    lock. A sermon that does not exist is refused before any task is recorded, and so is a
+    second preparation of the sermon while one runs (``busy``). That check and the record
+    are not atomic: two launches at the same instant may both pass.
+    """
+    with closing(connect(home)) as connection:
+        existing_sermon(connection, sermon_id)
+
+    def admit() -> None:
+        with closing(connect(home)) as connection:
+            _refuse_while_preparing(home, connection, sermon_id)
+            timelines.record(connection, sermon_id, "pending", datetime.now().astimezone())
+
+    return execution.start(
+        home,
+        PREPARE_KIND,
+        Resource("sermon", sermon_id),
+        {},
+        detach=detach,
+        on_progress=on_progress,
+        admit=admit,
+    )
+
+
+def _refuse_while_preparing(home: Home, connection: sqlite3.Connection, sermon_id: int) -> None:
+    running = running_task(home, connection, "sermon", sermon_id, PREPARE_KIND)
+    if running is not None:
+        raise WordcutError(
+            "busy",
+            f"A timeline da pregação {sermon_id} já está sendo preparada (tarefa {running.id}).",
+            {
+                "task_id": running.id,
+                "kind": running.kind,
+                "started_at": running.started_at.isoformat(),
+            },
+        )
 
 
 def _created(row: SermonRow, *, created: bool) -> dict[str, Any]:
@@ -139,6 +212,7 @@ def show_sermon(
     With ``transcript``, also its ``sentences`` in order, in sermon time.
     """
     row = _reconciled(home, connection, existing_sermon(connection, sermon_id))
+    reconcile(home, connection, tasks.of_resource(connection, "sermon", sermon_id))
     shown = _shown(connection, row)
     if transcript:
         shown["sentences"] = [
@@ -227,9 +301,14 @@ def _is_being_processed(home: Home, connection: sqlite3.Connection, sermon_id: i
         return True
     found = tasks.of_resource(connection, "sermon", sermon_id)
     reconcile(home, connection, found)
-    return any(
-        task.status == "running" for task in tasks.of_resource(connection, "sermon", sermon_id)
-    )
+    return any(task.status == "running" for task in _processing_tasks(connection, sermon_id))
+
+
+def _processing_tasks(connection: sqlite3.Connection, sermon_id: int) -> list[TaskRow]:
+    """The sermon's tasks, newest first, but those preparing its timeline, which run beside
+    the processing and are shown apart, in ``timeline``."""
+    found = tasks.of_resource(connection, "sermon", sermon_id)
+    return [task for task in found if task.kind != PREPARE_KIND]
 
 
 def existing_sermon(connection: sqlite3.Connection, sermon_id: int) -> SermonRow:
@@ -240,6 +319,43 @@ def existing_sermon(connection: sqlite3.Connection, sermon_id: int) -> SermonRow
             "not_found", f"Pregação {sermon_id} não existe.", {"sermon_id": sermon_id}
         )
     return row
+
+
+def delete_sermon(home: Home, connection: sqlite3.Connection, sermon_id: int) -> dict[str, Any]:
+    """Delete the sermon with its cuts, their exports and spelling fixes, its transcript and
+    the tasks of the sermon and of its cuts, then, once that is committed, their files in
+    ``home``: the sermon's media folder, the cuts' folders and the tasks' logs
+    (docs/cli.md §7.8)."""
+    row = existing_sermon(connection, sermon_id)
+    cut_ids = [cut.id for cut in cuts.of_sermon(connection, row.id)]
+    _refuse_while_running(home, connection, row.id, cut_ids)
+    files = sermon_files(home, connection, row.id)
+    with connection:
+        tasks.delete_of_resource(connection, "sermon", row.id)
+        for cut_id in cut_ids:
+            tasks.delete_of_resource(connection, "cut", cut_id)
+        sermons.delete(connection, row.id)
+    remove_within(home.root, files)
+    return {"id": row.id, "deleted": True}
+
+
+def _refuse_while_running(
+    home: Home, connection: sqlite3.Connection, sermon_id: int, cut_ids: list[int]
+) -> None:
+    """``busy`` while a task of the sermon or an export of one of its cuts runs. The check
+    and the delete are not atomic: a task launched at the same instant may pass."""
+    for task in running_tasks(home, connection, "sermon", sermon_id):
+        raise busy(
+            f"A pregação {sermon_id} tem uma tarefa {task.kind} em andamento (tarefa {task.id}).",
+            task,
+        )
+    for cut_id in cut_ids:
+        for task in running_tasks(home, connection, "cut", cut_id):
+            raise busy(
+                f"O corte {cut_id} da pregação {sermon_id} está sendo exportado"
+                f" (tarefa {task.id}).",
+                task,
+            )
 
 
 def trim_sermon(
@@ -316,6 +432,7 @@ def _shown(connection: sqlite3.Connection, row: SermonRow) -> dict[str, Any]:
         "last_task": _last_task(connection, row.id),
         "cuts": [shown_cut(cut) for cut in cuts.of_sermon(connection, row.id)],
         "suggestion_error": _suggestion_error(row.suggestion_error),
+        "timeline": _timeline(connection, row.id),
     }
 
 
@@ -341,16 +458,46 @@ def shown_cut(row: CutRow) -> dict[str, Any]:
 
 
 def _last_task(connection: sqlite3.Connection, sermon_id: int) -> dict[str, Any] | None:
-    found = tasks.of_resource(connection, "sermon", sermon_id)
+    found = _processing_tasks(connection, sermon_id)
     return shown_task(found[0]) if found else None
+
+
+def _timeline(connection: sqlite3.Connection, sermon_id: int) -> dict[str, Any]:
+    """The state of the preparation of the timeline's media and the task that runs it."""
+    running = next(
+        (
+            task
+            for task in tasks.of_resource(connection, "sermon", sermon_id)
+            if task.kind == PREPARE_KIND and task.status == "running"
+        ),
+        None,
+    )
+    if running is not None:
+        return {"status": "pending", "error": None, "task_id": running.id}
+    row = timelines.of_sermon(connection, sermon_id)
+    if row is None or row.status == "pending":
+        return {"status": "failed", "error": NOT_PREPARED, "task_id": None}
+    error = None if row.error is None else {"code": row.error.code, "message": row.error.message}
+    return {"status": row.status, "error": error, "task_id": None}
 
 
 def _listed(connection: sqlite3.Connection, row: SermonRow) -> dict[str, Any]:
     return {
         **_sermon(row),
         "duration": _sermon_duration(row),
+        "borders_changed": _borders_changed(row),
         "cut_counts": {**dict.fromkeys(CUT_STATES, 0), **cuts.counts_of(connection, row.id)},
     }
+
+
+def _borders_changed(row: SermonRow) -> bool:
+    """True when the sermon is processed and its borders differ from the processed ones.
+
+    Borders are kept to the millisecond, so plain equality compares them at that precision.
+    """
+    current = (row.live_start, row.live_end)
+    processed = (row.processed_live_start, row.processed_live_end)
+    return row.status == "processed" and current != processed
 
 
 def _sermon_duration(row: SermonRow) -> float | None:

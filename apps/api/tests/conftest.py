@@ -24,6 +24,7 @@ from wordcut.db.cuts import NewCut, Segment
 from wordcut.db.renders import NewRender
 from wordcut.db.sermons import NewSermon
 from wordcut.home import Home
+from wordcut.processing.sentences import split_sentences
 from wordcut.service.members import add_member
 from wordcut.transcript import Word
 from wordcut.youtube import LiveInfo
@@ -172,8 +173,8 @@ def home(wordcut_home: Path) -> Home:
 
 @pytest.fixture
 def processed_sermon_id(home: Home) -> int:
-    """A sermon of 2026-10-18, processed, whose transcript says ``SPOKEN`` and whose 16:9
-    video is in the data folder."""
+    """A sermon of 2026-10-18, processed, whose transcript says ``SPOKEN`` in one sentence and
+    whose 16:9 video is in the data folder."""
     with closing(connect(home)) as connection, connection:
         sermon = sermons.insert(
             connection,
@@ -187,7 +188,7 @@ def processed_sermon_id(home: Home) -> int:
                 created_at=NOW,
             ),
         )
-        transcripts.replace(connection, sermon.id, SPOKEN, ())
+        transcripts.replace(connection, sermon.id, SPOKEN, split_sentences(SPOKEN))
         video = home.sermon_media(sermon.id) / "sermon.mp4"
         sermons.record_processed(
             connection, sermon.id, 1000.0, 1100.0, str(video.relative_to(home.root)), NOW

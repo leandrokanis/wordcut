@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from "react";
 
+import { sermonVideoUrl } from "../../api/client";
 import { PlayerFactoryContext, type PlayerLike } from "../sermon/Player";
 import { cutTimeOf, next, pointAt, toLive, toSermon, type Span } from "./sequence";
 
@@ -106,7 +107,7 @@ export const CutPreview = forwardRef<CutPreviewHandle, CutPreviewProps>(function
         <div className="frame v">
           <video
             ref={video}
-            src={`/api/sermons/${sermonId}/video`}
+            src={sermonVideoUrl(sermonId)}
             aria-label="Prévia do corte"
             preload="metadata"
             playsInline

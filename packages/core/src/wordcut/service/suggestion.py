@@ -6,13 +6,13 @@ import sqlite3
 from contextlib import closing
 
 from wordcut import suggestion
-from wordcut.db import connect, tasks
+from wordcut.db import connect
 from wordcut.db.tasks import TaskRow
 from wordcut.errors import WordcutError
 from wordcut.home import Home
 from wordcut.service.presets import default_preset, show_preset
 from wordcut.service.sermons import processed_row
-from wordcut.service.tasks import reconcile
+from wordcut.service.tasks import running_task
 from wordcut.tasks import ProgressListener, Resource, execution
 
 
@@ -58,11 +58,7 @@ def start_suggestion(
 
 def _refuse_while_suggesting(home: Home, connection: sqlite3.Connection, sermon_id: int) -> None:
     """``busy`` while another ``suggest`` task of the sermon runs, once orphans are failed."""
-    reconcile(home, connection, tasks.of_resource(connection, "sermon", sermon_id))
-    found = tasks.of_resource(connection, "sermon", sermon_id)
-    running = next(
-        (task for task in found if task.kind == "suggest" and task.status == "running"), None
-    )
+    running = running_task(home, connection, "sermon", sermon_id, "suggest")
     if running is not None:
         raise WordcutError(
             "busy",

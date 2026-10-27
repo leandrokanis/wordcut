@@ -1,5 +1,6 @@
-"""Cuts: list, show and preview them, choose, discard or restore them, fix the spelling of
-their words and set their caption style (docs/api.md)."""
+"""Cuts: list, show and preview them, create one, choose, discard or restore them, fix the
+spelling of their words, set what they play, resize or move their range, set their caption
+style and delete them (docs/api.md)."""
 
 from __future__ import annotations
 
@@ -8,24 +9,30 @@ from collections.abc import Callable
 from contextlib import closing
 from typing import Any, Literal
 
-from fastapi import APIRouter
-from pydantic import StrictBool, StrictInt
+from fastapi import APIRouter, Depends
+from pydantic import StrictBool, StrictFloat, StrictInt
 
 from wordcut import db
 from wordcut.errors import WordcutError
 from wordcut.service.cuts import (
     caption_of,
     choose_cut,
+    create_cut,
+    delete_cut,
     discard_cut,
     fix_word,
     list_cuts,
+    move_range,
     preview_cut,
     reset_caption,
     restore_cut,
+    set_range,
+    set_segments,
     show_cut,
     update_caption,
 )
 from wordcut_api import deps
+from wordcut_api.auth import require
 from wordcut_api.bodies import Body, Changes
 
 router = APIRouter(prefix="/api")
@@ -34,10 +41,40 @@ router = APIRouter(prefix="/api")
 CutState = Literal["suggested", "chosen", "discarded"]
 
 
+class NewCutRange(Body):
+    """The range of a new cut in sermon time and, optionally, its title (docs/cli.md §8.8)."""
+
+    start: StrictFloat | StrictInt
+    end: StrictFloat | StrictInt
+    title: str | None = None
+
+
 class FixedWord(Body):
     """The word with its spelling fixed (docs/cli.md §8.5)."""
 
     text: str
+
+
+class WordRange(Body):
+    """Words ``from_word`` to ``to_word`` of the sermon, by word ID (docs/cli.md §8.10)."""
+
+    from_word: StrictInt
+    to_word: StrictInt
+
+
+class Segments(Body):
+    """What the cut plays, in the order it plays it (docs/cli.md §8.10)."""
+
+    segments: list[WordRange]
+
+
+class RangeChange(Changes):
+    """The new borders of the cut's range, either or both, or the shift of the whole range in
+    seconds, never both (docs/cli.md §8.9)."""
+
+    start: StrictFloat | StrictInt | None = None
+    end: StrictFloat | StrictInt | None = None
+    by: StrictFloat | StrictInt | None = None
 
 
 class CaptionChanges(Changes):
@@ -61,11 +98,26 @@ def listing(sermon_id: int, status: CutState | None = None) -> dict[str, Any]:
         return list_cuts(connection, sermon_id, status)
 
 
+@router.post("/sermons/{sermon_id}/cuts", status_code=201, dependencies=[Depends(require("admin"))])
+def create(sermon_id: int, body: NewCutRange) -> dict[str, Any]:
+    with closing(db.connect(deps.home())) as connection:
+        return without_paths(create_cut(connection, sermon_id, body.start, body.end, body.title))
+
+
 @router.get("/cuts/{cut_id}")
 def show(cut_id: int) -> dict[str, Any]:
     home = deps.home()
     with closing(db.connect(home)) as connection:
         return without_paths(show_cut(connection, cut_id, home=home))
+
+
+@router.delete("/cuts/{cut_id}", dependencies=[Depends(require("admin"))])
+def delete(cut_id: int) -> dict[str, Any]:
+    """``{"id", "deleted": true}``, as ``DELETE /api/presets/{id}``; ``busy`` while the cut is
+    exported or its sermon processed or suggested."""
+    home = deps.home()
+    with closing(db.connect(home)) as connection:
+        return delete_cut(home, connection, cut_id)
 
 
 @router.get("/cuts/{cut_id}/preview")
@@ -102,6 +154,29 @@ def _transition(
 def fix(cut_id: int, word_id: int, body: FixedWord) -> dict[str, Any]:
     with closing(db.connect(deps.home())) as connection:
         return fix_word(connection, cut_id, word_id, body.text)
+
+
+@router.put("/cuts/{cut_id}/segments", dependencies=[Depends(require("admin"))])
+def change_segments(cut_id: int, body: Segments) -> dict[str, Any]:
+    wanted = [segment.model_dump() for segment in body.segments]
+    with closing(db.connect(deps.home())) as connection:
+        return without_paths(set_segments(connection, cut_id, wanted))
+
+
+@router.patch("/cuts/{cut_id}/range", dependencies=[Depends(require("admin"))])
+def change_range(cut_id: int, body: RangeChange) -> dict[str, Any]:
+    """The cut once ``{start, end}`` resizes its range or ``{by}`` moves it."""
+    given = body.given()
+    if "by" in given and len(given) > 1:
+        raise WordcutError(
+            "invalid_argument",
+            "Use start e end para redimensionar ou by para mover, não os dois.",
+            {"argument": "by"},
+        )
+    with closing(db.connect(deps.home())) as connection:
+        if "by" in given:
+            return without_paths(move_range(connection, cut_id, given["by"]))
+        return without_paths(set_range(connection, cut_id, given.get("start"), given.get("end")))
 
 
 @router.get("/cuts/{cut_id}/caption")

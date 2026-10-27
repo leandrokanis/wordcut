@@ -13,6 +13,7 @@ from wordcut import processing
 from wordcut.db import connect
 from wordcut.errors import WordcutError
 from wordcut.home import Home
+from wordcut.processing import OnProgress
 from wordcut.service.processing import start_processing
 from wordcut.service.sermons import create_sermon, list_sermons, show_sermon, trim_sermon
 from wordcut.service.tasks import list_tasks, show_task
@@ -60,17 +61,21 @@ class FakeGateways:
         self.while_transcribing: Callable[[], None] = lambda: None
         self.downloads: list[tuple[float, float]] = []
 
-    def download_section(self, url: str, start: float, end: float, output: Path) -> Path:
+    def download_section(
+        self, url: str, start: float, end: float, output: Path, *, on_progress: OnProgress
+    ) -> Path:
         self.downloads.append((start, end))
         return output
 
-    def download_audio_window(self, url: str, start: float, end: float, output: Path) -> Path:
+    def download_audio_window(
+        self, url: str, start: float, end: float, output: Path, *, on_progress: OnProgress
+    ) -> Path:
         return output
 
     def locate(self, recording: Path, clip: Path, expected_start: float, search: float) -> float:
         return SECTION_START - (LIVE_START - 50)
 
-    def transcribe(self, media: Path, workdir: Path) -> Transcript:
+    def transcribe(self, media: Path, workdir: Path, *, on_progress: OnProgress) -> Transcript:
         self.while_transcribing()
         words = tuple(word.shifted(-SECTION_START) for word in self.live_words)
         return Transcript(words=words, language="pt", model="fake")
@@ -104,7 +109,7 @@ def opened(home: Home) -> Iterator[Any]:
 def trimmed_sermon(home: Home, live: FakeLive | None = None) -> int:
     with closing(connect(home)) as connection:
         created = create_sermon(
-            connection, live or FakeLive(), LINK, start=LIVE_START, end=LIVE_END
+            connection, live or FakeLive(), LINK, home=home, start=LIVE_START, end=LIVE_END
         )
     sermon_id: int = created["id"]
     return sermon_id
@@ -198,12 +203,14 @@ def test_a_detached_processing_answers_at_once_with_the_sermon_already_processin
 
 
 class RefusingYouTube(FakeGateways):
-    def download_section(self, url: str, start: float, end: float, output: Path) -> Path:
+    def download_section(
+        self, url: str, start: float, end: float, output: Path, *, on_progress: OnProgress
+    ) -> Path:
         raise YouTubeError("O YouTube recusou o pedido.")
 
 
 class MissingWhisperX(FakeGateways):
-    def transcribe(self, media: Path, workdir: Path) -> Transcript:
+    def transcribe(self, media: Path, workdir: Path, *, on_progress: OnProgress) -> Transcript:
         raise FileNotFoundError("ambiente do WhisperX não encontrado")
 
 
@@ -233,7 +240,7 @@ def test_a_failure_leaves_the_task_and_the_sermon_failed_with_its_error(
     with pytest.raises(WordcutError) as raised:
         process(home, sermon_id)
 
-    [task] = list_tasks(home)["items"]
+    [task] = list_tasks(home, kind="process")["items"]
     assert (
         raised.value.code,
         raised.value.exit_code,
@@ -274,7 +281,7 @@ def test_a_sermon_whose_detached_processing_failed_can_be_trimmed_again_at_once(
 
 def untrimmed_sermon(home: Home) -> int:
     with closing(connect(home)) as connection:
-        sermon_id: int = create_sermon(connection, FakeLive(), LINK)["id"]
+        sermon_id: int = create_sermon(connection, FakeLive(), LINK, home=home)["id"]
     return sermon_id
 
 
@@ -289,7 +296,8 @@ def processed_sermon(home: Home) -> int:
 
 
 def task_count(home: Home) -> int:
-    return len(list_tasks(home)["items"])
+    """The processing tasks; creating a sermon also starts preparing its timeline."""
+    return len(list_tasks(home, kind="process")["items"])
 
 
 @pytest.mark.parametrize(
@@ -428,11 +436,13 @@ class FailingOnce(FakeGateways):
         super().__init__()
         self.failures = 1
 
-    def download_section(self, url: str, start: float, end: float, output: Path) -> Path:
+    def download_section(
+        self, url: str, start: float, end: float, output: Path, *, on_progress: OnProgress
+    ) -> Path:
         if self.failures:
             self.failures -= 1
             raise YouTubeError("O YouTube recusou o pedido.")
-        return super().download_section(url, start, end, output)
+        return super().download_section(url, start, end, output, on_progress=on_progress)
 
 
 def test_a_failed_sermon_is_processed_again_by_the_same_operation(
@@ -452,9 +462,11 @@ def test_a_failed_sermon_is_processed_again_by_the_same_operation(
 class YtDlpLike(FakeGateways):
     """Keeps a file it finds already downloaded, as yt-dlp does."""
 
-    def download_section(self, url: str, start: float, end: float, output: Path) -> Path:
+    def download_section(
+        self, url: str, start: float, end: float, output: Path, *, on_progress: OnProgress
+    ) -> Path:
         if not output.exists():
-            super().download_section(url, start, end, output)
+            super().download_section(url, start, end, output, on_progress=on_progress)
         return output
 
 
@@ -507,7 +519,7 @@ def test_a_sermon_whose_task_process_died_is_read_failed_with_its_task_interrupt
 ) -> None:
     sermon_id = trimmed_sermon(home)
     start_processing(home, sermon_id, live=FakeLive(), detach=True)
-    killed(harmless_tasks[0])
+    killed(harmless_tasks[-1])
 
     sermon = shown(home, sermon_id)
 
@@ -523,7 +535,7 @@ def test_listing_processing_sermons_leaves_out_one_whose_task_process_died(
 ) -> None:
     sermon_id = trimmed_sermon(home)
     start_processing(home, sermon_id, live=FakeLive(), detach=True)
-    killed(harmless_tasks[0])
+    killed(harmless_tasks[-1])
 
     with closing(connect(home)) as connection:
         assert list_sermons(connection, "processing", home=home) == {"items": []}

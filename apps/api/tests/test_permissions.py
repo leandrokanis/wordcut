@@ -23,7 +23,8 @@ ASSISTANT = "assistant"
 ADMIN = "admin"
 
 # Feature 1.2.a: an assistant creates, processes, chooses, fixes the form of and exports cuts;
-# suggestions, settings, criteria, presets and the team are the administrator's (ADR-0021).
+# suggestions, settings, criteria, presets and the team are the administrator's (ADR-0021), and
+# so is deleting sermons and cuts (1.2.b.1).
 PERMISSIONS: dict[tuple[str, str], str] = {
     ("GET", "/api/me"): ASSISTANT,
     ("POST", "/api/sermons"): ASSISTANT,
@@ -33,7 +34,13 @@ PERMISSIONS: dict[tuple[str, str], str] = {
     ("GET", "/api/sermons/{sermon_id}/video"): ASSISTANT,
     ("POST", "/api/sermons/{sermon_id}/process"): ASSISTANT,
     ("POST", "/api/sermons/{sermon_id}/suggest"): ADMIN,
+    ("POST", "/api/sermons/{sermon_id}/prepare"): ASSISTANT,
+    ("GET", "/api/sermons/{sermon_id}/thumbnails"): ASSISTANT,
+    ("GET", "/api/sermons/{sermon_id}/thumbnails.json"): ASSISTANT,
+    ("GET", "/api/sermons/{sermon_id}/waveform"): ASSISTANT,
+    ("DELETE", "/api/sermons/{sermon_id}"): ADMIN,
     ("GET", "/api/sermons/{sermon_id}/cuts"): ASSISTANT,
+    ("POST", "/api/sermons/{sermon_id}/cuts"): ADMIN,
     ("GET", "/api/tasks"): ASSISTANT,
     ("GET", "/api/tasks/{task_id}"): ASSISTANT,
     ("GET", "/api/tasks/{task_id}/events"): ASSISTANT,
@@ -44,6 +51,9 @@ PERMISSIONS: dict[tuple[str, str], str] = {
     ("POST", "/api/cuts/{cut_id}/discard"): ASSISTANT,
     ("POST", "/api/cuts/{cut_id}/restore"): ASSISTANT,
     ("PUT", "/api/cuts/{cut_id}/words/{word_id}"): ASSISTANT,
+    ("PUT", "/api/cuts/{cut_id}/segments"): ADMIN,
+    ("PATCH", "/api/cuts/{cut_id}/range"): ADMIN,
+    ("DELETE", "/api/cuts/{cut_id}"): ADMIN,
     ("GET", "/api/cuts/{cut_id}/caption"): ASSISTANT,
     ("PATCH", "/api/cuts/{cut_id}/caption"): ASSISTANT,
     ("DELETE", "/api/cuts/{cut_id}/caption"): ASSISTANT,
@@ -76,6 +86,8 @@ FAKE_KEY = "sk-or-v1-ficticia-permissoes-0123456789abcdef-WXYZ"
 FAKE_COOKIES = ".youtube.com\tTRUE\t/\tTRUE\t1893456000\tSID-FICTICIO\tvalor-ficticio-perm\n"
 # Valid bodies that would change something, were the role allowed to.
 CHANGING_BODIES: dict[tuple[str, str], dict[str, Any]] = {
+    ("POST", "/api/sermons/{sermon_id}/cuts"): {"start": 0, "end": 30},
+    ("PATCH", "/api/cuts/{cut_id}/range"): {"by": 5},
     ("PATCH", "/api/settings"): {"llm_model": "provedor/modelo-de-teste"},
     ("PUT", "/api/settings/llm-key"): {"value": FAKE_KEY},
     ("PUT", "/api/settings/youtube-cookies"): {"value": FAKE_COOKIES},
@@ -114,12 +126,6 @@ def call(
 
 def test_the_table_has_every_route_of_the_app_and_nothing_more() -> None:
     assert app_routes() == set(PERMISSIONS)
-
-
-def test_there_is_no_route_to_edit_the_content_of_a_cut(assistant: TestClient) -> None:
-    response = assistant.put("/api/cuts/1/segments", json=[])
-
-    assert (response.status_code, response.json()["error"]["code"]) == (404, "not_found")
 
 
 def test_every_route_in_the_table_requires_someone_identified(wordcut_home: Path) -> None:

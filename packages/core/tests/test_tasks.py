@@ -19,7 +19,7 @@ from wordcut.home import Home
 from wordcut.lock import ProcessingLock
 from wordcut.service.tasks import list_tasks, show_task, wait_task
 from wordcut.tasks import Progress, Resource, TaskContext, TaskKind, kind, register
-from wordcut.tasks.execution import start
+from wordcut.tasks.execution import ProgressRecorder, start
 
 SERMON = Resource("sermon", 12)
 
@@ -460,3 +460,56 @@ def test_running_task_whose_process_ended_unreaped_is_shown_failed(
 def zombie_state(pid: int) -> str:
     with open(f"/proc/{pid}/stat") as stat:
         return stat.read().rpartition(")")[2].split()[0]
+
+
+class FakeClock:
+    """Seconds that only move when the test says so."""
+
+    def __init__(self) -> None:
+        self.now = 0.0
+
+    def __call__(self) -> float:
+        return self.now
+
+
+def recorder_heard(wordcut_home: Path, clock: FakeClock) -> tuple[ProgressRecorder, list[float]]:
+    home = Home(wordcut_home)
+    heard: list[float] = []
+    task = recorded_running_task(home, os.getpid())
+    recorder = ProgressRecorder(
+        home, task, lambda progress: heard.append(progress.fraction), clock=clock
+    )
+    return recorder, heard
+
+
+def test_same_message_twice_within_a_second_is_stored_once(wordcut_home: Path) -> None:
+    clock = FakeClock()
+    recorder, heard = recorder_heard(wordcut_home, clock)
+
+    recorder.report(0.1, "baixando")
+    clock.now = 0.9
+    recorder.report(0.2, "baixando")
+
+    assert heard == [0.1]
+
+
+def test_a_new_message_is_stored_even_within_a_second(wordcut_home: Path) -> None:
+    clock = FakeClock()
+    recorder, heard = recorder_heard(wordcut_home, clock)
+
+    recorder.report(0.28, "baixando")
+    clock.now = 0.1
+    recorder.report(0.3, "sincronizando")
+
+    assert heard == [0.28, 0.3]
+
+
+def test_same_message_is_stored_again_once_a_second_has_passed(wordcut_home: Path) -> None:
+    clock = FakeClock()
+    recorder, heard = recorder_heard(wordcut_home, clock)
+
+    recorder.report(0.1, "baixando")
+    clock.now = 1.0
+    recorder.report(0.2, "baixando")
+
+    assert heard == [0.1, 0.2]

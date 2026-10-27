@@ -1,9 +1,11 @@
-import { act, fireEvent, screen, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach } from "vitest";
 
-import type { RecordedCall } from "../../test/fakeApi";
+import { apiError, type RecordedCall } from "../../test/fakeApi";
+import { fakeEventSource } from "../../test/fakeEventSource";
 import { fakePlayers, type FakePlayers } from "../../test/fakePlayers";
-import { shownSermon } from "../../test/fixtures";
+import { runningTask, shownSermon } from "../../test/fixtures";
 import { renderRoute } from "../../test/renderRoute";
 import { fakeShellApi } from "../../test/shellApi";
 
@@ -76,16 +78,44 @@ test("marks the ruler in time of the live, every 15 minutes of a two-hour live",
   ]);
 });
 
-test("draws no thumbnails nor waveform, which the API does not serve", async () => {
-  const timeline = await timelineOf();
+const LAYOUT = { width: 160, height: 90, times: [0, 1770, 3540, 5310] };
+const PEAKS = { buckets: 4, peaks: [0.1, 1, 0.5, 0] };
 
-  expect({
-    images: timeline.querySelectorAll("img, canvas").length,
-    calls: calls.map(({ method, url }) => `${method} ${url}`).sort(),
-  }).toEqual({
-    images: 0,
-    calls: ["GET /api/me", "GET /api/sermons/12", "GET /api/sermons/12", "GET /api/status"],
+/** The timeline of a sermon whose media is prepared, served by the API. */
+async function preparedTimelineOf(sermon = shownSermon({ live_duration: LIVE })) {
+  calls = fakeShellApi({
+    "GET /api/sermons/12": { body: sermon },
+    "GET /api/sermons/12/thumbnails.json": { body: LAYOUT },
+    "GET /api/sermons/12/waveform": { body: PEAKS },
   });
+  players = fakePlayers();
+  renderRoute("/sermons/12", players);
+  return screen.findByRole("region", { name: "Timeline" });
+}
+
+/** The prototype's ``innerBg``: the clip shows only its stretch of the whole live's image, as
+ * the browser writes it back. */
+function innerBackground(start: number, end: number) {
+  return {
+    size: `${(LIVE / (end - start)) * 100}% 100%`,
+    position: `${(start / (LIVE - (end - start))) * 100}% 0px`,
+  };
+}
+
+test("draws the live's thumbnails faded behind the video track and cropped in the clip", async () => {
+  const timeline = await preparedTimelineOf();
+  const track = within(timeline).getByLabelText("Faixa Vídeo");
+
+  await waitFor(() => expect(track.querySelector("[data-faded]")).toHaveStyle({
+    backgroundImage: `url(/api/sermons/12/thumbnails?v=1)`,
+  }));
+  const clip = within(track).getByRole("group", { name: "Pregação na live" });
+  const inner = innerBackground(1800, 4275);
+  expect([clip.style.backgroundImage, clip.style.backgroundSize, clip.style.backgroundPosition]).toEqual([
+    'url("/api/sermons/12/thumbnails?v=1")',
+    inner.size,
+    inner.position,
+  ]);
 });
 
 test("keeps the screen when the live's duration is unknown", async () => {
@@ -111,4 +141,121 @@ test("seeks the player to the time clicked on the ruler", async () => {
   fireEvent.pointerDown(within(timeline).getByLabelText("Régua da live"), { clientX: 250 });
 
   expect(players.current().seeks).toEqual([1770]);
+});
+
+test("draws the live's waveform faded behind the audio track and cropped in the clip", async () => {
+  const timeline = await preparedTimelineOf();
+  const track = within(timeline).getByLabelText("Faixa Áudio");
+  const faded = track.querySelector("[data-faded]") as HTMLElement;
+
+  await waitFor(() => expect(faded.style.backgroundImage).toMatch(/^url\("data:image\/svg\+xml,/));
+  const clip = within(track).getByLabelText("Áudio da pregação");
+  const inner = innerBackground(1800, 4275);
+  expect([clip.style.backgroundImage, clip.style.backgroundSize, clip.style.backgroundPosition]).toEqual([
+    faded.style.backgroundImage,
+    inner.size,
+    inner.position,
+  ]);
+});
+
+test("draws a bar for each peak, as tall as the peak, in time order", async () => {
+  const timeline = await preparedTimelineOf();
+  const faded = within(timeline).getByLabelText("Faixa Áudio").querySelector("[data-faded]");
+
+  await waitFor(() => expect((faded as HTMLElement).style.backgroundImage).not.toBe(""));
+  const svg = decodeURIComponent((faded as HTMLElement).style.backgroundImage);
+  const heights = [...svg.matchAll(/v([\d.]+)h-2z/g)].map(([, height]) => Number(height));
+  expect(heights).toEqual([3.4, 34, 17, 2]);
+});
+
+const PREPARING = { status: "pending", error: null, task_id: 31 } as const;
+
+test("tells the media is being prepared, with plain tracks and the borders still editable", async () => {
+  fakeEventSource();
+  const timeline = await timelineOf(shownSermon({ live_duration: LIVE, timeline: PREPARING }));
+
+  expect({
+    note: within(timeline).queryByText("Preparando a timeline…") !== null,
+    handles: within(timeline).getAllByRole("slider").length,
+    images: [...timeline.querySelectorAll<HTMLElement>("[data-faded]")].map(
+      (faded) => faded.style.backgroundImage,
+    ),
+    media: calls.filter(({ url }) => /thumbnails|waveform/.test(url)).length,
+  }).toEqual({ note: true, handles: 2, images: ["", ""], media: 0 });
+});
+
+test("draws the thumbnails and the waveform once the preparation ends, without reloading", async () => {
+  const events = fakeEventSource();
+  let sermon = shownSermon({ live_duration: LIVE, timeline: PREPARING });
+  calls = fakeShellApi({
+    "GET /api/sermons/12": () => ({ body: sermon }),
+    "GET /api/sermons/12/thumbnails.json": { body: LAYOUT },
+    "GET /api/sermons/12/waveform": { body: PEAKS },
+  });
+  renderRoute("/sermons/12", fakePlayers());
+  const timeline = await screen.findByRole("region", { name: "Timeline" });
+  const [stream] = events.streams();
+
+  sermon = shownSermon({ live_duration: LIVE });
+  act(() => stream.emit("done", runningTask({ id: 31, kind: "prepare", status: "succeeded" })));
+
+  const video = within(timeline).getByLabelText("Faixa Vídeo").querySelector("[data-faded]");
+  await waitFor(() =>
+    expect(video).toHaveStyle({ backgroundImage: "url(/api/sermons/12/thumbnails?v=1)" }),
+  );
+  expect([stream.url, within(timeline).queryByText("Preparando a timeline…")]).toEqual([
+    "/api/tasks/31/events",
+    null,
+  ]);
+});
+
+const FAILED = {
+  status: "failed",
+  error: { code: "youtube_error", message: "Não foi possível preparar." },
+  task_id: null,
+} as const;
+
+test("warns that the media failed and prepares it again on Tentar de novo", async () => {
+  fakeEventSource();
+  calls = fakeShellApi({
+    "GET /api/sermons/12": { body: shownSermon({ live_duration: LIVE, timeline: FAILED }) },
+    "POST /api/sermons/12/prepare": {
+      status: 202,
+      body: { task_id: 32, kind: "prepare", status: "running", sermon_id: 12 },
+    },
+  });
+  renderRoute("/sermons/12", fakePlayers());
+  const timeline = await screen.findByRole("region", { name: "Timeline" });
+  const warning = within(timeline).getByRole("status");
+  const told = warning.textContent;
+
+  await userEvent.click(within(warning).getByRole("button", { name: "Tentar de novo" }));
+
+  expect([
+    told?.startsWith("Miniaturas e forma de onda indisponíveis."),
+    calls.filter(({ method }) => method === "POST").map(({ url }) => url),
+    await within(timeline).findByText("Preparando a timeline…"),
+  ]).toEqual([true, ["/api/sermons/12/prepare"], expect.anything()]);
+});
+
+test("draws only the waveform, without a warning, for a live without thumbnails", async () => {
+  calls = fakeShellApi({
+    "GET /api/sermons/12": { body: shownSermon({ live_duration: LIVE }) },
+    "GET /api/sermons/12/thumbnails.json": apiError(404, "not_found", "Sem miniaturas."),
+    "GET /api/sermons/12/waveform": { body: PEAKS },
+  });
+  renderRoute("/sermons/12", fakePlayers());
+  const timeline = await screen.findByRole("region", { name: "Timeline" });
+  const [video, audio] = [...timeline.querySelectorAll<HTMLElement>("[data-faded]")];
+
+  await waitFor(() => expect(audio.style.backgroundImage).not.toBe(""));
+  expect([video.style.backgroundImage, within(timeline).queryByRole("status")]).toEqual(["", null]);
+});
+
+test("opening a sermon whose media is ready never prepares it again", async () => {
+  const timeline = await preparedTimelineOf();
+  const audio = within(timeline).getByLabelText("Faixa Áudio").querySelector("[data-faded]");
+
+  await waitFor(() => expect((audio as HTMLElement).style.backgroundImage).not.toBe(""));
+  expect(calls.filter(({ method }) => method === "POST")).toEqual([]);
 });

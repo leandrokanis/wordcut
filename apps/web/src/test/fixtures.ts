@@ -9,6 +9,7 @@ import type {
   Me,
   Member,
   Preset,
+  RangeSentence,
   Render,
   RenderOptions,
   SermonCreated,
@@ -33,6 +34,7 @@ export function listedSermon(overrides: Partial<SermonListItem> = {}): SermonLis
     status: "processed",
     created_at: "2026-10-18T21:10:00-03:00",
     duration: 2475,
+    borders_changed: false,
     cut_counts: { suggested: 3, chosen: 1, discarded: 0 },
     ...overrides,
   };
@@ -123,6 +125,7 @@ export function shownSermon(overrides: Partial<SermonShown> = {}): SermonShown {
     last_task: null,
     cuts: [],
     suggestion_error: null,
+    timeline: { status: "ready", error: null, task_id: null },
     ...overrides,
   };
 }
@@ -159,6 +162,8 @@ export function listedCut(overrides: Partial<ListedCut> = {}): ListedCut {
     duration: 58.4,
     start: 620.5,
     end: 678.9,
+    range_start: 620.5,
+    range_end: 678.9,
     segments: [{ from_word: 1201, to_word: 1230 }],
     range_start_word: 1201,
     range_end_word: 1230,
@@ -203,6 +208,23 @@ export function cutWords(): CutWord[] {
   ];
 }
 
+/** The sentences of ``shownCut``'s range: the cut plays all of the first, part of the
+ * second (not word 1104) and none of the third. */
+export function rangeSentences(): RangeSentence[] {
+  const sentence = (
+    id: number,
+    [start, end]: [number, number],
+    text: string,
+    [first_word, last_word]: [number, number],
+    included: RangeSentence["included"],
+  ): RangeSentence => ({ id, start, end, text, first_word, last_word, included });
+  return [
+    sentence(41, [0.3, 1.9], "Irmãos, graça paz.", [1101, 1103], "all"),
+    sentence(42, [2.0, 3.4], "Então Deus governa.", [1104, 1106], "part"),
+    sentence(43, [3.6, 4.2], "Amém, igreja.", [1107, 1108], "none"),
+  ];
+}
+
 /** ``GET /api/cuts/34`` as service/cuts.py ``show_cut`` gives it: the out-of-order example of
  * docs/cli.md §8.3, playing 2.5–3.4, then 0.3–1.2, then 1.35–1.9 of the sermon. */
 export function shownCut(overrides: Partial<Cut> = {}): Cut {
@@ -218,12 +240,13 @@ export function shownCut(overrides: Partial<Cut> = {}): Cut {
       { from_word: 1101, to_word: 1102, start: 0.3, end: 1.2, text: "Irmãos, graça" },
       { from_word: 1103, to_word: 1103, start: 1.35, end: 1.9, text: "paz." },
     ],
+    range_sentences: rangeSentences(),
     words: cutWords(),
     caption: churchCaption(),
     render_options: defaultRenderOptions(),
     renders: [],
     range_start_word: 1101,
-    range_end_word: 1106,
+    range_end_word: 1108,
     source: "llm",
     preset_id: 1,
     edited: false,

@@ -16,7 +16,7 @@ router = APIRouter(prefix="/api/tasks")
 # docs/cli.md §6.1: the choices of ``task list`` (TASK_STATES, TASK_KINDS); the internal
 # ``diagnostic`` kind is not one of them.
 TaskState = Literal["running", "succeeded", "failed"]
-TaskKind = Literal["process", "render", "suggest"]
+TaskKind = Literal["process", "render", "suggest", "prepare"]
 
 
 @router.get("")

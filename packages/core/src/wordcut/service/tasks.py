@@ -19,7 +19,7 @@ from wordcut.tasks.processes import is_running, this_host
 # docs/cli.md §6.1; the CHECK of migration 0003 lists the same states.
 TASK_STATES = ("running", "succeeded", "failed")
 # docs/cli.md §6.1: the kinds commands launch. The internal diagnostic kind is not one of them.
-TASK_KINDS = ("process", "render", "suggest")
+TASK_KINDS = ("process", "render", "suggest", "prepare")
 
 ORPHAN_MESSAGE = "A tarefa foi interrompida: o processo dela terminou antes do fim."
 
@@ -90,6 +90,33 @@ def _found(connection: sqlite3.Connection, task_id: int) -> TaskRow:
     if task is None:
         raise WordcutError("not_found", f"Tarefa {task_id} não existe.", {"task_id": task_id})
     return task
+
+
+def running_task(
+    home: Home, connection: sqlite3.Connection, resource_type: str, resource_id: int, kind: str
+) -> TaskRow | None:
+    """The task of ``kind`` that still runs on the resource, once orphans are failed."""
+    reconcile(home, connection, tasks.of_resource(connection, resource_type, resource_id))
+    found = tasks.of_resource(connection, resource_type, resource_id)
+    return next((task for task in found if task.kind == kind and task.status == "running"), None)
+
+
+def running_tasks(
+    home: Home, connection: sqlite3.Connection, resource_type: str, resource_id: int
+) -> list[TaskRow]:
+    """The tasks that still run on the resource, once orphans are failed."""
+    reconcile(home, connection, tasks.of_resource(connection, resource_type, resource_id))
+    found = tasks.of_resource(connection, resource_type, resource_id)
+    return [task for task in found if task.status == "running"]
+
+
+def busy(message: str, task: TaskRow) -> WordcutError:
+    """``busy`` because of ``task``, which the details name (docs/cli.md §5.3)."""
+    return WordcutError(
+        "busy",
+        message,
+        {"task_id": task.id, "kind": task.kind, "started_at": task.started_at.isoformat()},
+    )
 
 
 def reconcile(home: Home, connection: sqlite3.Connection, found: list[TaskRow]) -> bool:

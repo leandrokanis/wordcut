@@ -18,6 +18,7 @@ from wordcut.db.transcripts import SentenceRow
 from wordcut.errors import WordcutError
 from wordcut.home import Home
 from wordcut.processing.sentences import Sentence
+from wordcut.service.cuts import create_cut, discard_cut, restore_cut
 from wordcut.service.presets import create_preset, default_preset, update_preset
 from wordcut.service.sermons import show_sermon
 from wordcut.service.settings import store_llm_key, update_settings
@@ -525,6 +526,21 @@ def test_a_replacing_suggestion_keeps_the_suggestions_of_another_sermon(
     suggest(connection, sermon_id, default_preset(connection), replace_suggested=True)
 
     assert shown_cuts(connection, other.id) == elsewhere
+
+
+def test_a_replacing_suggestion_keeps_a_cut_the_admin_created_even_discarded_and_restored(
+    connection: sqlite3.Connection, configured: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sermon_id = recorded_processed(connection)
+    created = create_cut(connection, sermon_id, 30.0, 70.0)["id"]
+    discard_cut(connection, created)
+    restore_cut(connection, created)
+    [before] = [cut for cut in shown_cuts(connection, sermon_id) if cut["id"] == created]
+    install(monkeypatch, answer(("Novo", [3, 4, 5, 6, 7, 8])))
+
+    suggest(connection, sermon_id, default_preset(connection), replace_suggested=True)
+
+    assert [cut for cut in shown_cuts(connection, sermon_id) if cut["id"] == created] == [before]
 
 
 def test_a_valid_answer_without_cuts_to_keep_still_replaces_the_unedited_suggestions(

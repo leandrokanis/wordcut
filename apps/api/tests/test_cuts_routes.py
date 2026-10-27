@@ -1,12 +1,19 @@
+import os
+import socket
 from contextlib import closing
+from datetime import date, datetime, timezone
 from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
 
 from wordcut.cuts.caption import DEFAULT_CAPTION
-from wordcut.db import connect
+from wordcut.db import connect, cuts, sermons, tasks, transcripts
+from wordcut.db.cuts import NewCut, Segment
+from wordcut.db.sermons import NewSermon
+from wordcut.db.tasks import NewTask
 from wordcut.home import Home
+from wordcut.processing.sentences import split_sentences
 from wordcut.service.cuts import (
     caption_of,
     fix_word,
@@ -16,6 +23,7 @@ from wordcut.service.cuts import (
     update_caption,
 )
 from wordcut.service.sermons import CUT_STATES
+from wordcut.transcript import Word
 
 
 def test_listing_answers_the_cuts_as_the_cli_lists_them_the_discarded_last(
@@ -432,3 +440,375 @@ def test_the_assistant_changes_a_cut_while_the_machine_is_busy(
     response = assistant.request(method, f"/api/cuts/{cut_id}/{action}", json=body)
 
     assert response.status_code == 200
+
+
+def test_showing_a_cut_gives_the_sentences_of_its_range_with_how_much_it_plays(
+    assistant: TestClient, cut_id: int
+) -> None:
+    response = assistant.get(f"/api/cuts/{cut_id}")
+
+    assert [
+        (sentence["text"], sentence["included"]) for sentence in response.json()["range_sentences"]
+    ] == [("Irmãos, graça e paz.", "all")]
+
+
+def test_an_admin_sets_the_segments_and_gets_the_cut_as_get_shows_it(
+    admin: TestClient, home: Home, cut_id: int
+) -> None:
+    with closing(connect(home)) as connection:
+        [*_, last] = [word["word_id"] for word in show_cut(connection, cut_id)["words"]]
+
+    response = admin.put(
+        f"/api/cuts/{cut_id}/segments", json={"segments": [{"from_word": last, "to_word": last}]}
+    )
+
+    assert (response.status_code, response.json(), response.json()["text"]) == (
+        200,
+        admin.get(f"/api/cuts/{cut_id}").json(),
+        "paz.",
+    )
+
+
+def test_an_assistant_is_forbidden_to_set_the_segments_and_nothing_changes(
+    assistant: TestClient, cut_id: int
+) -> None:
+    before = assistant.get(f"/api/cuts/{cut_id}").json()
+
+    response = assistant.put(f"/api/cuts/{cut_id}/segments", json={"segments": []})
+
+    assert (
+        response.status_code,
+        response.json()["error"]["code"],
+        assistant.get(f"/api/cuts/{cut_id}").json(),
+    ) == (403, "forbidden", before)
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"segments": []},
+        {"segments": [{"from_word": 1}]},
+        {"segments": [{"from_word": "1", "to_word": 2}]},
+        {"segments": "segredo-digitado"},
+        {"trechos": []},
+    ],
+    ids=["empty", "without to_word", "text for a word", "not a list", "misspelt field"],
+)
+def test_segments_that_break_a_rule_are_400_invalid_argument_and_change_nothing(
+    body: dict[str, Any], admin: TestClient, cut_id: int
+) -> None:
+    before = admin.get(f"/api/cuts/{cut_id}").json()
+
+    response = admin.put(f"/api/cuts/{cut_id}/segments", json=body)
+
+    assert (
+        response.status_code,
+        response.json()["error"]["code"],
+        "segredo-digitado" in response.text,
+        admin.get(f"/api/cuts/{cut_id}").json(),
+    ) == (400, "invalid_argument", False, before)
+
+
+def test_setting_the_segments_of_a_missing_cut_is_not_found(admin: TestClient) -> None:
+    response = admin.put(
+        "/api/cuts/99/segments", json={"segments": [{"from_word": 1, "to_word": 1}]}
+    )
+
+    assert (response.status_code, response.json()["error"]["details"]) == (404, {"cut_id": 99})
+
+
+# Eight sentences of two words; sentence k spans 10k to 10k + 8 s.
+LONG_SPOKEN = tuple(
+    word
+    for k in range(8)
+    for word in (Word("Frase", 10.0 * k, 10.0 * k + 4), Word(f"{k}.", 10.0 * k + 4.5, 10.0 * k + 8))
+)
+
+
+@pytest.fixture
+def long_cut(home: Home) -> tuple[int, list[int]]:
+    """A cut playing sentences 1 to 3 of a ``LONG_SPOKEN`` sermon over sentences 0 to 4, its
+    ID and the IDs of the sermon's words."""
+    with closing(connect(home)) as connection, connection:
+        sermon = sermons.insert(
+            connection,
+            NewSermon(
+                youtube_id="Zz9_y-8PqRs",
+                url="https://youtu.be/Zz9_y-8PqRs",
+                title="Culto de quarta",
+                service_date=date(2026, 10, 21),
+                live_duration=7718.0,
+                live_finished=True,
+                created_at=datetime(2026, 10, 27, 3, 0, tzinfo=timezone.utc),
+            ),
+        )
+        transcripts.replace(connection, sermon.id, LONG_SPOKEN, split_sentences(LONG_SPOKEN))
+        word = [row.id for row in transcripts.words_of(connection, sermon.id)]
+        new = NewCut(
+            "suggested", "Faixa", (Segment(word[2], word[7]),), word[0], word[9], "llm", None
+        )
+        [created] = cuts.insert_many(connection, sermon.id, [new], sermon.created_at)
+    return created, word
+
+
+def test_an_admin_resizes_the_range_and_gets_the_cut_as_get_shows_it(
+    admin: TestClient, long_cut: tuple[int, list[int]]
+) -> None:
+    cut_id, word = long_cut
+
+    response = admin.patch(f"/api/cuts/{cut_id}/range", json={"start": 17, "end": 41.0})
+
+    assert (
+        response.status_code,
+        response.json(),
+        (response.json()["range_start_word"], response.json()["range_end_word"]),
+    ) == (200, admin.get(f"/api/cuts/{cut_id}").json(), (word[4], word[7]))
+
+
+def test_an_admin_moves_the_range_and_the_chosen_sentences_go_along(
+    admin: TestClient, long_cut: tuple[int, list[int]]
+) -> None:
+    cut_id, word = long_cut
+
+    response = admin.patch(f"/api/cuts/{cut_id}/range", json={"by": 10})
+
+    assert (
+        response.status_code,
+        response.json(),
+        [(item["from_word"], item["to_word"]) for item in response.json()["segments"]],
+    ) == (200, admin.get(f"/api/cuts/{cut_id}").json(), [(word[4], word[9])])
+
+
+def test_an_assistant_is_forbidden_to_change_the_range_and_nothing_changes(
+    assistant: TestClient, long_cut: tuple[int, list[int]]
+) -> None:
+    cut_id, _ = long_cut
+    before = assistant.get(f"/api/cuts/{cut_id}").json()
+
+    response = assistant.patch(f"/api/cuts/{cut_id}/range", json={"by": 10})
+
+    assert (
+        response.status_code,
+        response.json()["error"]["code"],
+        assistant.get(f"/api/cuts/{cut_id}").json(),
+    ) == (403, "forbidden", before)
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {},
+        {"start": 0, "by": 10},
+        {"end": 40, "by": 10},
+        {"inicio": 0},
+        {"start": "segredo-digitado"},
+        {"by": None},
+        {"start": 19, "end": 31},
+        {"start": 40, "end": 20},
+        {"start": 50, "end": 78},
+    ],
+    ids=[
+        "empty",
+        "start and by",
+        "end and by",
+        "misspelt field",
+        "text for a time",
+        "null shift",
+        "shorter than 10 s",
+        "end before the start",
+        "no chosen sentence left",
+    ],
+)
+def test_a_range_change_that_breaks_a_rule_is_400_invalid_argument_and_changes_nothing(
+    body: dict[str, Any], admin: TestClient, long_cut: tuple[int, list[int]]
+) -> None:
+    cut_id, _ = long_cut
+    before = admin.get(f"/api/cuts/{cut_id}").json()
+
+    response = admin.patch(f"/api/cuts/{cut_id}/range", json=body)
+
+    assert (
+        response.status_code,
+        response.json()["error"]["code"],
+        "segredo-digitado" in response.text,
+        admin.get(f"/api/cuts/{cut_id}").json(),
+    ) == (400, "invalid_argument", False, before)
+
+
+def test_changing_the_range_of_a_missing_cut_is_not_found(admin: TestClient) -> None:
+    response = admin.patch("/api/cuts/99/range", json={"by": 5})
+
+    assert (response.status_code, response.json()["error"]["details"]) == (404, {"cut_id": 99})
+
+
+@pytest.fixture
+def long_sermon_id(home: Home) -> int:
+    """A processed ``LONG_SPOKEN`` sermon of 80 s, without cuts."""
+    return long_sermon(home)
+
+
+def long_sermon(home: Home, processed: bool = True) -> int:
+    """A ``LONG_SPOKEN`` sermon of 80 s without cuts, processed unless told otherwise."""
+    with closing(connect(home)) as connection, connection:
+        sermon = sermons.insert(
+            connection,
+            NewSermon(
+                youtube_id="Qq7_w-5MnBv",
+                url="https://youtu.be/Qq7_w-5MnBv",
+                title="Culto de sexta",
+                service_date=date(2026, 10, 23),
+                live_duration=7718.0,
+                live_finished=True,
+                created_at=datetime(2026, 10, 27, 3, 0, tzinfo=timezone.utc),
+            ),
+        )
+        transcripts.replace(connection, sermon.id, LONG_SPOKEN, split_sentences(LONG_SPOKEN))
+        if processed:
+            sermons.record_processed(
+                connection, sermon.id, 1000.0, 1080.0, "sermon.mp4", sermon.created_at
+            )
+    return sermon.id
+
+
+def test_an_admin_creates_a_chosen_cut_and_gets_201_with_it_as_get_shows_it(
+    admin: TestClient, long_sermon_id: int
+) -> None:
+    response = admin.post(
+        f"/api/sermons/{long_sermon_id}/cuts", json={"start": 17, "end": 41.0, "title": "Graça"}
+    )
+
+    created = response.json()
+    assert (
+        response.status_code,
+        created,
+        (created["status"], created["source"], created["title"]),
+    ) == (201, admin.get(f"/api/cuts/{created['id']}").json(), ("chosen", "admin", "Graça"))
+
+
+def test_an_assistant_is_forbidden_to_create_a_cut_and_nothing_is_created(
+    assistant: TestClient, long_sermon_id: int
+) -> None:
+    response = assistant.post(f"/api/sermons/{long_sermon_id}/cuts", json={"start": 0, "end": 30})
+
+    assert (
+        response.status_code,
+        response.json()["error"]["code"],
+        assistant.get(f"/api/sermons/{long_sermon_id}/cuts").json(),
+    ) == (403, "forbidden", {"items": []})
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"start": 0},
+        {"inicio": 0, "end": 30},
+        {"start": "segredo-digitado", "end": 30},
+        {"start": 0, "end": 30, "title": 7},
+        {"start": 19, "end": 31},
+        {"start": 40, "end": 20},
+        {"start": -1, "end": 30},
+        {"start": 50, "end": 81},
+    ],
+    ids=[
+        "no end",
+        "misspelt field",
+        "text for a time",
+        "a number for the title",
+        "shorter than 10 s",
+        "end before the start",
+        "before the sermon",
+        "after the sermon",
+    ],
+)
+def test_a_new_cut_that_breaks_a_rule_is_400_invalid_argument_and_nothing_is_created(
+    body: dict[str, Any], admin: TestClient, long_sermon_id: int
+) -> None:
+    response = admin.post(f"/api/sermons/{long_sermon_id}/cuts", json=body)
+
+    assert (
+        response.status_code,
+        response.json()["error"]["code"],
+        "segredo-digitado" in response.text,
+        admin.get(f"/api/sermons/{long_sermon_id}/cuts").json(),
+    ) == (400, "invalid_argument", False, {"items": []})
+
+
+def test_creating_a_cut_on_a_sermon_not_processed_is_409_sermon_not_processed(
+    admin: TestClient, home: Home
+) -> None:
+    sermon_id = long_sermon(home, processed=False)
+
+    response = admin.post(f"/api/sermons/{sermon_id}/cuts", json={"start": 17, "end": 41})
+
+    assert (response.status_code, response.json()["error"]["code"]) == (
+        409,
+        "sermon_not_processed",
+    )
+
+
+def test_creating_a_cut_on_a_missing_sermon_is_not_found(admin: TestClient) -> None:
+    response = admin.post("/api/sermons/99/cuts", json={"start": 17, "end": 41})
+
+    assert (response.status_code, response.json()["error"]["details"]) == (
+        404,
+        {"sermon_id": 99},
+    )
+
+
+def running_task(home: Home, kind: str, resource_type: str, resource_id: int) -> int:
+    """A task recorded ``running`` in this process, so it is not taken for an orphan."""
+    started = datetime(2026, 10, 27, 9, 30, tzinfo=timezone.utc)
+    new = NewTask(kind, resource_type, resource_id, {}, os.getpid(), socket.gethostname(), started)
+    with closing(connect(home)) as connection:
+        return tasks.insert(connection, new).id
+
+
+def test_an_admin_deletes_a_cut_with_its_exports_and_then_it_is_not_found(
+    admin: TestClient, home: Home, cut_id: int, export: Any
+) -> None:
+    export(cut_id)
+
+    deleted = admin.delete(f"/api/cuts/{cut_id}")
+    shown = admin.get(f"/api/cuts/{cut_id}")
+
+    assert (
+        deleted.status_code,
+        deleted.json(),
+        shown.status_code,
+        home.cut_media(cut_id).exists(),
+    ) == (
+        200,
+        {"id": cut_id, "deleted": True},
+        404,
+        False,
+    )
+
+
+def test_an_assistant_is_forbidden_to_delete_a_cut_and_it_stays(
+    assistant: TestClient, cut_id: int
+) -> None:
+    answer = assistant.delete(f"/api/cuts/{cut_id}")
+
+    assert (answer.status_code, answer.json()["error"]["code"]) == (403, "forbidden")
+    assert assistant.get(f"/api/cuts/{cut_id}").status_code == 200
+
+
+def test_deleting_a_missing_cut_is_not_found(admin: TestClient) -> None:
+    answer = admin.delete("/api/cuts/99")
+
+    assert (answer.status_code, answer.json()["error"]["code"]) == (404, "not_found")
+
+
+def test_deleting_a_cut_being_exported_is_busy_and_keeps_it(
+    admin: TestClient, home: Home, cut_id: int
+) -> None:
+    task_id = running_task(home, "render", "cut", cut_id)
+
+    answer = admin.delete(f"/api/cuts/{cut_id}")
+
+    assert (
+        answer.status_code,
+        answer.json()["error"]["code"],
+        answer.json()["error"]["details"]["task_id"],
+        admin.get(f"/api/cuts/{cut_id}").status_code,
+    ) == (409, "busy", task_id, 200)

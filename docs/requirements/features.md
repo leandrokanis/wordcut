@@ -3,6 +3,9 @@
 Fonte canônica de requisitos funcionais do Wordcut, gerada pela inception
 ([inception.md](inception.md)) e mantida por /dev-idea.
 
+Cada história traz o **Status**: ✅ feita, 🟡 parcial (com o que falta) ou ☐ a fazer, com
+a issue do GitHub quando houver.
+
 Formato: **BDD in Action** (Smart, 2014); Temas de Investimento conforme
 **SAFe** (Leffingwell, 2011). Os cenários Dado/Quando/Então ficam nas specs (/dev-specify).
 

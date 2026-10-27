@@ -39,7 +39,12 @@ def link(youtube_id: str) -> str:
 def listed(created: dict[str, Any]) -> dict[str, Any]:
     """What ``list_sermons`` shows of a sermon that has no borders nor cuts yet."""
     sermon = {field: value for field, value in created.items() if field != "created"}
-    return {**sermon, "duration": None, "cut_counts": {"suggested": 0, "chosen": 0, "discarded": 0}}
+    return {
+        **sermon,
+        "duration": None,
+        "borders_changed": False,
+        "cut_counts": {"suggested": 0, "chosen": 0, "discarded": 0},
+    }
 
 
 class FakeLive:
@@ -69,7 +74,7 @@ def connection(tmp_path: Path) -> Iterator[sqlite3.Connection]:
 def test_first_sermon_of_a_finished_live_is_created_with_the_live_data(
     connection: sqlite3.Connection,
 ) -> None:
-    sermon = create_sermon(connection, FakeLive(), LINK, now=NOW)
+    sermon = create_sermon(connection, FakeLive(), LINK, now=NOW, home=home_of(connection))
 
     assert (type(sermon["id"]), sermon) == (
         int,
@@ -92,9 +97,11 @@ def test_same_video_through_another_link_returns_the_existing_sermon_without_ask
     connection: sqlite3.Connection,
 ) -> None:
     live = FakeLive()
-    first = create_sermon(connection, live, LINK, now=NOW)
+    first = create_sermon(connection, live, LINK, now=NOW, home=home_of(connection))
 
-    again = create_sermon(connection, live, f"https://youtu.be/{VIDEO}?si=abc", now=NOW)
+    again = create_sermon(
+        connection, live, f"https://youtu.be/{VIDEO}?si=abc", now=NOW, home=home_of(connection)
+    )
 
     assert (again, live.calls) == ({**first, "created": False}, 1)
 
@@ -106,7 +113,7 @@ def test_live_still_on_air_without_duration_is_created_unfinished_with_unknown_d
         {"title": "Culto ao vivo", "timestamp": 1792361083, "live_status": "is_live"}
     )
 
-    sermon = create_sermon(connection, FakeLive(on_air), LINK, now=NOW)
+    sermon = create_sermon(connection, FakeLive(on_air), LINK, now=NOW, home=home_of(connection))
 
     assert (sermon["live_finished"], sermon["live_duration"], sermon["created"]) == (
         False,
@@ -121,7 +128,9 @@ def test_link_without_a_video_is_refused_before_asking_youtube(
     live = FakeLive()
 
     with pytest.raises(WordcutError) as raised:
-        create_sermon(connection, live, "https://vimeo.com/123456", now=NOW)
+        create_sermon(
+            connection, live, "https://vimeo.com/123456", now=NOW, home=home_of(connection)
+        )
 
     assert (raised.value.code, raised.value.details, live.calls) == (
         "invalid_argument",
@@ -133,8 +142,18 @@ def test_link_without_a_video_is_refused_before_asking_youtube(
 def test_sermons_are_listed_newest_service_first_with_zeroed_cut_counts(
     connection: sqlite3.Connection,
 ) -> None:
-    older = create_sermon(connection, FakeLive(live_on(date(2026, 10, 11))), link("Aaaaaaaaaa1"))
-    newer = create_sermon(connection, FakeLive(live_on(date(2026, 10, 18))), link("Aaaaaaaaaa2"))
+    older = create_sermon(
+        connection,
+        FakeLive(live_on(date(2026, 10, 11))),
+        link("Aaaaaaaaaa1"),
+        home=home_of(connection),
+    )
+    newer = create_sermon(
+        connection,
+        FakeLive(live_on(date(2026, 10, 18))),
+        link("Aaaaaaaaaa2"),
+        home=home_of(connection),
+    )
 
     assert list_sermons(connection, home=home_of(connection)) == {
         "items": [listed(newer), listed(older)],
@@ -144,7 +163,7 @@ def test_sermons_are_listed_newest_service_first_with_zeroed_cut_counts(
 def test_listing_by_status_keeps_only_the_sermons_in_that_state(
     connection: sqlite3.Connection,
 ) -> None:
-    create_sermon(connection, FakeLive(), LINK, now=NOW)
+    create_sermon(connection, FakeLive(), LINK, now=NOW, home=home_of(connection))
 
     assert (
         list_sermons(connection, "trimmed", home=home_of(connection)),
@@ -164,7 +183,7 @@ def test_youtube_failure_is_a_youtube_error_and_creates_nothing(
     connection: sqlite3.Connection,
 ) -> None:
     with pytest.raises(WordcutError) as raised:
-        create_sermon(connection, UnreachableYouTube(), LINK, now=NOW)
+        create_sermon(connection, UnreachableYouTube(), LINK, now=NOW, home=home_of(connection))
 
     assert (
         raised.value.code,
@@ -186,7 +205,9 @@ class RacedLive(FakeLive):
         self.winner: dict[str, Any] = {}
 
     def info(self, url: str) -> LiveInfo:
-        self.winner = create_sermon(self.connection, FakeLive(), url, now=NOW)
+        self.winner = create_sermon(
+            self.connection, FakeLive(), url, now=NOW, home=home_of(self.connection)
+        )
         return super().info(url)
 
 
@@ -195,7 +216,7 @@ def test_create_that_loses_a_race_for_the_same_video_returns_the_winner(
 ) -> None:
     live = RacedLive(connection)
 
-    sermon = create_sermon(connection, live, LINK, now=NOW)
+    sermon = create_sermon(connection, live, LINK, now=NOW, home=home_of(connection))
 
     assert sermon == {**live.winner, "created": False}
 
@@ -203,7 +224,8 @@ def test_create_that_loses_a_race_for_the_same_video_returns_the_winner(
 def test_shown_sermon_has_empty_borders_no_task_and_no_cuts(
     connection: sqlite3.Connection,
 ) -> None:
-    created = create_sermon(connection, FakeLive(), LINK, now=NOW)
+    """Only the preparation of its timeline (task 1), launched by the creation, runs."""
+    created = create_sermon(connection, FakeLive(), LINK, now=NOW, home=home_of(connection))
 
     assert show_sermon(connection, created["id"], home=home_of(connection)) == {
         **listed(created),
@@ -215,6 +237,7 @@ def test_shown_sermon_has_empty_borders_no_task_and_no_cuts(
         "last_task": None,
         "cuts": [],
         "suggestion_error": None,
+        "timeline": {"status": "pending", "error": None, "task_id": 1},
     }
 
 
@@ -251,7 +274,7 @@ def store_cuts(connection: sqlite3.Connection, sermon_id: int, *statuses: str) -
 def test_shown_sermon_lists_its_cuts_with_their_segments_range_and_preset(
     connection: sqlite3.Connection,
 ) -> None:
-    created = create_sermon(connection, FakeLive(), LINK, now=NOW)
+    created = create_sermon(connection, FakeLive(), LINK, now=NOW, home=home_of(connection))
     store_cuts(connection, created["id"], "suggested")
     [stored] = cuts.of_sermon(connection, created["id"])
     preset = presets.default(connection)
@@ -277,7 +300,7 @@ def test_shown_sermon_lists_its_cuts_with_their_segments_range_and_preset(
 def test_listed_and_shown_sermons_count_their_cuts_by_state(
     connection: sqlite3.Connection,
 ) -> None:
-    created = create_sermon(connection, FakeLive(), LINK, now=NOW)
+    created = create_sermon(connection, FakeLive(), LINK, now=NOW, home=home_of(connection))
     store_cuts(connection, created["id"], "suggested", "chosen", "chosen", "discarded")
     counts = {"suggested": 1, "chosen": 2, "discarded": 1}
 
@@ -288,7 +311,7 @@ def test_listed_and_shown_sermons_count_their_cuts_by_state(
 
 
 def test_shown_sermon_tells_the_last_suggestions_failure(connection: sqlite3.Connection) -> None:
-    created = create_sermon(connection, FakeLive(), LINK, now=NOW)
+    created = create_sermon(connection, FakeLive(), LINK, now=NOW, home=home_of(connection))
     with connection:
         sermons.record_suggestion_error(
             connection, created["id"], SuggestionError("llm_error", "O LLM falhou.")

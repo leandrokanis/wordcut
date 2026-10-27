@@ -13,7 +13,7 @@ fixtures `no_real_processing` e `no_real_llm` fazem as reais falharem. As duas p
 valem dentro do processo do pytest. Um teste que lança uma tarefa destacada de verdade
 (`detached_tasks`) cria um interpretador novo, que monta as fábricas reais. Durante o item
 2.1.b.2, um runner destacado de `suggest` com uma chave fictícia chegou ao OpenRouter e
-recebeu HTTP 401 (`specs/2.1.b.2-sermon-suggest/qa.md`, rodada 1). Pelo mesmo caminho, um
+recebeu HTTP 401 (QA do item 2.1.b.2, rodada 1). Pelo mesmo caminho, um
 `process` destacado chegaria ao YouTube.
 
 ## Decisão

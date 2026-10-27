@@ -210,7 +210,8 @@ def test_trim_without_json_describes_the_sermon_as_show_does(
         "Live: 2:00:00, terminada\n"
         "Estado: delimitada\n"
         "Bordas: 1:02:10 a 1:48:30 da live\n"
-        "Cortes: nenhum\n",
+        "Cortes: nenhum\n"
+        "Timeline: preparando\n",
     )
 
 

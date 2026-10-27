@@ -1,18 +1,22 @@
 import { useEffect, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 
-import { showSermon } from "../../api/client";
+import { useMe } from "../../app/Identity";
+import { patchCutRange, showSermon, type ApiError } from "../../api/client";
 import type { SermonShown } from "../../api/types";
 import { useResource } from "../../api/useResource";
 import { Saved } from "../../ui/Saved";
 import { isTrimmed, savedBounds } from "./bounds";
 import { useClipEdges, type Edge } from "./ClipEdges";
-import { cutLayers } from "./CutLayers";
-import { CutsPanel, useSermonCuts } from "./CutsPanel";
+import { cutLayers, type CutLayer, type RangeChange } from "./CutLayers";
+import { CutsPanel, openCut, useSermonCuts } from "./CutsPanel";
 import { Preview, type PreviewHandle } from "./Preview";
 import { ProcessButton } from "./ProcessButton";
+import { SermonExportMenu } from "./SermonExportMenu";
 import { Timeline } from "./Timeline";
 import { Transport } from "./Transport";
+import { useProcessing } from "./useProcessing";
+import { useTimelineMedia } from "./useTimelineMedia";
 
 /** Level 2: the cuts panel beside the 16:9 preview and the timeline of one sermon. */
 export function SermonPage() {
@@ -21,9 +25,11 @@ export function SermonPage() {
   const preview = useRef<PreviewHandle>(null);
   const [cursor, setCursor] = useState(0);
   const [patched, setPatched] = useState<SermonShown>();
-  const [bordersChanged, setBordersChanged] = useState(false);
   const shown = patched ?? sermon.data;
   const cuts = useSermonCuts(sermon.data);
+  const admin = useMe().role === "admin";
+  const navigate = useNavigate();
+  const [layerError, setLayerError] = useState<string>();
   // A fresh load of the sermon already has the borders the PATCH saved.
   useEffect(() => setPatched(undefined), [sermon.data]);
 
@@ -32,17 +38,35 @@ export function SermonPage() {
     sermonId: id,
     saved: shown ? savedBounds(shown, liveDuration ?? 0) : { start: 0, end: 0 },
     liveDuration: liveDuration ?? 0,
-    onSaved(saved) {
-      setPatched(saved);
-      setBordersChanged(saved.status === "processed");
-    },
+    // The PATCH answers the sermon as shown, borders_changed included.
+    onSaved: setPatched,
   });
 
   function moveEdge(edge: Edge, liveSeconds: number) {
     preview.current?.seek(edges.move(edge, liveSeconds));
   }
 
-  const editable = shown !== undefined && shown.status !== "processing";
+  // A refused range leaves the layer where it was and says why (FR-003).
+  function changeRange(layer: CutLayer, change: RangeChange): Promise<unknown> {
+    setLayerError(undefined);
+    return patchCutRange(layer.id, change).then(cuts.reload, (error: ApiError) =>
+      setLayerError(error.message),
+    );
+  }
+
+  function openLayer(layer: CutLayer) {
+    setLayerError(undefined);
+    openCut(layer, navigate).catch((error: ApiError) => setLayerError(error.message));
+  }
+
+  const processing = useProcessing(shown, sermon.reload);
+  const media = useTimelineMedia(shown, sermon.reload);
+  const editable = shown !== undefined && !processing.processing && shown.status !== "processing";
+  useEffect(() => {
+    if (processing.processing) {
+      preview.current?.pause();
+    }
+  }, [processing.processing]);
   const markAtCursor = editable ? (edge: Edge) => edges.mark(edge, cursor) : null;
   useMarkKeys(markAtCursor);
 
@@ -62,19 +86,20 @@ export function SermonPage() {
   }
   return (
     <div className="l2">
-      <CutsPanel sermon={shown} cuts={cuts} />
+      <CutsPanel
+        sermon={shown}
+        cuts={cuts}
+        processing={!editable}
+        task={processing.task}
+        cursor={cursor - (shown.sermon_start ?? 0)}
+        admin={admin}
+      />
       <main className="work">
         <div className="l2-bar">
           <span className="spacer" />
           <Saved savedAt={edges.savedAt} />
-          <ProcessButton
-            sermon={shown}
-            bordersChanged={bordersChanged}
-            onEnd={() => {
-              setBordersChanged(false);
-              sermon.reload();
-            }}
-          />
+          <ProcessButton sermon={shown} processing={processing} />
+          {shown.status === "processed" && editable && <SermonExportMenu sermon={shown} processing={processing} />}
         </div>
         <Preview
           key={shown.status === "processed" ? "processed" : "live"}
@@ -87,10 +112,16 @@ export function SermonPage() {
           cursor={cursor}
           liveDuration={liveDuration}
           onMark={markAtCursor}
+          locked={!editable}
         />
         {edges.error && (
           <p className="ferr edge-error" role="alert">
             {edges.error}
+          </p>
+        )}
+        {layerError && (
+          <p className="ferr edge-error" role="alert">
+            {layerError}
           </p>
         )}
         <Timeline
@@ -101,7 +132,10 @@ export function SermonPage() {
           onSeek={(liveSeconds) => preview.current?.seek(liveSeconds)}
           onEdgeMove={editable ? moveEdge : null}
           onEdgeRelease={edges.release}
-          layers={cutLayers(shown, cuts.data)}
+          layers={cutLayers(shown, cuts.data, admin)}
+          onCutChange={changeRange}
+          onCutOpen={openLayer}
+          media={media}
         />
       </main>
     </div>

@@ -284,24 +284,20 @@ def test_show_without_json_describes_the_sermon_in_portuguese(
         "Live: 2:08:38, terminada\n"
         "Estado: criada\n"
         "Bordas: não definidas\n"
-        "Cortes: nenhum\n",
+        "Cortes: nenhum\n"
+        "Timeline: preparando\n",
     )
 
 
 def test_sermon_help_lists_its_actions(capsys: pytest.CaptureFixture[str]) -> None:
     exit_code = main(["sermon", "--help"])
 
-    assert (
-        exit_code,
-        "{create,list,show,trim,process,download,suggest}" in capsys.readouterr().out,
-    ) == (
-        0,
-        True,
-    )
+    actions = "{create,list,show,trim,process,download,suggest,prepare,delete}"
+    assert (exit_code, actions in capsys.readouterr().out) == (0, True)
 
 
 @pytest.mark.parametrize(
-    "action", ["create", "list", "show", "trim", "process", "download", "suggest"]
+    "action", ["create", "list", "show", "trim", "process", "download", "suggest", "prepare"]
 )
 def test_each_sermon_action_help_shows_an_example_ready_to_copy(
     action: str, capsys: pytest.CaptureFixture[str]
@@ -341,7 +337,7 @@ def test_show_tells_why_the_last_suggestion_failed(
 
     assert (
         exit_code,
-        readable.splitlines()[-2:],
+        readable.splitlines()[-3:],
         [cut["title"] for cut in shown["cuts"]],
         shown["suggestion_error"],
         shown["cut_counts"],
@@ -349,6 +345,7 @@ def test_show_tells_why_the_last_suggestion_failed(
         0,
         [
             "Cortes: 1",
+            "Timeline: preparando",
             "Sugestão de cortes falhou: Sem a chave do LLM (wordcut settings set-key).",
         ],
         ["Graça que alcança"],
@@ -358,3 +355,57 @@ def test_show_tells_why_the_last_suggestion_failed(
         },
         {"suggested": 1, "chosen": 0, "discarded": 0},
     )
+
+
+BORDERS = ["--start", "1:02:10", "--end", "1:48:30"]
+REPROCESS_WARNING = (
+    "Bordas mudaram desde o processamento: reprocesse com wordcut sermon process --force."
+)
+
+
+def processed_sermon(live: FakeLive) -> None:
+    """Sermon 1, processed with the borders ``BORDERS``."""
+    assert main(["sermon", "create", LINK, *BORDERS, "--quiet"]) == 0
+    with closing(connect(Home.from_environment())) as connection, connection:
+        sermons.record_processed(
+            connection, 1, 3730.4, 6509.5, "sermon.mp4", datetime.now().astimezone()
+        )
+
+
+def test_show_and_list_with_json_tell_that_the_borders_changed_since_processing(
+    live: FakeLive, capsys: pytest.CaptureFixture[str]
+) -> None:
+    processed_sermon(live)
+    main(["sermon", "trim", "1", "--start", "1:02:15", "--end", "1:48:30", "--quiet"])
+    capsys.readouterr()
+
+    _, shown = run_json(["sermon", "show", "1", "--json"], capsys)
+    _, listing = run_json(["sermon", "list", "--json"], capsys)
+
+    assert (shown["borders_changed"], [item["borders_changed"] for item in listing["items"]]) == (
+        True,
+        [True],
+    )
+
+
+def test_show_without_json_warns_to_reprocess_when_the_borders_changed(
+    live: FakeLive, capsys: pytest.CaptureFixture[str]
+) -> None:
+    processed_sermon(live)
+    main(["sermon", "trim", "1", "--start", "1:02:15", "--end", "1:48:30", "--quiet"])
+    capsys.readouterr()
+
+    main(["sermon", "show", "1"])
+
+    assert REPROCESS_WARNING in capsys.readouterr().out.splitlines()
+
+
+def test_show_without_json_says_nothing_of_borders_kept_since_processing(
+    live: FakeLive, capsys: pytest.CaptureFixture[str]
+) -> None:
+    processed_sermon(live)
+    capsys.readouterr()
+
+    main(["sermon", "show", "1"])
+
+    assert REPROCESS_WARNING not in capsys.readouterr().out.splitlines()

@@ -25,13 +25,13 @@ function captionLayer(): HTMLElement {
   });
 }
 
-test("opens on Texto, with the cut's assembled text", async () => {
+test("opens on Texto, with the sentences of the cut's range for the administrator", async () => {
   await openTabs();
 
   const panel = screen.getByRole("tabpanel");
   expect([selectedTab(), panel.textContent]).toEqual([
     "Texto",
-    expect.stringMatching(/Deus governa\..*Irmãos, graça.*paz\./),
+    expect.stringMatching(/Irmãos, graça paz\..*Então Deus governa\..*Amém, igreja\./),
   ]);
 });
 
@@ -54,7 +54,7 @@ test("goes back to Texto when Legenda is closed", async () => {
 
 test.each([
   ["the preview", () => screen.getByLabelText("Prévia do corte")],
-  ["the video track", () => screen.getByRole("group", { name: "Trecho 1" })],
+  ["the video track", () => screen.getByRole("button", { name: "Trecho 1" })],
   ["the transport", () => screen.getByLabelText("Tempo do corte")],
 ])("goes back to Texto on a click on %s", async (_area, area) => {
   await openTabs();

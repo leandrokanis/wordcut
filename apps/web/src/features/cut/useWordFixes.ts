@@ -13,9 +13,15 @@ export interface WordFixes {
   saving: boolean;
 }
 
-/** The spelling fixes of the cut's words, saved with ``PUT /api/cuts/{id}/words/{word_id}``. */
+/** The spelling fixes of the cut's words, saved with ``PUT /api/cuts/{id}/words/{word_id}``;
+ * new ``initial`` words, of the cut once it plays something else, replace them. */
 export function useWordFixes(cutId: number, initial: CutWord[], onSaved: () => void): WordFixes {
   const [words, setWords] = useState(initial);
+  const [shown, setShown] = useState(initial);
+  if (shown !== initial) {
+    setShown(initial);
+    setWords(initial);
+  }
   const [inFlight, setInFlight] = useState(0);
   const tellSaved = useRef(onSaved);
   tellSaved.current = onSaved;

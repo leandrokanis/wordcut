@@ -1,4 +1,6 @@
+import json
 import subprocess
+import sys
 from collections.abc import Callable
 from datetime import date
 from pathlib import Path
@@ -17,7 +19,15 @@ def no_real_yt_dlp(monkeypatch: pytest.MonkeyPatch) -> None:
     def refuse(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
         raise AssertionError("test reached the real yt-dlp")
 
+    real_popen = subprocess.Popen
+
+    def only_fakes(command: list[str], **kwargs: Any) -> subprocess.Popen[str]:
+        if command[0] == "yt-dlp":
+            raise AssertionError("test reached the real yt-dlp")
+        return real_popen(command, **kwargs)
+
     monkeypatch.setattr(youtube.subprocess, "run", refuse)
+    monkeypatch.setattr(youtube.subprocess, "Popen", only_fakes)
 
 
 def youtube_with(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, run: FakeRun) -> YouTube:
@@ -159,3 +169,146 @@ def test_live_in_progress_without_duration_has_unknown_duration() -> None:
     )
 
     assert (info.duration, info.is_finished) == (None, False)
+
+
+def fake_yt_dlp(tmp_path: Path, *lines: str, exit_code: int = 0) -> YouTube:
+    """A ``YouTube`` whose yt-dlp is a Python process printing ``lines`` and exiting so."""
+    cookies = tmp_path / "youtube-cookies.txt"
+    cookies.write_text("# fictício\n")
+    script = f"import sys\nfor line in {list(lines)!r}:\n    print(line)\nsys.exit({exit_code})"
+    return YouTube(cookies=cookies, ffmpeg_dir=None, program=(sys.executable, "-c", script))
+
+
+def window_progress(source: YouTube, tmp_path: Path) -> list[float]:
+    heard: list[float] = []
+    source.download_audio_window(
+        "https://youtu.be/Ab3_x-9QzLk", 950.0, 1040.0, tmp_path / "w.m4a", on_progress=heard.append
+    )
+    return heard
+
+
+def test_downloaded_media_time_over_the_section_length_is_the_download_progress(
+    tmp_path: Path,
+) -> None:
+    source = fake_yt_dlp(tmp_path, "out_time_us=22500000", "out_time_us=45000000")
+
+    assert window_progress(source, tmp_path) == [0.25, 0.5]
+
+
+def test_downloaded_bytes_over_the_total_or_its_estimate_is_the_download_progress(
+    tmp_path: Path,
+) -> None:
+    source = fake_yt_dlp(tmp_path, "wordcut-progress 30 NA 120", "wordcut-progress 60 120 NA")
+
+    assert window_progress(source, tmp_path) == [0.25, 0.5]
+
+
+def test_downloads_ask_yt_dlp_and_its_ffmpeg_to_print_progress_line_by_line(
+    tmp_path: Path,
+) -> None:
+    argv = tmp_path / "argv.json"
+    cookies = tmp_path / "youtube-cookies.txt"
+    cookies.write_text("# fictício\n")
+    script = f"import json, sys\nopen({str(argv)!r}, 'w').write(json.dumps(sys.argv[1:]))"
+    source = YouTube(cookies=cookies, ffmpeg_dir=None, program=(sys.executable, "-c", script))
+
+    window_progress(source, tmp_path)
+
+    command = json.loads(argv.read_text())
+    template = command[command.index("--progress-template") + 1]
+    assert (
+        {"--quiet", "--newline", "--progress"} <= set(command),
+        template.startswith("download:"),
+        command[command.index("--downloader-args") + 1],
+    ) == (True, True, "ffmpeg_o:-progress pipe:1")
+
+
+def test_lines_that_are_not_progress_and_bytes_without_total_are_ignored(
+    tmp_path: Path,
+) -> None:
+    source = fake_yt_dlp(
+        tmp_path,
+        "[download] Destination: w.m4a",
+        "out_time_us=N/A",
+        "wordcut-progress 10 NA NA",
+        "progress=continue",
+        "out_time_us=45000000",
+    )
+
+    assert window_progress(source, tmp_path) == [0.5]
+
+
+def section_progress(source: YouTube, tmp_path: Path) -> list[float]:
+    heard: list[float] = []
+    source.download_section(
+        "https://youtu.be/Ab3_x-9QzLk", 970.0, 1130.0, tmp_path / "s.mp4", on_progress=heard.append
+    )
+    return heard
+
+
+def test_section_downloaded_by_a_single_ffmpeg_runs_through_the_whole_download(
+    tmp_path: Path,
+) -> None:
+    source = fake_yt_dlp(
+        tmp_path,
+        "out_time_us=40000000",
+        "out_time_us=80000000",
+        "out_time_us=120000000",
+        "out_time_us=160000000",
+        "wordcut-progress 5000 5000 NA",
+    )
+
+    assert section_progress(source, tmp_path) == [0.25, 0.5, 0.75, 1.0, 1.0]
+
+
+def test_section_whose_video_and_audio_report_their_bytes_runs_through_both_without_going_back(
+    tmp_path: Path,
+) -> None:
+    source = fake_yt_dlp(
+        tmp_path,
+        "wordcut-progress 450 900 NA",
+        "wordcut-progress 900 900 NA",
+        "wordcut-progress 50 100 NA",
+        "wordcut-progress 100 100 NA",
+    )
+
+    assert section_progress(source, tmp_path) == [
+        pytest.approx(0.45),
+        0.9,
+        pytest.approx(0.95),
+        1.0,
+    ]
+
+
+def test_failed_download_is_a_youtube_error_that_hides_the_command_and_cookies(
+    tmp_path: Path,
+) -> None:
+    source = fake_yt_dlp(tmp_path, "out_time_us=45000000", exit_code=1)
+
+    with pytest.raises(YouTubeError) as raised:
+        window_progress(source, tmp_path)
+
+    message = str(raised.value)
+    assert ("--cookies" in message, str(tmp_path) in message, "recusou" in message) == (
+        False,
+        False,
+        True,
+    )
+
+
+def test_audio_for_the_waveform_is_the_lowest_audio_of_the_whole_live(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    asked: list[list[str]] = []
+
+    def run(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        asked.append(command)
+        return subprocess.CompletedProcess(command, 0, stdout="")
+
+    source = youtube_with(tmp_path, monkeypatch, run)
+
+    source.download_audio("https://youtu.be/Ab3_x-9QzLk", tmp_path / "audio")
+
+    [command] = asked
+    assert command[command.index("-f") + 1] == "worstaudio"
+    assert "--download-sections" not in command

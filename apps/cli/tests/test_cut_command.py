@@ -118,8 +118,8 @@ def test_show_with_json_prints_the_whole_cut(
         sorted(
             [
                 "id", "sermon_id", "status", "title", "text", "duration", "segments",
-                "range_start_word", "range_end_word", "source", "preset_id", "edited",
-                "words", "caption", "render_options", "renders",
+                "range_sentences", "range_start_word", "range_end_word", "source", "preset_id",
+                "edited", "words", "caption", "render_options", "renders",
             ]
         ),
         "Deus governa. Irmãos, graça",
@@ -292,10 +292,11 @@ def test_error_without_json_goes_to_stderr_in_portuguese_and_stdout_stays_empty(
 def test_cut_help_lists_its_actions(capsys: pytest.CaptureFixture[str]) -> None:
     exit_code = main(["cut", "--help"])
 
+    # The list may wrap after a comma to fit the terminal.
     assert (
         exit_code,
-        "{list,show,preview,choose,discard,restore,fix-word,caption,render}"
-        in capsys.readouterr().out,
+        "{list,show,preview,choose,discard,restore,fix-word,create,segments,range,move,caption,render,delete}"
+        in "".join(capsys.readouterr().out.split()),
     ) == (
         0,
         True,
@@ -304,8 +305,11 @@ def test_cut_help_lists_its_actions(capsys: pytest.CaptureFixture[str]) -> None:
 
 @pytest.mark.parametrize(
     "action",
-    ["list", "show", "preview", "choose", "discard", "restore", "fix-word", "caption", "render"],
-)
+    [
+        "list", "show", "preview", "choose", "discard", "restore", "fix-word", "create",
+        "segments", "range", "move", "caption", "render",
+    ],
+)  # fmt: skip
 def test_each_cut_action_help_shows_an_example_ready_to_copy(
     action: str, capsys: pytest.CaptureFixture[str]
 ) -> None:

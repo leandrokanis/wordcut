@@ -281,8 +281,102 @@ Formato de [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões
   e-mail com o papel e Remover, libera acesso por e-mail e papel, protege o último
   administrador (o papel volta ao anterior) e manda quem se rebaixa para a tela de recusa. Um
   só "Salvo" para a tela, nunca depois de erro; o motivo da recusa aparece junto ao campo.
+- Web: a pregação processada ganha no nível 2 o menu Exportar do protótipo com o item
+  "Pregação 16:9 · 1080p · duração", que baixa o vídeo recortado pela API com o nome legível
+  dado pelo servidor, mesmo com a máquina ocupada (o menu avisa). O menu não aparece antes do
+  processamento nem enquanto a pregação reprocessa; abre e fecha pelo teclado (setas, Esc
+  devolve o foco ao botão) e fecha ao clicar fora, sem baixar
+  ([#7](https://github.com/leandrokanis/wordcut/issues/7)).
+- A pregação guarda as bordas na live do último processamento bem-sucedido (migração 0011;
+  as já processadas ficam com as bordas atuais) e `sermon show`, `sermon list` e a API
+  passam a trazer `borders_changed`: verdadeiro quando a pregação está processada e as bordas
+  atuais diferem das processadas. O `sermon show` legível avisa para reprocessar com
+  `--force`. Na web, Reprocessar sai do botão do nível 2 e entra no menu Exportar a partir
+  desse campo, valendo depois de recarregar ou em outra sessão; a recusa da API aparece na
+  barra do nível 2 ([#8](https://github.com/leandrokanis/wordcut/issues/8)).
+- Miniaturas e forma de onda na timeline da pregação (1.1.b.1, ADR-0025): a tarefa nova
+  `prepare`, sem trava e uma por pregação, baixa só as imagens de navegação da live
+  (storyboards do YouTube) e o áudio na menor qualidade, monta a faixa de miniaturas e os
+  picos da forma de onda em `media/sermons/<id>/timeline/` e apaga o áudio. `sermon create`
+  a lança numa pregação nova; `wordcut sermon prepare <id> [--wait]` e
+  `POST /api/sermons/{id}/prepare` a pedem de novo. Estado na tabela `timeline_media`
+  (migração 0012) e em `timeline` no `sermon show` e no `GET` da pregação; `task list
+  --kind` aceita `prepare`. A API serve `GET /api/sermons/{id}/thumbnails`,
+  `thumbnails.json` e `waveform`, com 404 enquanto não há mídia. Na web, a timeline do nível
+  2 ganha as faixas "Vídeo" (miniaturas) e "Áudio" (onda), esmaecidas fora das bordas, o
+  aviso "Preparando a timeline…" que some quando a tarefa termina e, na falha, "Tentar de
+  novo" ([#9](https://github.com/leandrokanis/wordcut/issues/9)).
+- Escolher as frases do corte no texto da faixa (2.1.c.1, antecipada): `wordcut cut segments
+  <id> --file <arquivo|->` e `PUT /api/cuts/{id}/segments` (só administrador) trocam a lista
+  de trechos do corte, recusando com `invalid_argument`, sem gravar, lista vazia, palavra fora
+  da faixa ou de outra pregação, trecho invertido e sobreposição; o corte passa a editado.
+  `cut show` e o `GET` do corte trazem `range_sentences`, as frases da faixa com `included`
+  (`all`, `part`, `none`). Na web, a aba Texto do administrador lista essas frases com uma
+  caixa (marcada, parcial ou vazia): desmarcar divide ou encurta o trecho, marcar junta aos
+  vizinhos ou cria o trecho na ordem da pregação, e a prévia, a trilha e a duração se
+  remontam; a última frase não sai, e as caixas travam enquanto grava ou a pregação processa.
+  O assistente vê o texto como antes ([#5](https://github.com/leandrokanis/wordcut/issues/5)).
+- Ajustar os trechos na trilha do corte (2.1.c.2): no nível 3, clicar num trecho da faixa
+  Vídeo o seleciona, e o transporte ganha as ferramentas do protótipo — desfazer, refazer,
+  dividir o trecho no cursor na fronteira de frase mais próxima, mover para a esquerda ou a
+  direita e remover (nunca o último) — e o chip da duração contra a meta de 40 a 75 s. Cada
+  ação grava por `PUT /api/cuts/{id}/segments` e remonta prévia, trilha e duração; os trechos
+  fora da ordem da pregação ficam marcados na trilha. Desfazer e refazer (Ctrl+Z e
+  Ctrl+Shift+Z, fora de campos de texto) valem na sessão e incluem marcar e desmarcar frases;
+  uma falha ao gravar deixa a tela como estava e mostra o erro. As ferramentas travam enquanto
+  grava ou a pregação processa, e o assistente as vê desabilitadas com o motivo
+  ([#10](https://github.com/leandrokanis/wordcut/issues/10)).
+- Ajustar a faixa do corte (2.1.c.3): `wordcut cut range <id> [--start T] [--end T]`,
+  `wordcut cut move <id> --by ±S` e `PATCH /api/cuts/{id}/range` (`{start, end}` ou `{by}`,
+  só administrador). Redimensionar encosta o início e o fim nas frases mais próximas e tira do
+  corte as palavras que ficam fora; ampliar só oferece as frases novas. Mover desloca a faixa
+  sem sair da pregação e leva cada frase escolhida, inteira, para a frase de início mais
+  próximo, sem repetir destino. Faixa com menos de 10 s, invertida ou que esvaziaria o corte é
+  recusada com `invalid_argument`, sem gravar; o corte passa a editado e as correções de
+  grafia ficam. `cut list` e o `GET` dos cortes trazem `range_start` e `range_end`, e a camada
+  do corte na timeline do nível 2 passa a desenhar a faixa. Na web, o administrador arrasta as
+  bordas ou o meio da camada de um corte não descartado, com prévia, e grava ao soltar; uma
+  recusa devolve a camada e mostra o erro; um clique sem arrastar abre o corte não descartado,
+  para qualquer papel, e a camada do descartado, como o cartão, não abre
+  ([#11](https://github.com/leandrokanis/wordcut/issues/11)).
+- Criar corte do zero (2.1.c.4): `wordcut cut create --sermon <id> --start T --end T
+  [--title TEXTO]` e `POST /api/sermons/{id}/cuts` (`{start, end, title?}`, 201, só
+  administrador). A faixa encosta em frases como em `cut range`, o corte toca todas elas e
+  nasce `chosen`, com origem `admin`; sem título, chama-se "Novo corte · MM:SS". Faixa com
+  menos de 10 s, invertida ou fora da pregação é recusada com `invalid_argument`, e pregação
+  não processada, com `sermon_not_processed`, sem gravar. No painel de cortes do nível 2, o
+  administrador tem "Novo corte", que cria a faixa de 60 s a partir do cursor (terminando no
+  fim da pregação, com ao menos 10 s) e abre o nível do corte
+  ([#12](https://github.com/leandrokanis/wordcut/issues/12)).
+- Apagar pregações e cortes (1.2.b.1): `wordcut sermon delete <id>` e `wordcut cut delete
+  <id>`, `DELETE /api/sermons/{id}` e `DELETE /api/cuts/{id}` (200 `{"id", "deleted": true}`,
+  só administrador). A pregação vai com cortes, correções, exportações, transcrição, tarefas e
+  a pasta de mídia inteira; o corte, com exportações, correções e tarefas de exportação. Os
+  arquivos são apagados depois de gravar no banco, só dentro da pasta de dados e sem falhar
+  por arquivo já ausente. Tarefa rodando recusa com `busy` (saída 4, 409). Na web, o
+  administrador tem "Mais ações" > Apagar no card da pregação ("Apagar a pregação e N
+  cortes?") e Apagar no menu do cartão do corte ("Apagar o corte e N exportações?"), com
+  Apagar e Cancelar ([#13](https://github.com/leandrokanis/wordcut/issues/13)).
 
 ### Alterado
+
+- `last_task` do `sermon show` deixa de fora a tarefa `prepare`, que aparece em `timeline`.
+- `sermon suggest` substitui só os cortes sugeridos não editados que vieram do LLM: um corte
+  criado pelo administrador fica, mesmo descartado e restaurado
+  ([#12](https://github.com/leandrokanis/wordcut/issues/12)).
+- O progresso de `sermon process` avança dentro do download da faixa e da transcrição, não só
+  na troca de etapa, na web, na CLI (`--wait`, `task wait`) e na SSE, sem mudança de contrato;
+  nunca diminui e é gravado no máximo uma vez por segundo, além das trocas de etapa
+  ([#3](https://github.com/leandrokanis/wordcut/issues/3); ADR-0024).
+- Web: a pregação em processamento mostra a etapa e o percentual no botão ("Processando —
+  Transcrevendo 50%") e, no painel de cortes, a lista de passos do protótipo (baixar,
+  transcrever, cortar, sugerir), cada um com o seu percentual, no lugar de "Os cortes aparecem
+  depois do processamento.". Enquanto processa, iniciado nesta sessão ou em outra, o editor
+  fica travado: bordas, atalhos I e O, "Início aqui"/"Fim aqui", reprodução e Processar; a
+  prévia que tocava é pausada. A trava começa quando a API aceita o processamento (o
+  Processar fica desabilitado enquanto o pedido não tem resposta), não vale para a recusa e
+  sai no fim, com sucesso ou falha, sem recarregar a página
+  ([#4](https://github.com/leandrokanis/wordcut/issues/4)).
 
 - `cut list` e `GET /api/sermons/{id}/cuts` trazem em cada corte `start` e `end`: o menor
   início e o maior fim dos trechos, em tempo da pregação, ao milissegundo.
@@ -331,3 +425,13 @@ Formato de [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões
   comportamento.
 - `skills/video-corte-vertical/sugerir-cortes.md` e `exemplos.md`: os critérios da sugestão
   vivem no pacote (`criteria list`, presets).
+
+### Corrigido
+
+- Os arquivos das exportações de um corte apagado por `sermon suggest` ou por `sermon process
+  --force` deixam de ficar órfãos no disco: são apagados depois que os cortes saem do banco
+  ([#13](https://github.com/leandrokanis/wordcut/issues/13)).
+- Web: a chave da API do LLM nas configurações passa a ser gravada também ao sair do campo,
+  não só com Enter, com uma gravação só por envio, o "Salvo" e "••••" com os 4 últimos
+  caracteres na confirmação, e o erro ao lado do campo na falha
+  ([#1](https://github.com/leandrokanis/wordcut/issues/1)).

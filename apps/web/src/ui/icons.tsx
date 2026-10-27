@@ -38,6 +38,10 @@ export function FilmIcon() {
   return <Icon path="M5 5h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2zM7 5v14M17 5v14M3 9.5h4M3 14.5h4M17 9.5h4M17 14.5h4" />;
 }
 
+export function WaveIcon() {
+  return <Icon path="M3 12h1M7 8v8M11 5v14M15 9v6M19 7v10M22 12h-1" />;
+}
+
 export function PlayIcon() {
   return (
     <svg viewBox="0 0 12 12" aria-hidden="true">
@@ -62,4 +66,30 @@ export function DotsIcon() {
 
 export function CaptionIcon() {
   return <Icon path="M5 5h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2zM10 10.5a2 2 0 1 0 0 3M17 10.5a2 2 0 1 0 0 3" />;
+}
+
+export function UndoIcon() {
+  return <Icon path="M9 14 4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />;
+}
+
+export function RedoIcon() {
+  return <Icon path="m15 14 5-5-5-5M20 9H9.5a5.5 5.5 0 0 0 0 11H13" />;
+}
+
+export function ScissorsIcon() {
+  return (
+    <Icon path="M3 6a3 3 0 1 0 6 0 3 3 0 1 0-6 0zM3 18a3 3 0 1 0 6 0 3 3 0 1 0-6 0zM20 4 8.1 15.9M14.5 14.5 20 20M8.1 8.1 12 12" />
+  );
+}
+
+export function LeftIcon() {
+  return <Icon path="m15 18-6-6 6-6" />;
+}
+
+export function RightIcon() {
+  return <Icon path="m9 18 6-6-6-6" />;
+}
+
+export function TrashIcon() {
+  return <Icon path="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14" />;
 }

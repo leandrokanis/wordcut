@@ -7,7 +7,7 @@ from typing import BinaryIO
 
 import pytest
 
-from wordcut.files import copy_without_overwrite, folder_name
+from wordcut.files import copy_without_overwrite, folder_name, remove_within
 
 SUGGESTED = "2026-10-18 - Culto de domingo.mp4"
 # Arbitrary, non-repeating bytes: a copy that drops or reorders any of them is caught.
@@ -223,3 +223,76 @@ def test_without_hard_links_a_failed_copy_leaves_no_final_name_and_no_temporary_
 
 def test_folder_name_strips_path_unsafe_characters() -> None:
     assert folder_name(date(2026, 1, 2), 'Quem é "Deus"?/') == "2026-01-02 - Quem é Deus"
+
+
+def test_remove_within_takes_a_folder_with_what_it_holds_and_a_file(tmp_path: Path) -> None:
+    root = tmp_path / "home"
+    folder, file = root / "media" / "cuts" / "3", root / "tasks" / "9.log"
+    (folder / "work").mkdir(parents=True)
+    (folder / "4.mp4").write_bytes(VIDEO)
+    file.parent.mkdir()
+    file.write_text("log")
+
+    remove_within(root, [folder, file])
+
+    assert (folder.exists(), file.exists()) == (False, False)
+
+
+def test_remove_within_skips_what_is_already_gone(tmp_path: Path) -> None:
+    root = tmp_path / "home"
+    root.mkdir()
+    kept = root / "kept.mp4"
+    kept.write_bytes(VIDEO)
+
+    remove_within(root, [root / "gone", root / "gone.mp4", kept])
+
+    assert not kept.exists()
+
+
+@pytest.mark.parametrize("escape", ["../outside.mp4", "media/../../outside.mp4", "absolute"])
+def test_remove_within_never_removes_outside_its_root(tmp_path: Path, escape: str) -> None:
+    root = tmp_path / "home"
+    root.mkdir()
+    bait = tmp_path / "outside.mp4"
+    bait.write_bytes(VIDEO)
+
+    remove_within(root, [bait if escape == "absolute" else root / escape])
+
+    assert bait.read_bytes() == VIDEO
+
+
+def test_remove_within_never_removes_its_root_itself(tmp_path: Path) -> None:
+    root = tmp_path / "home"
+    root.mkdir()
+
+    remove_within(root, [root, root / "media" / ".."])
+
+    assert root.is_dir()
+
+
+def test_remove_within_does_not_follow_a_link_that_leads_outside(tmp_path: Path) -> None:
+    root = tmp_path / "home"
+    root.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "keep.mp4").write_bytes(VIDEO)
+    (root / "link").symlink_to(outside)
+
+    remove_within(root, [root / "link"])
+
+    assert (outside / "keep.mp4").read_bytes() == VIDEO
+
+
+def test_remove_within_skips_a_path_that_leaves_its_root_through_a_link_on_the_way(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "home"
+    root.mkdir()
+    outside = tmp_path / "outside"
+    (outside / "cuts" / "3").mkdir(parents=True)
+    (outside / "cuts" / "3" / "4.mp4").write_bytes(VIDEO)
+    (root / "media").symlink_to(outside)
+
+    remove_within(root, [root / "media" / "cuts" / "3"])
+
+    assert (outside / "cuts" / "3" / "4.mp4").read_bytes() == VIDEO

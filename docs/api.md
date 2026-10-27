@@ -4,8 +4,9 @@ A API (`apps/api`, FastAPI) expõe à web as mesmas operações da CLI, sobre a 
 serviço ([ADR-0004](adr/0004-camada-de-servico-no-core.md)). Este documento lista as rotas,
 os corpos, os status e os eventos de progresso. As decisões estão na
 [ADR-0019](adr/0019-identidade-e-erros-na-api.md), na
-[ADR-0020](adr/0020-rotas-e-progresso-por-sse-na-api.md) e na
-[ADR-0021](adr/0021-rotas-de-cortes-e-administracao-na-api.md).
+[ADR-0020](adr/0020-rotas-e-progresso-por-sse-na-api.md), na
+[ADR-0021](adr/0021-rotas-de-cortes-e-administracao-na-api.md) e, para a mídia da timeline,
+na [ADR-0025](adr/0025-midia-da-timeline-por-storyboards-e-audio-minimo.md).
 
 As palavras-chave DEVE, NÃO DEVE e PODE seguem o BCP 14
 ([RFC 2119](https://www.rfc-editor.org/rfc/rfc2119),
@@ -58,18 +59,27 @@ As palavras-chave DEVE, NÃO DEVE e PODE seguem o BCP 14
 | `PATCH /api/sermons/{id}` | `{"start", "end"}` | 200 a pregação como o `GET` a mostra | 400 bordas fora da live; 404; 409 `sermon_too_short`, `busy` | assistente |
 | `POST /api/sermons/{id}/process` | `{"force": false}`, opcional | 202 a tarefa lançada | 404; 409 `sermon_not_trimmed`, `would_discard_edits`, `live_not_finished`, `busy`; 502 `youtube_error` | assistente |
 | `POST /api/sermons/{id}/suggest` | `{"preset_id": null}`, opcional | 202 a tarefa lançada | 404 pregação ou preset; 409 `sermon_not_processed`, `llm_not_configured`, `busy` | administrador |
+| `POST /api/sermons/{id}/prepare` | — | 202 a tarefa `prepare` lançada, que refaz as miniaturas e a forma de onda | 404; 409 `busy` com outra `prepare` da pregação em andamento | assistente |
+| `GET /api/sermons/{id}/thumbnails` | — | 200 a faixa de miniaturas (`image/jpeg`), lado a lado na ordem do tempo | 404 pregação inexistente ou miniaturas indisponíveis | assistente |
+| `GET /api/sermons/{id}/thumbnails.json` | — | 200 `{"width", "height", "times"}`: tamanho de uma miniatura da faixa e o segundo da live de cada uma | 404 como `thumbnails` | assistente |
+| `GET /api/sermons/{id}/waveform` | — | 200 `{"buckets", "peaks"}`: os picos da live inteira, de 0 a 1, na ordem do tempo | 404 pregação inexistente ou forma de onda indisponível | assistente |
+| `DELETE /api/sermons/{id}` | — | 200 `{"id", "deleted": true}`, como `DELETE /api/presets/{id}`; apaga a pregação com cortes, exportações, transcrição, tarefas e arquivos, como `sermon delete` (CLI §7.8); depois dele o `GET` dá 404 | 404; 409 `busy` com tarefa da pregação (`process`, `suggest`, `prepare`) ou exportação de um corte dela rodando, nada apagado | administrador |
 | `GET /api/sermons/{id}/video` | — | 200 o vídeo 16:9 (`video/mp4`), `Content-Disposition: attachment` com o nome `AAAA-MM-DD - Título.mp4` | 404; 409 `sermon_not_processed` | assistente |
-| `GET /api/tasks[?status=&kind=]` | — | 200 `{"items"}` de `task list` | 400 `status` fora de `running`, `succeeded`, `failed`; `kind` fora de `process`, `render`, `suggest` | assistente |
+| `GET /api/tasks[?status=&kind=]` | — | 200 `{"items"}` de `task list` | 400 `status` fora de `running`, `succeeded`, `failed`; `kind` fora de `process`, `render`, `suggest`, `prepare` | assistente |
 | `GET /api/tasks/{id}` | — | 200 a tarefa de `task show` | 404 | assistente |
 | `GET /api/tasks/{id}/events` | — | 200 `text/event-stream` (§3) | 404 em JSON, antes de abrir o fluxo | assistente |
 | `GET /api/status` | — | 200 `{"lock", "running_tasks"}` de `wordcut status` | — | assistente |
-| `GET /api/sermons/{id}/cuts[?status=]` | — | 200 `{"items"}` de `cut list`, os descartados por último, cada corte com `start` e `end` (vão dos trechos, em tempo da pregação) | 400 `status` fora de `suggested`, `chosen`, `discarded`; 404 | assistente |
+| `GET /api/sermons/{id}/cuts[?status=]` | — | 200 `{"items"}` de `cut list`, os descartados por último, cada corte com `start` e `end` (vão dos trechos) e `range_start` e `range_end` (a faixa), em tempo da pregação | 400 `status` fora de `suggested`, `chosen`, `discarded`; 404 | assistente |
+| `POST /api/sermons/{id}/cuts` | `{"start", "end", "title"?}`, em segundos da pregação | 201 o corte criado, como o `GET /api/cuts/{id}` o mostra: `chosen`, `source` `admin` | 400 campo desconhecido ou faltando, valor que não é número (título que não é texto), regra de `cut create` (menos de 10 s depois de encostar, fim antes do início, fora da pregação); 404; 409 `sermon_not_processed` | administrador |
 | `GET /api/cuts/{id}` | — | 200 o corte de `cut show`, com as exportações sem `path` | 404 | assistente |
+| `DELETE /api/cuts/{id}` | — | 200 `{"id", "deleted": true}`; apaga o corte com exportações e arquivos, como `cut delete` (CLI §8.11); depois dele o `GET` dá 404 | 404; 409 `busy` com o corte exportando ou a pregação dele processando ou sugerindo, nada apagado | administrador |
 | `GET /api/cuts/{id}/preview` | — | 200 a sequência de `cut preview`; nunca espera a trava | 404 | assistente |
 | `POST /api/cuts/{id}/choose` | — | 200 o corte como o `GET` o mostra | 404 | assistente |
 | `POST /api/cuts/{id}/discard` | — | 200 o corte como o `GET` o mostra | 404 | assistente |
 | `POST /api/cuts/{id}/restore` | — | 200 o corte como o `GET` o mostra; um corte não descartado fica como está | 404 | assistente |
 | `PUT /api/cuts/{id}/words/{word_id}` | `{"text"}` | 200 `{"cut_id", "word_id", "text", "start", "end", "corrected"}` de `cut fix-word`; o texto original remove a correção | 400 `text` vazio ou com mais de uma palavra, `word_id` fora dos trechos; 404; 409 `spelling_too_different` com `distance`, `limit` e `original` | assistente |
+| `PUT /api/cuts/{id}/segments` | `{"segments": [{"from_word", "to_word"}]}` | 200 o corte como o `GET` o mostra, editado | 400 corpo fora do formato ou regra de `cut segments` (lista vazia, palavra fora da faixa ou de outra pregação, trecho invertido, sobreposição); 404 | administrador |
+| `PATCH /api/cuts/{id}/range` | `{"start"?, "end"?}` ou `{"by"}` | 200 o corte como o `GET` o mostra, editado | 400 corpo vazio, `by` junto com `start` ou `end`, campo desconhecido, valor que não é número, regra de `cut range`/`cut move` (menos de 10 s depois de encostar, fim antes do início, corte vazio); 404 | administrador |
 | `GET /api/cuts/{id}/caption` | — | 200 o estilo da legenda de `cut caption` | 404 | assistente |
 | `PATCH /api/cuts/{id}/caption` | campos do estilo | 200 o estilo inteiro | 400 sem campo, valor fora da faixa (`min`, `max`), escolha fora (`choices`), cor fora de `#RRGGBB`; 404 | assistente |
 | `DELETE /api/cuts/{id}/caption` | — | 200 o estilo padrão, ligado | 404 | assistente |
@@ -99,8 +109,40 @@ Corpos de entrada:
 - `start` e `end` do `PATCH` são obrigatórios, em segundos da live e como número
   (`3730.5`); texto como `"1:02:10"` dá 400. A resposta não traz `needs_reprocess`: numa
   pregação já processada, o estado continua `processed` e as bordas novas valem depois de
-  processar de novo com `force`.
-- A pregação nasce sem bordas no `POST /api/sermons`; as bordas vão no `PATCH`.
+  processar de novo com `force`. Ela traz `borders_changed`, como o `GET`.
+- `borders_changed` (booleano, no `GET /api/sermons`, no `GET /api/sermons/{id}` e na
+  resposta do `PATCH`): `true` quando a pregação está processada e as bordas atuais diferem
+  das usadas no último processamento bem-sucedido ([docs/cli.md](cli.md) §7.2). A web
+  oferece Reprocessar no menu Exportar a partir dele.
+- A pregação nasce sem bordas no `POST /api/sermons`; as bordas vão no `PATCH`. Uma
+  pregação nova já sai com a preparação da timeline lançada ([docs/cli.md](cli.md) §7.7).
+- `timeline` (no `GET /api/sermons/{id}` e na resposta do `PATCH`): `{"status", "error",
+  "task_id"}`, com `status` `pending` (a tarefa `prepare` em `task_id` roda), `ready` ou
+  `failed` (com `error`, mensagem genérica) ([docs/cli.md](cli.md) §7.7). A web acompanha a
+  tarefa pelos eventos (§3) e, no fim, lê a pregação de novo e busca as mídias.
+- As três rotas de mídia da timeline dão 404 `not_found` enquanto a preparação não terminou,
+  quando ela falhou ou, nas miniaturas, quando a live não tem storyboards; nunca 500. As
+  respostas não trazem caminho do servidor. A faixa muda quando a timeline é preparada de
+  novo: a web acrescenta `?v=` à URL para não reaproveitar a imagem antiga.
+- O `GET /api/cuts/{id}` traz `range_sentences`, as frases da faixa com quanto delas o corte
+  toca (`included`: `all`, `part`, `none`), como `cut show` ([docs/cli.md](cli.md) §8.2). O
+  `PUT .../segments` troca a lista inteira de trechos, com as regras de `cut segments`
+  (§8.10); a recusa não grava nada. A aba Texto da web, para o administrador, mostra essas
+  frases com uma caixa cada e grava por essa rota.
+- O `POST /api/sermons/{id}/cuts` cria um corte do zero com as regras de `cut create`
+  ([docs/cli.md](cli.md) §8.8): a faixa encosta em frases, o corte toca todas elas, nasce
+  `chosen` com `source` `admin` e a nova sugestão nunca o substitui; a recusa não grava nada.
+  No painel de cortes do nível 2, o administrador tem "Novo corte", que cria a faixa de 60 s a
+  partir do cursor (em tempo da pregação), terminando no fim da pregação quando faltam menos
+  de 60 s e recuando o início para manter 10 s; com a resposta, a web abre o nível do corte.
+  O assistente não vê o botão.
+- O `PATCH .../range` redimensiona a faixa com `start` e `end` (um deles basta; o outro fica)
+  ou a move com `by`, em segundos da pregação e como número, com as regras de `cut range` e
+  `cut move` ([docs/cli.md](cli.md) §8.9); a recusa não grava nada. Na timeline do nível 2, o
+  administrador arrasta as bordas (`start` e `end`) ou o meio (`by`) da camada de um corte
+  não descartado, com prévia local; grava ao soltar e, se a API recusar, a camada volta e o
+  erro aparece. Um toque sem arrastar (até 3 px) abre o corte não descartado, para qualquer
+  papel; a camada de um corte descartado não abre, como o cartão do painel.
 - O `PATCH` da legenda aceita `enabled` (booleano), `font`, `color` e `border_color`
   (`#RRGGBB`), `position` (`top`, `center`, `bottom`), `shadow` (`none`, `soft`, `strong`)
   e `size`, `offset` e `border` (inteiros), com os nomes e as faixas de `cut caption`

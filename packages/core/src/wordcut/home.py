@@ -34,6 +34,10 @@ class Home:
         """The folder of the media files of sermon ``sermon_id``."""
         return self.root / "media" / "sermons" / str(sermon_id)
 
+    def sermon_timeline(self, sermon_id: int) -> Path:
+        """The folder of the thumbnails and waveform of sermon ``sermon_id``'s timeline."""
+        return self.sermon_media(sermon_id) / "timeline"
+
     def cut_media(self, cut_id: int) -> Path:
         """The folder of the exports of cut ``cut_id``."""
         return self.root / "media" / "cuts" / str(cut_id)

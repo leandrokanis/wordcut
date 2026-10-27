@@ -125,6 +125,7 @@ interativa permitida é a digitação sem eco de segredo em `settings set-key` e
 | `sermon process` | 1.1.c | assistente | ✅ com trava |
 | `sermon download` | 1.1.d | assistente | — |
 | `sermon suggest` | 2.1.b | admin | ✅ sem trava |
+| `sermon prepare` | 1.1.b | assistente | ✅ sem trava |
 | `sermon delete` | 1.2.b | admin | — |
 | `cut list` · `show` · `preview` | 1.1.e, 1.1.g | assistente | — |
 | `cut choose` · `discard` · `restore` | 1.1.e | assistente | — |
@@ -229,7 +230,7 @@ Sem `--json`, o `message` vai para o stderr.
 | `forbidden` | 1 | só na API (HTTP 403): e-mail fora da equipe, ou papel sem permissão para a rota; a mensagem nunca traz o e-mail (ADR-0015, ADR-0019) |
 | `invalid_argument` | 2 | argumento inválido; `details.argument` diz qual opção do comando, quando identificável, com o nome que o parser define, e `details.choices` lista as opções válidas de uma escolha; argumento não reconhecido não traz `details`; a mensagem nunca repete o que foi digitado, nem como nome de opção (ADR-0015) |
 | `not_found` | 3 | ID ou e-mail inexistente |
-| `busy` | 4 | outra tarefa segura a trava, ou já há uma sugestão da mesma pregação em andamento (§7.6); `details` traz a tarefa (`task_id`, `kind`, `started_at`) |
+| `busy` | 4 | outra tarefa segura a trava, ou já há uma sugestão (§7.6) ou uma preparação da timeline (§7.7) da mesma pregação em andamento, ou o que se quer apagar tem tarefa rodando (§7.8, §8.11); `details` traz a tarefa (`task_id`, `kind`, `started_at`) |
 | `live_not_finished` | 5 | processar uma live que ainda não terminou |
 | `sermon_not_trimmed` | 5 | processar sem bordas definidas |
 | `sermon_too_short` | 5 | bordas com menos de 1 minuto |
@@ -251,14 +252,16 @@ Códigos novos MAY ser acrescentados; os existentes MUST NOT mudar de saída.
 
 ### 6.1. Modelo
 
-`sermon process`, `sermon suggest` e `cut render` são **tarefas**: rodam em segundo plano,
-têm ID e estado gravados no SQLite e podem ser acompanhadas.
+`sermon process`, `sermon suggest`, `sermon prepare` e `cut render` são **tarefas**: rodam
+em segundo plano, têm ID e estado gravados no SQLite e podem ser acompanhadas. `sermon
+create` também lança uma, a preparação da timeline da pregação nova (§7.7).
 
 | Tipo (`kind`) | Comando | Trava |
 |---|---|:-:|
 | `process` | `sermon process` | ✅ |
 | `render` | `cut render` | ✅ |
 | `suggest` | `sermon suggest` | — |
+| `prepare` | `sermon prepare`, e `sermon create` numa pregação nova | — |
 
 Estados: `running`, `succeeded`, `failed`.
 
@@ -307,6 +310,10 @@ Cria a pregação a partir do link da live e devolve título, data do culto e du
 
 - O mesmo vídeo duas vezes MUST devolver a pregação existente, com `"created": false` e
   saída 0.
+- Uma pregação nova MUST ter a timeline preparada em segundo plano (§7.7): a criação lança a
+  tarefa `prepare`, destacada, e volta sem esperá-la. O mesmo vídeo de novo não prepara outra
+  vez. Se o lançamento falhar, a pregação continua criada e a timeline aparece como não
+  preparada.
 - Live não terminada: cria, avisa no stderr e devolve `"live_finished": false` (1.1.a.2).
 - `--start`/`--end`: delimita na criação, como `sermon trim`; os dois juntos ou nenhum. Bordas
   recusadas MUST NOT deixar pregação criada. Para um vídeo que já tem pregação, delimita a
@@ -322,26 +329,38 @@ wordcut sermon create https://youtube.com/live/… --start 1:02:10 --end 1:48:30
 
 ### 7.2. `sermon list [--status S]` · `sermon show <id> [--transcript]`
 
-- `list`: ID, título, data, duração da pregação, estado e quantidade de cortes por estado.
+- `list`: ID, título, data, duração da pregação, estado, quantidade de cortes por estado e
+  `borders_changed`.
 - `show`: os mesmos dados, mais as bordas na live (`live_start`, `live_end`), as bordas
   ajustadas às palavras pelo processamento (`sermon_start`, `sermon_end`, em tempo da live;
   `null` antes de processar), `processed_at`, a última tarefa da pregação (`last_task`, no
-  formato de `task show`, ou `null`), os cortes (`cuts`) e o erro da última sugestão
-  (`suggestion_error`).
+  formato de `task show`, ou `null`; a preparação da timeline não conta), os cortes
+  (`cuts`), o erro da última sugestão (`suggestion_error`) e o estado da timeline
+  (`timeline`, §7.7).
 - Cada corte em `cuts`, na ordem em que foi criado: `id`, `status`, `title`, `segments` (no
   formato de `cut segments`, §8.10, na ordem em que o corte toca), `range_start_word` e
   `range_end_word` (primeira e última palavra da faixa contínua, na ordem da pregação),
   `source` (`llm` ou `admin`), `preset_id` (o preset da sugestão; `null` se o preset foi
   apagado ou o corte não veio do LLM) e `edited`.
+- `borders_changed` (em `list` e `show`): `true` quando a pregação está `processed` e as
+  bordas na live (`live_start`, `live_end`) diferem, ao milissegundo, das usadas no último
+  processamento bem-sucedido (1.1.b.3); `false` nos demais casos, inclusive para pregações
+  processadas antes de as bordas processadas serem guardadas, até a próxima mudança. Sem
+  `--json`, o `show` traz a linha
+  `Bordas mudaram desde o processamento: reprocesse com wordcut sermon process --force.`
 - `suggestion_error`: `{"code", "message"}` da última sugestão que falhou, ou `null` quando
   ela deu certo ou nunca rodou. Sem `--json`, o `show` termina com a linha
   `Sugestão de cortes falhou: <mensagem>`.
+- `timeline`: `{"status", "error", "task_id"}` da preparação das miniaturas e da forma de
+  onda (§7.7). Sem `--json`, o `show` traz a linha `Timeline: preparando`, `Timeline: pronta`
+  ou `Timeline: falhou (<mensagem>)`.
 
 ```json
 { "cuts": [ { "id": 34, "status": "suggested", "title": "Graça que alcança",
               "segments": [ { "from_word": 1201, "to_word": 1230 } ],
               "range_start_word": 1201, "range_end_word": 1230, "source": "llm",
               "preset_id": 1, "edited": false } ],
+  "borders_changed": false,
   "suggestion_error": null }
 ```
 - `--transcript`: acrescenta a transcrição, uma frase por linha, com ID da frase, tempo e IDs
@@ -362,7 +381,9 @@ Define as bordas da pregação, em tempo da live (1.1.b.2).
 - Faixa com menos de 1 minuto: `sermon_too_short`.
 - Bordas fora de `[0, duração da live]` ou com o início no fim ou depois dele:
   `invalid_argument`. Com a duração da live desconhecida (live no ar), vale só a ordem.
-- Numa pregação processada, só grava as bordas; reprocessar é `sermon process --force`.
+- Numa pregação processada, só grava as bordas; reprocessar é `sermon process --force`. A
+  resposta traz `borders_changed` (§7.2), que volta a `false` quando as bordas voltam às
+  processadas.
 
 ### 7.4. `sermon process <id> [--force] [--wait]`
 
@@ -373,9 +394,12 @@ pede as sugestões ao LLM com o preset padrão (2.1.b.1).
   criada com a live no ar é consultada de novo no YouTube antes da recusa.
 - Numa pregação já processada, MUST exigir `--force`, porque os cortes e suas edições são
   refeitos (1.1.b.3); sem ele, `would_discard_edits`. Com `--force`, os cortes da pregação
-  são apagados junto com as palavras e as frases.
+  são apagados junto com as palavras e as frases, e depois os arquivos das exportações deles
+  (1.2.b.1).
 - Uma pregação `failed` é refeita pelo mesmo comando (1.1.c.3).
-- A pregação fica `processing` desde o lançamento e termina `processed` ou `failed`.
+- A pregação fica `processing` desde o lançamento e termina `processed` ou `failed`. O
+  sucesso guarda as bordas na live usadas como as processadas, e `borders_changed` (§7.2)
+  volta a `false`; a falha não as muda.
 - Depois de gravar palavras e frases, a tarefa pede os cortes ao LLM uma vez (constituição
   §III), com o prompt do preset padrão e as frases numeradas de 1 em diante, sem tempos. A
   resposta é validada por esquema; fora dele, uma nova tentativa; fora de novo, `llm_error`.
@@ -408,8 +432,11 @@ título). Devolve o caminho de destino (1.1.d).
 Tarefa sem trava: pede nova sugestão ao LLM (2.1.b.2), com o preset indicado ou o padrão.
 O pedido e a validação da resposta são os do `sermon process` (§7.4).
 
-- Os cortes `suggested` não editados são substituídos, só no sucesso e numa transação.
-- Os cortes escolhidos, descartados ou editados permanecem.
+- Os cortes `suggested` não editados que vieram do LLM (`source` `llm`) são substituídos, só
+  no sucesso e numa transação; depois dela, os arquivos das exportações deles são apagados
+  (1.2.b.1).
+- Os cortes escolhidos, descartados ou editados permanecem, e os criados pelo administrador
+  (`source` `admin`, §8.8) também, em qualquer estado.
 - Recusas antes de criar a tarefa: pregação inexistente ou preset inexistente (`not_found`,
   com `details.sermon_id` ou `details.preset_id`); pregação não processada
   (`sermon_not_processed`); sem o modelo do LLM ou sem a chave (`llm_not_configured`, que não
@@ -441,10 +468,58 @@ O pedido e a validação da resposta são os do `sermon process` (§7.4).
   `suggested_cuts` traz os cortes novos no formato do `sermon show`; `suggestion_warnings`,
   os descartados pela duração, como no §7.4.
 
-### 7.7. `sermon delete <id>` — administrador
+### 7.7. `sermon prepare <id> [--wait]`
 
-Apaga a pregação, seus cortes, exportações e mídias (1.2.b). Falha com `busy` se uma tarefa
-da pregação estiver rodando.
+Tarefa sem trava (1.1.b.1, ADR-0025): prepara as miniaturas e a forma de onda da timeline da
+pregação. Baixa só as imagens de navegação da live (storyboards do YouTube, do maior
+tamanho) e o áudio da live inteira na menor qualidade; calcula os picos da forma de onda e
+apaga o áudio. `sermon create` lança a mesma tarefa numa pregação nova (§7.1); este comando
+a pede de novo.
+
+- Não toma a trava de processamento: roda junto com um `process` ou um `render`. Outra
+  `prepare` da mesma pregação em andamento: `busy`, com `task_id`, `kind` e `started_at`
+  dela. A tarefa órfã (§6.5) não conta. A conferência e a criação da tarefa não são
+  atômicas.
+- Roda em qualquer estado da timeline, pronta inclusive: refaz tudo. Mostrar a pregação
+  (`sermon show`, web) nunca prepara.
+- Live sem storyboards: a timeline fica pronta só com a forma de onda, sem erro. A falha das
+  miniaturas também deixa só a forma de onda; a falha do áudio deixa a timeline `failed`.
+- `timeline.status` (§7.2): `pending` enquanto a tarefa roda (`task_id` é a tarefa),
+  `ready` ou `failed`. Uma pregação sem preparação em andamento nem terminada (criada antes
+  desta versão, ou com a tarefa morta) aparece `failed` com o erro `interrupted`.
+- `timeline.error`: `{"code", "message"}` da falha, com uma mensagem genérica que nunca traz
+  caminho, URL, cookies nem a saída do yt-dlp; o código é o da falha (`youtube_error`,
+  `network_error`, `internal_error`). A tarefa falha com o mesmo erro.
+- A falha da preparação MUST NOT impedir `sermon trim` nem `sermon process`.
+- Etapas no progresso: `miniaturas`, `áudio`, `forma de onda`.
+- Sem `--wait`, devolve a tarefa (§6.2). Com `--wait`, devolve
+  `{"sermon_id": 12, "timeline": {"status": "ready", "error": null, "task_id": null}}`; o
+  resultado gravado na tarefa é `{"sermon_id", "status": "ready", "thumbnails"}`, com
+  `thumbnails` falso quando a live não tem storyboards.
+
+```
+wordcut sermon prepare 12 --wait --json
+```
+
+### 7.8. `sermon delete <id>` — administrador
+
+Apaga a pregação de vez, sem pedir confirmação (1.2.b.1): os cortes dela (sugeridos,
+escolhidos e descartados), as correções de grafia, as exportações, a transcrição, o estado da
+timeline e as tarefas da pregação e dos cortes. Depois de gravar no banco, apaga os arquivos:
+a pasta de mídia da pregação inteira (vídeo 16:9, miniaturas, forma de onda e pasta de
+trabalho), a pasta de cada corte com as exportações e os logs das tarefas. Arquivo que já
+não existe não impede; caminho que sairia da pasta de dados (§14) nunca é apagado.
+
+- Saída: `{"id": 12, "deleted": true}`; em texto, `Pregação 12 apagada, com seus cortes e
+  arquivos.`
+- Pregação inexistente: `not_found` (saída 3), com `details.sermon_id`.
+- Tarefa da pregação rodando (`process`, `suggest` ou `prepare`), ou exportação (`render`)
+  de um corte dela: `busy` (saída 4), com `task_id`, `kind` e `started_at` da tarefa, e nada
+  é apagado. A tarefa órfã (§6.5) não impede.
+
+```
+wordcut sermon delete 12 --json
+```
 
 ## 8. Cortes (`cut`)
 
@@ -454,8 +529,10 @@ Estados (`status`): `suggested`, `chosen`, `discarded`.
 
 Lista os cortes da pregação com texto montado, duração e estado (1.1.e.1). Descartados vêm
 por último. Cada corte traz também `start` e `end`: o menor início e o maior fim dos seus
-trechos, em tempo da pregação, arredondados ao milissegundo. É o vão que a timeline do
-nível 2 desenha; com trechos fora de ordem ele vai além do que o corte toca.
+trechos, em tempo da pregação, arredondados ao milissegundo; com trechos fora de ordem esse
+vão vai além do que o corte toca. E traz `range_start` e `range_end`: o início e o fim da
+faixa do corte (§8.9), no mesmo tempo e arredondamento. A camada do corte na timeline do
+nível 2 desenha a faixa.
 
 ### 8.2. `cut show <id>`
 
@@ -463,6 +540,12 @@ Devolve o corte completo:
 
 - texto montado, duração, estado e faixa na pregação;
 - `segments`: trechos em ordem, no formato de `cut segments` (§8.10), com tempos e texto;
+- `range_sentences`: as frases da faixa do corte, na ordem da pregação, cada uma com `id`,
+  `start` e `end` (tempo da pregação), `text` (com as correções de grafia do corte),
+  `first_word` e `last_word` e `included`: `all` quando o corte toca todas as suas palavras,
+  `part` quando toca algumas e `none` quando não toca nenhuma. A frase que cruza a borda da
+  faixa vem recortada a ela: `first_word`, `last_word`, tempos e texto são os da parte dentro
+  da faixa. Sem `--json`, não aparece;
 - `words`: palavras do corte com `word_id`, `text` (o original), tempos e `corrected` (a
   correção de grafia do corte, §8.5, ou `null`);
 - `caption`: estilo efetivo da legenda, no formato de `cut caption` (§8.6); o padrão completo
@@ -607,17 +690,66 @@ Tarefa com trava: cria uma exportação 9:16 do estado atual do corte (1.1.h).
 - Uma falha da renderização deixa a tarefa `failed` (`internal_error`) e um Ctrl+C a deixa
   `interrupted`; nos dois casos nenhuma exportação é registrada e nenhum arquivo fica.
 
-### 8.8. `cut create --sermon <id> --start T --end T` — administrador
+### 8.8. `cut create --sermon <id> --start T --end T [--title TEXTO]` — administrador
 
-Cria um corte do zero com as frases da faixa, já `chosen` (2.1.c.4).
+Cria um corte do zero com as frases da faixa, já `chosen` (2.1.c.4). Os tempos são da
+pregação (0 no início dela); `T` aceita `SS`, `MM:SS` ou `HH:MM:SS`, como em `cut range`.
+
+- A faixa encosta em frases como em `cut range` (§8.9): o início no início de frase mais
+  próximo e o fim no fim de frase mais próximo. O corte toca a faixa inteira, num trecho só,
+  com todas as frases dela.
+- O corte nasce `chosen`, com `source` `admin`, `preset_id` `null` e `edited` `false`.
+  `sermon suggest` nunca o substitui, nem depois de descartado e restaurado (§7.6).
+- `--title`: o título, sem os espaços das pontas. Omitido ou só com espaços, o corte se chama
+  `Novo corte · MM:SS`, com o início da faixa encostada em tempo da pregação (os minutos
+  passam de 59, como em `75:03`).
+- Recusas, sem gravar nada: `invalid_argument` (`details.argument` é `range`) para tempo que
+  não é número finito, fim antes do início ou igual a ele, início antes de 0 ou fim depois
+  do fim da pregação, e faixa com menos de 10 s depois de encostar nas frases ou cujo fim,
+  ao encostar, cai antes do início; pregação inexistente: `not_found`; pregação não
+  processada: `sermon_not_processed`.
+- Não é tarefa nem toma a trava. A CLI roda no host e não confere papel, como `cut range`;
+  pela API, só o administrador (§5.3).
+- Saída: o corte como `cut show` (§8.2), em JSON ou em texto.
+
+```
+wordcut cut create --sermon 12 --start 12:30 --end 13:30 --title "Graça" --json
+```
 
 ### 8.9. `cut range <id> [--start T] [--end T]` · `cut move <id> --by ±S` — administrador
 
-Ajustam a faixa contínua do corte (2.1.c.3).
+Ajustam a faixa contínua do corte (2.1.c.3). Os tempos são da pregação (0 no início dela).
 
-- `range`: redimensiona; as frases que ficam de fora saem do corte.
-- `move`: desloca a faixa inteira em `S` segundos; as frases escolhidas acompanham e encostam
-  na frase mais próxima.
+- `range`: redimensiona. `T` aceita `SS`, `MM:SS` ou `HH:MM:SS`, como em `sermon trim`; a
+  borda omitida fica onde estava, e sem nenhuma das duas é `invalid_argument`. O início
+  encosta no início de frase mais próximo e o fim, no fim de frase mais próximo; as palavras
+  dos trechos que ficam fora da faixa saem do corte (um trecho que cruza a borda é cortado
+  nela). Ampliar a faixa só oferece as frases novas em `range_sentences` (§8.2), com
+  `included` `none`; elas não entram sozinhas no corte.
+- `move`: desloca a faixa inteira em `S` segundos (`--by -12.5` ou `--by=-12.5` volta). O
+  deslocamento para no início e no fim da pregação (a primeira e a última frase da
+  transcrição), e a faixa deslocada encosta em frases como em `range`. Cada frase escolhida
+  (com ao menos uma palavra no corte, mesmo que só em parte) vai inteira para a frase da faixa
+  nova cujo início fica mais perto do seu início deslocado, sem repetir destino; as que ficam
+  sem destino livre saem. Os trechos novos seguem a ordem em que o corte tocava as frases, e
+  destinos vizinhos tocados em seguida viram um trecho só.
+- `invalid_argument`, sem gravar nada (`details.argument` é `range`): faixa com menos de
+  10 s depois de encostar nas frases; fim antes do início ou igual a ele; fim que, ao
+  encostar, cai antes do início; faixa que deixaria o corte sem nenhuma palavra; tempo que não é número. Em `move`,
+  um `--by` que não é número finito dá `invalid_argument` com `details.argument` `by`. Corte
+  inexistente: `not_found`.
+- Gravar marca o corte como editado (`edited`), e `sermon suggest` o mantém (§7.6). As
+  correções de grafia ficam gravadas, como em `cut segments` (§8.10). Vale em qualquer estado
+  do corte, inclusive descartado (a web é que não arrasta o descartado); não é tarefa nem toma
+  a trava.
+- A CLI roda no host e não confere papel, como `cut segments`; pela API, só o administrador
+  (§5.3).
+- Saída: o corte como `cut show` (§8.2), em JSON ou em texto.
+
+```
+wordcut cut range 34 --start 1:02:10 --end 1:03:05 --json
+wordcut cut move 34 --by -12.5 --json
+```
 
 ### 8.10. `cut segments <id> --file <arquivo|->` — administrador
 
@@ -631,13 +763,44 @@ uma lista ordenada de faixas de palavras:
 ]
 ```
 
-- A lista cobre escolher frases, reordenar trechos e dividir uma frase.
-- As palavras MUST estar dentro da faixa do corte; senão, `invalid_argument`.
+- A lista cobre escolher frases, reordenar trechos e dividir uma frase. Ela substitui a
+  anterior inteira, na ordem dada.
+- `invalid_argument`, sem gravar nada: lista vazia; elemento que não é um objeto com
+  `from_word` e `to_word` inteiros; palavra que não é da pregação do corte; trecho que
+  termina antes de começar; palavra fora da faixa do corte (as bordas da faixa valem);
+  trechos que se sobrepõem, inclusive repetidos. Arquivo ilegível, que não é JSON ou não é
+  uma lista também dá `invalid_argument`. Em todos os casos, `details.argument` é `file` e
+  nenhuma mensagem repete o caminho nem o conteúdo (ADR-0015). Corte inexistente:
+  `not_found`.
+- Gravar marca o corte como editado (`edited`), e `sermon suggest` o mantém (§7.6). As
+  correções de grafia ficam gravadas, inclusive as das palavras que saem do corte, que
+  voltam se a frase voltar; as exportações já feitas não mudam. Vale em qualquer estado do
+  corte; não é tarefa nem toma a trava.
+- A CLI roda no host e não confere papel, como `preset`; pela API, só o administrador
+  (§5.3).
+- Saída: o corte como `cut show` (§8.2), em JSON ou em texto.
 - `cut show --json` devolve `segments` no mesmo formato, para editar e devolver.
+
+```
+wordcut cut segments 34 --file - --json < trechos.json
+```
 
 ### 8.11. `cut delete <id>` — administrador
 
-Apaga o corte e suas exportações (1.2.b).
+Apaga o corte de vez, sem pedir confirmação (1.2.b.1): as exportações, as correções de grafia
+e as tarefas de exportação dele. Depois de gravar no banco, apaga a pasta do corte com os
+arquivos das exportações e os logs dessas tarefas, com as mesmas regras de arquivo ausente e
+de pasta de dados do `sermon delete` (§7.8). Os outros cortes da pregação ficam.
+
+- Saída: `{"id": 34, "deleted": true}`; em texto, `Corte 34 apagado, com suas exportações.`
+- Corte inexistente: `not_found` (saída 3), com `details.cut_id`.
+- Corte exportando (`render`), ou pregação dele processando (`process`) ou sugerindo
+  (`suggest`): `busy` (saída 4), com `task_id`, `kind` e `started_at` da tarefa, e nada é
+  apagado. A tarefa órfã (§6.5) não impede.
+
+```
+wordcut cut delete 34 --json
+```
 
 ## 9. Exportações (`render`)
 
@@ -781,6 +944,7 @@ A CLI também roda no contêiner: `docker compose run --rm cli <comando>`.
 |---|---|---|
 | Banco (SQLite) e mídias | `~/.local/share/wordcut/` | sobrescrito por `WORDCUT_HOME`; nos contêineres, o volume de dados |
 | Mídias de uma pregação | `media/sermons/<id>/` na pasta de dados | `sermon.mp4`; intermediários em `work/`, apagados no sucesso |
+| Mídias da timeline | `media/sermons/<id>/timeline/` na pasta de dados | `thumbnails.jpg`, `thumbnails.json`, `waveform.json`; intermediários em `timeline-work/`, apagados no fim |
 | Exportações de um corte | `media/cuts/<id>/` na pasta de dados | `<render_id>.mp4`; intermediários em `work/`, apagados no fim |
 | Saída dos processos de tarefa | `tasks/<id>.log` na pasta de dados | traz o rastreio de um erro interno; permissão 600 |
 | Segredos (chave do LLM, cookies) | `~/.config/wordcut/` | permissão 600 |

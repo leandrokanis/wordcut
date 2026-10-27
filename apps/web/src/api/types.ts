@@ -24,9 +24,12 @@ export interface Sermon {
   created_at: string;
 }
 
-/** An item of ``GET /api/sermons``: ``duration`` is null until the sermon has borders. */
+/** An item of ``GET /api/sermons``: ``duration`` is null until the sermon has borders;
+ * ``borders_changed`` is true when the sermon is processed and its borders differ from the
+ * ones the processing used. */
 export interface SermonListItem extends Sermon {
   duration: number | null;
+  borders_changed: boolean;
   cut_counts: Record<CutStatus, number>;
 }
 
@@ -54,6 +57,29 @@ export interface SermonShown extends Omit<SermonListItem, "live_duration"> {
   last_task: Task | null;
   cuts: SermonCut[];
   suggestion_error: { code: string; message: string } | null;
+  timeline: TimelineState;
+}
+
+/** service/sermons.py ``_timeline``: the preparation of the thumbnails and the waveform, and
+ * the ``prepare`` task that runs it while ``pending``. */
+export interface TimelineState {
+  status: "pending" | "ready" | "failed";
+  error: { code: string; message: string } | null;
+  task_id: number | null;
+}
+
+/** ``GET /api/sermons/{id}/thumbnails.json``: the size of a thumbnail of the strip and the
+ * second of the live each one shows, in the order they lie side by side. */
+export interface ThumbnailsLayout {
+  width: number;
+  height: number;
+  times: number[];
+}
+
+/** ``GET /api/sermons/{id}/waveform``: the peaks of the whole live, 0 to 1, in time order. */
+export interface Waveform {
+  buckets: number;
+  peaks: number[];
 }
 
 /** An item of ``GET /api/sermons/{id}/cuts``, service/cuts.py ``_spanned``: ``text`` is the
@@ -65,6 +91,9 @@ export interface ListedCut extends SermonCut {
   duration: number;
   start: number;
   end: number;
+  /** Where the cut's range starts and ends, in sermon time. */
+  range_start: number;
+  range_end: number;
   segments: { from_word: number; to_word: number }[];
   range_start_word: number;
   range_end_word: number;
@@ -89,6 +118,18 @@ export interface CutSegment {
   start: number;
   end: number;
   text: string;
+}
+
+/** A sentence of the cut's range, docs/cli.md §8.2: cut down to the range when it crosses
+ * its border, times in sermon time; ``included`` says how much of it the cut plays. */
+export interface RangeSentence {
+  id: number;
+  start: number;
+  end: number;
+  text: string;
+  first_word: number;
+  last_word: number;
+  included: "all" | "part" | "none";
 }
 
 /** A word of the cut: ``text`` is the original, ``corrected`` the cut's spelling fix. */
@@ -149,8 +190,12 @@ export interface RenderEstimate {
 }
 
 /** ``GET /api/cuts/{id}``, service/cuts.py ``show_cut``: ``renders`` oldest first. */
-export interface Cut extends Omit<ListedCut, "start" | "end" | "segments"> {
+export interface Cut extends Omit<
+  ListedCut,
+  "start" | "end" | "segments" | "range_start" | "range_end"
+> {
   segments: CutSegment[];
+  range_sentences: RangeSentence[];
   words: CutWord[];
   caption: CaptionStyle;
   render_options: RenderOptions;
@@ -177,7 +222,7 @@ export interface FixedWord extends CutWord {
   cut_id: number;
 }
 
-export type TaskKind = "process" | "render" | "suggest";
+export type TaskKind = "process" | "render" | "suggest" | "prepare";
 
 /** A task as service/tasks.py ``shown_task`` gives it. */
 export interface Task {

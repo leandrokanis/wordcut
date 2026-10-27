@@ -12,9 +12,10 @@ from typing import Any
 import pytest
 
 from wordcut import suggestion
-from wordcut.db import connect, cuts, sermons, tasks, transcripts
+from wordcut.db import connect, cuts, renders, sermons, tasks, transcripts
 from wordcut.db.cuts import NewCut, Segment
 from wordcut.db.presets import SecondsRange
+from wordcut.db.renders import NewRender
 from wordcut.db.sermons import NewSermon, SuggestionError
 from wordcut.db.tasks import NewTask
 from wordcut.errors import WordcutError
@@ -182,6 +183,35 @@ def test_a_suggestion_in_the_foreground_replaces_the_suggestions_and_gives_the_n
         },
         ["Sugerido editado", "Escolhido", "Descartado", "Novo"],
         build_request(preset, sentences).system,
+    )
+
+
+def exported_file(connection: sqlite3.Connection, home: Home, sermon_id: int, title: str) -> Path:
+    """An export of the cut titled ``title``, recorded as the ``render`` task does, with its
+    file on disk."""
+    [cut] = [row for row in cuts.of_sermon(connection, sermon_id) if row.title == title]
+    with connection:
+        render_id = renders.insert(connection, NewRender(cut.id, "", 31.5, {}, PROCESSED_AT))
+        file = home.cut_media(cut.id) / f"{render_id}.mp4"
+        renders.set_path(connection, render_id, str(file.relative_to(home.root)))
+    file.parent.mkdir(parents=True, exist_ok=True)
+    file.write_bytes(b"exported cut")
+    return file
+
+
+def test_a_suggestion_deletes_the_export_files_of_the_cuts_it_replaces_and_only_those(
+    home: Home, connection: sqlite3.Connection, configured: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sermon_id = processed_sermon(connection)
+    replaced = exported_file(connection, home, sermon_id, "Sugerido antigo")
+    kept = [exported_file(connection, home, sermon_id, title) for title, _ in EARLIER_CUTS[1:]]
+    install(monkeypatch, answer(("Novo", [3, 4, 5, 6, 7, 8])))
+
+    start_suggestion(home, sermon_id, detach=False)
+
+    assert (replaced.parent.exists(), [file.is_file() for file in kept]) == (
+        False,
+        [True, True, True],
     )
 
 

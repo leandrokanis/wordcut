@@ -12,3 +12,6 @@ node_modules/
 
 # credenciais nunca entram no repo
 *cookies*.txt
+
+# specs, planos e QA são artefatos locais de trabalho
+specs/

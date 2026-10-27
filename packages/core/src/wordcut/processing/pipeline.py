@@ -9,7 +9,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 
 from wordcut.errors import WordcutError
-from wordcut.processing import ProcessingGateways
+from wordcut.processing import OnProgress, ProcessingGateways
 from wordcut.processing.sentences import Sentence, split_sentences
 from wordcut.transcript import Word
 from wordcut.youtube import YouTubeError
@@ -34,6 +34,10 @@ DOWNLOADING = (0.0, "baixando")
 SYNCING = (0.3, "sincronizando")
 TRANSCRIBING = (0.35, "transcrevendo")
 CUTTING = (0.85, "cortando")
+# Inside "baixando": the section first, then the much shorter audio window.
+SECTION_DOWNLOAD = (0.0, 0.28)
+WINDOW_DOWNLOAD = (0.28, SYNCING[0])
+TRANSCRIPTION = (TRANSCRIBING[0], CUTTING[0])
 
 Progress = Callable[[float, str], None]
 
@@ -66,7 +70,10 @@ def process(
     downloaded into ``workdir``; the cut video is left there as ``sermon.mp4``.
     """
     progress(*DOWNLOADING)
-    downloaded = _download(gateways, workdir, url, live_start, live_end, _Live(live_duration))
+    downloading = _Stage(progress, DOWNLOADING[1])
+    downloaded = _download(
+        gateways, workdir, url, live_start, live_end, _Live(live_duration), downloading
+    )
     progress(*SYNCING)
     offset = gateways.locate(
         downloaded.window, downloaded.section, downloaded.expected_offset, SYNC_SEARCH_S
@@ -74,7 +81,11 @@ def process(
     section_start = downloaded.window_start + offset
     progress(*TRANSCRIBING)
     with _transcription_errors():
-        transcript = gateways.transcribe(downloaded.section, workdir)
+        transcript = gateways.transcribe(
+            downloaded.section,
+            workdir,
+            on_progress=_Stage(progress, TRANSCRIBING[1]).within(*TRANSCRIPTION),
+        )
     kept = _within(transcript.shifted(section_start).words, live_start, live_end)
     sermon_start = _to_millisecond(kept[0].start - LEAD_IN_S)
     sermon_end = _to_millisecond(kept[-1].end + TAIL_S)
@@ -108,15 +119,24 @@ def _download(
     live_start: float,
     live_end: float,
     live: _Live,
+    stage: _Stage,
 ) -> _Downloaded:
     section_start = live.clamped(live_start - SECTION_MARGIN_S)
     window_start = live.clamped(live_start - WINDOW_BEFORE_S)
     with _youtube_errors():
         section = gateways.download_section(
-            url, section_start, live.clamped(live_end + SECTION_MARGIN_S), workdir / SECTION_FILE
+            url,
+            section_start,
+            live.clamped(live_end + SECTION_MARGIN_S),
+            workdir / SECTION_FILE,
+            on_progress=stage.within(*SECTION_DOWNLOAD),
         )
         window = gateways.download_audio_window(
-            url, window_start, live.clamped(live_start + WINDOW_AFTER_S), workdir / WINDOW_FILE
+            url,
+            window_start,
+            live.clamped(live_start + WINDOW_AFTER_S),
+            workdir / WINDOW_FILE,
+            on_progress=stage.within(*WINDOW_DOWNLOAD),
         )
     return _Downloaded(section, window, window_start, section_start - window_start)
 
@@ -153,6 +173,27 @@ def _transcription_errors() -> Iterator[None]:
             "transcription_error",
             "A transcrição falhou: confira o ambiente do WhisperX e a GPU (veja o README).",
         ) from None
+
+
+class _Stage:
+    """The progress of one stage: operations inside it report how far they are, from 0 to 1,
+    and the stage keeps the processing's progress rising within their part of it."""
+
+    def __init__(self, progress: Progress, message: str) -> None:
+        self._progress = progress
+        self._message = message
+        self._reached = -1.0
+
+    def within(self, start: float, end: float) -> OnProgress:
+        """How an operation filling ``start`` to ``end`` of the processing reports."""
+
+        def report(fraction: float) -> None:
+            reached = start + (end - start) * min(max(fraction, 0.0), 1.0)
+            if reached > self._reached:
+                self._reached = reached
+                self._progress(reached, self._message)
+
+        return report
 
 
 @dataclass(frozen=True)

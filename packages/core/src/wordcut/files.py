@@ -1,5 +1,5 @@
-"""Copies of media files to a place the user chose, never overwriting what is there, and the
-readable names they suggest."""
+"""Copies of media files to a place the user chose, never overwriting what is there, the
+readable names they suggest, and the removal of media files of the data folder."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import os
 import re
 import shutil
 import uuid
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from datetime import date
 from itertools import count
 from pathlib import Path
@@ -108,3 +108,20 @@ def _candidates(target: Path) -> Iterator[Path]:
     yield target
     for number in count(FIRST_COPY_NUMBER):
         yield target.with_name(f"{target.stem} ({number}){target.suffix}")
+
+
+def remove_within(root: Path, paths: Iterable[Path]) -> None:
+    """Remove each file or folder of ``paths``, with what it holds, when it lies inside
+    ``root``; one already gone is skipped.
+
+    A path is judged by where it leads once ``..`` and links are resolved, so a corrupted
+    path recorded in the database never removes anything outside the data folder.
+    """
+    inside = root.resolve()
+    for path in paths:
+        if inside not in path.resolve().parents:
+            continue
+        if path.is_dir() and not path.is_symlink():
+            shutil.rmtree(path, ignore_errors=True)
+        else:
+            path.unlink(missing_ok=True)

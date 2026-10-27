@@ -27,3 +27,5 @@ Uma decisão por arquivo, no formato de Michael Nygard ([ADR-0001](0001-registra
 | [ADR-0021](0021-rotas-de-cortes-e-administracao-na-api.md) | Rotas de cortes e de administração na API (complementa a ADR-0020 e a ADR-0019) | Aceita |
 | [ADR-0022](0022-arquitetura-do-cliente-web.md) | Arquitetura do cliente web (complementa a ADR-0008 e a ADR-0019) | Aceita; o ponto "nenhum recurso de outro host" substituído pela ADR-0023 |
 | [ADR-0023](0023-previa-da-live-pelo-embed-do-youtube.md) | Prévia da live pelo embed do YouTube (substitui a ADR-0022 num ponto) | Aceita |
+| [ADR-0024](0024-progresso-dentro-das-etapas.md) | Progresso dentro das etapas do processamento (complementa a ADR-0014 e a ADR-0007) | Aceita |
+| [ADR-0025](0025-midia-da-timeline-por-storyboards-e-audio-minimo.md) | Mídia da timeline por storyboards e áudio mínimo, numa tarefa sem trava (complementa a ADR-0014, a ADR-0007 e a ADR-0017) | Aceita |

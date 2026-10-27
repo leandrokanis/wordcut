@@ -22,6 +22,8 @@ import type {
   Settings,
   SettingsModels,
   TaskLaunched,
+  ThumbnailsLayout,
+  Waveform,
 } from "./types";
 
 /** A failed call: the API's error object, with the HTTP status. */
@@ -106,6 +108,24 @@ export function processSermon(id: number, force = false): Promise<TaskLaunched> 
   return post(`/api/sermons/${id}/process`, force ? { force } : {});
 }
 
+/** Prepares the thumbnails and the waveform of the sermon's timeline again. */
+export function prepareSermon(id: number): Promise<TaskLaunched> {
+  return post(`/api/sermons/${id}/prepare`, {});
+}
+
+export function getThumbnailsLayout(sermonId: number): Promise<ThumbnailsLayout> {
+  return request(`/api/sermons/${sermonId}/thumbnails.json`);
+}
+
+/** The strip of thumbnails; ``version`` changes once the strip is prepared again. */
+export function thumbnailsUrl(sermonId: number, version: number): string {
+  return `/api/sermons/${sermonId}/thumbnails?v=${version}`;
+}
+
+export function getWaveform(sermonId: number): Promise<Waveform> {
+  return request(`/api/sermons/${sermonId}/waveform`);
+}
+
 /** The cuts of the sermon in the service's order: the discarded ones last. */
 export async function listCuts(sermonId: number): Promise<ListedCut[]> {
   return (await request<{ items: ListedCut[] }>(`/api/sermons/${sermonId}/cuts`)).items;
@@ -133,6 +153,30 @@ export function getCut(id: number): Promise<Cut> {
 /** The sequence the level 3 preview plays; never waits for the processing lock. */
 export function previewCut(id: number): Promise<CutPreview> {
   return request(`/api/cuts/${id}/preview`);
+}
+
+/** Makes ``segments`` what the cut plays, in that order (docs/cli.md §8.10); administrator
+ * only. Answers the cut as ``getCut``. */
+export function putCutSegments(
+  id: number,
+  segments: { from_word: number; to_word: number }[],
+): Promise<Cut> {
+  return send("PUT", `/api/cuts/${id}/segments`, { segments });
+}
+
+/** Creates a chosen cut of the sermon over ``{start, end}``, in sermon time, snapped to
+ * sentences; answers it as ``GET /api/cuts/{id}`` shows it (docs/cli.md §8.8). */
+export function createCut(sermonId: number, range: { start: number; end: number }): Promise<Cut> {
+  return post(`/api/sermons/${sermonId}/cuts`, range);
+}
+
+/** Resizes the cut's range to ``{start, end}`` or moves it ``{by}`` seconds, in sermon time;
+ * answers the cut as ``GET /api/cuts/{id}`` shows it (docs/cli.md §8.9). */
+export function patchCutRange(
+  id: number,
+  change: { start: number; end: number } | { by: number },
+): Promise<Cut> {
+  return send("PATCH", `/api/cuts/${id}/range`, change);
 }
 
 /** Changes only the given fields of the cut's caption style; answers the whole style. */
@@ -185,6 +229,11 @@ export function startRender(id: number, options: RenderOptions): Promise<TaskLau
 /** The exports of the cut, newest first. */
 export async function listRenders(cutId: number): Promise<Render[]> {
   return (await request<{ items: Render[] }>(`/api/cuts/${cutId}/renders`)).items;
+}
+
+/** Where the browser plays or downloads the processed 16:9 video, named by the API. */
+export function sermonVideoUrl(sermonId: number): string {
+  return `/api/sermons/${sermonId}/video`;
 }
 
 /** Where the browser downloads the export's video, named by the API. */
@@ -244,6 +293,16 @@ export function patchPreset(id: number, change: PresetChange): Promise<Preset> {
 
 export function setDefaultPreset(id: number): Promise<Preset> {
   return post(`/api/presets/${id}/set-default`, {});
+}
+
+/** Deletes the sermon with its cuts, exports and files: 409 ``busy`` while one of its tasks
+ * runs. */
+export function deleteSermon(id: number): Promise<{ id: number; deleted: true }> {
+  return request(`/api/sermons/${id}`, { method: "DELETE" });
+}
+
+export function deleteCut(id: number): Promise<{ id: number; deleted: true }> {
+  return request(`/api/cuts/${id}`, { method: "DELETE" });
 }
 
 /** The default preset cannot be deleted: 409 ``default_preset``. */

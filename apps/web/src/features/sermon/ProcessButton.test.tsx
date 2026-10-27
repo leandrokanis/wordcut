@@ -1,4 +1,4 @@
-import { act, fireEvent, screen, within } from "@testing-library/react";
+import { act, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach } from "vitest";
 
@@ -69,12 +69,25 @@ async function launchAndFollow(sermon = shownSermon(), routes = {}) {
   return streams()[0];
 }
 
-test("shows the progress on the button as the events arrive", async () => {
+test("shows the stage and the progress on the button as the events arrive", async () => {
   const stream = await launchAndFollow();
 
-  act(() => stream.emit("progress", runningTask({ progress: 0.35 })));
+  act(() => stream.emit("progress", runningTask({ progress: 0.12, progress_message: "baixando" })));
+  const downloading = screen.getByRole("button", { name: "Processando — Baixando 12%" });
+  act(() =>
+    stream.emit("progress", runningTask({ progress: 0.5, progress_message: "transcrevendo" })),
+  );
 
-  expect(screen.getByRole("button", { name: "Processando 35%" })).toBeDisabled();
+  expect([downloading.textContent, downloading.hasAttribute("disabled")]).toEqual([
+    "Processando — Transcrevendo 50%",
+    true,
+  ]);
+});
+
+test("says only Processando until the task names its stage", async () => {
+  await launchAndFollow();
+
+  expect(screen.getByRole("button", { name: "Processando" })).toBeDisabled();
 });
 
 /** The sermon's GET answers as the API would before and after the task ends. */
@@ -127,7 +140,9 @@ test("follows the task already running when the sermon opens", async () => {
 
   expect({
     streams: streams().map(({ url }) => url),
-    button: screen.getByRole("button", { name: "Processando 35%" }).hasAttribute("disabled"),
+    button: screen
+      .getByRole("button", { name: "Processando — Transcrevendo 35%" })
+      .hasAttribute("disabled"),
   }).toEqual({ streams: ["/api/tasks/15/events"], button: true });
 });
 
@@ -181,42 +196,3 @@ test("locks Processar with the reason once the API says the live is on", async (
   ]).toEqual([LIVE_ON, true]);
 });
 
-async function openProcessedAndMoveBorder() {
-  const routes = {
-    "PATCH /api/sermons/12": ({ body }: RecordedCall) => {
-      const { start, end } = body as { start: number; end: number };
-      return { body: processedSermon({ live_start: start, live_end: end }) };
-    },
-  };
-  await openSermon(processedSermon({ live_duration: 7080 }), routes);
-  const before = screen.queryByRole("button", { name: "Reprocessar" });
-  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue(
-    DOMRect.fromRect({ x: 0, y: 0, width: 1000, height: 100 }),
-  );
-  const timeline = screen.getByRole("region", { name: "Timeline" });
-  const start = within(timeline).getByRole("slider", { name: "Início da pregação" });
-  fireEvent.pointerDown(start, { clientX: 254 });
-  fireEvent.pointerMove(start, { clientX: 300 });
-  fireEvent.pointerUp(start, { clientX: 300 });
-  return before;
-}
-
-test("offers Reprocessar, warning that the cuts' edits are lost, once the borders change", async () => {
-  const before = await openProcessedAndMoveBorder();
-
-  await screen.findByRole("button", { name: "Reprocessar" });
-
-  expect([before, screen.getByText(/as edições dos cortes se perdem/).tagName]).toEqual([
-    null,
-    "P",
-  ]);
-});
-
-test("reprocesses with force, the only way the API discards the cuts' edits", async () => {
-  fakeEventSource();
-  await openProcessedAndMoveBorder();
-
-  await userEvent.click(await screen.findByRole("button", { name: "Reprocessar" }));
-
-  expect(processPosts().map(({ body }) => body)).toEqual([{ force: true }]);
-});

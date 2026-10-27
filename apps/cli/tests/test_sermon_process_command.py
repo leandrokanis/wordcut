@@ -9,6 +9,7 @@ import pytest
 from wordcut import processing
 from wordcut.home import Home
 from wordcut.lock import ProcessingLock
+from wordcut.processing import OnProgress
 from wordcut.transcript import Transcript, Word
 from wordcut.youtube import LiveInfo, YouTubeError
 from wordcut_cli import deps, main
@@ -40,16 +41,20 @@ class FakeLive:
 class FakeGateways:
     """``ProcessingGateways`` double: the section holds ``LIVE_WORDS``."""
 
-    def download_section(self, url: str, start: float, end: float, output: Path) -> Path:
+    def download_section(
+        self, url: str, start: float, end: float, output: Path, *, on_progress: OnProgress
+    ) -> Path:
         return output
 
-    def download_audio_window(self, url: str, start: float, end: float, output: Path) -> Path:
+    def download_audio_window(
+        self, url: str, start: float, end: float, output: Path, *, on_progress: OnProgress
+    ) -> Path:
         return output
 
     def locate(self, recording: Path, clip: Path, expected_start: float, search: float) -> float:
         return expected_start
 
-    def transcribe(self, media: Path, workdir: Path) -> Transcript:
+    def transcribe(self, media: Path, workdir: Path, *, on_progress: OnProgress) -> Transcript:
         words = tuple(word.shifted(-SECTION_START) for word in LIVE_WORDS)
         return Transcript(words=words, language="pt", model="fake")
 
@@ -155,23 +160,28 @@ def test_force_processes_a_processed_sermon_again(
     live: FakeLive, gateways: Any, capsys: pytest.CaptureFixture[str]
 ) -> None:
     sermon_id = trimmed(capsys)
-    main(["sermon", "process", sermon_id, "--wait", "--quiet"])
-    capsys.readouterr()
+    _, first = run_json(["sermon", "process", sermon_id, "--wait", "--json"], capsys)
 
     exit_code, sermon = run_json(
         ["sermon", "process", sermon_id, "--force", "--wait", "--json"], capsys
     )
 
-    assert (exit_code, sermon["status"], sermon["last_task"]["id"]) == (0, "processed", 2)
+    assert (exit_code, sermon["status"], sermon["last_task"]["id"]) == (
+        0,
+        "processed",
+        first["last_task"]["id"] + 1,
+    )
 
 
 class RefusingYouTube(FakeGateways):
-    def download_section(self, url: str, start: float, end: float, output: Path) -> Path:
+    def download_section(
+        self, url: str, start: float, end: float, output: Path, *, on_progress: OnProgress
+    ) -> Path:
         raise YouTubeError("O YouTube recusou o pedido.")
 
 
 class MissingWhisperX(FakeGateways):
-    def transcribe(self, media: Path, workdir: Path) -> Transcript:
+    def transcribe(self, media: Path, workdir: Path, *, on_progress: OnProgress) -> Transcript:
         raise FileNotFoundError("ambiente do WhisperX não encontrado")
 
 

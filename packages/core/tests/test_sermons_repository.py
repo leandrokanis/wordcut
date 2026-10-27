@@ -156,3 +156,42 @@ def test_database_at_schema_version_1_gains_the_sermons_table_and_keeps_its_data
             ("mantida",),
             [inserted],
         )
+
+
+def migrations_up_to(tmp_path: Path, last: int) -> Path:
+    folder = tmp_path / "migrations"
+    folder.mkdir()
+    for packaged in MIGRATIONS.glob("*.sql"):
+        if int(packaged.name.split("_")[0]) <= last:
+            (folder / packaged.name).write_text(packaged.read_text(encoding="utf-8"))
+    return folder
+
+
+def insert_at_schema_10(connection: sqlite3.Connection, youtube_id: str, status: str) -> int:
+    sermon_id = connection.execute(
+        "INSERT INTO sermons (youtube_id, url, title, service_date, live_finished, status,"
+        " live_start, live_end, sermon_start, sermon_end, created_at, updated_at)"
+        " VALUES (?, 'https://youtu.be/x', 'Culto', '2026-10-18', 1, ?, 600.5, 4200.25,"
+        " 601.2, 4199.8, '2026-10-26T22:40:00+00:00', '2026-10-26T22:40:00+00:00')",
+        (youtube_id, status),
+    ).lastrowid
+    assert sermon_id is not None
+    return sermon_id
+
+
+def test_a_database_at_schema_10_takes_the_live_borders_of_processed_sermons_as_processed(
+    tmp_path: Path,
+) -> None:
+    home = Home(tmp_path / "home")
+    with closing(connect(home, migrations_up_to(tmp_path, 10))) as old, old:
+        processed_id = insert_at_schema_10(old, "Aaaaaaaaaa1", "processed")
+        trimmed_id = insert_at_schema_10(old, "Aaaaaaaaaa2", "trimmed")
+
+    with closing(connect(home)) as migrated:
+        processed = sermons.by_id(migrated, processed_id)
+        trimmed = sermons.by_id(migrated, trimmed_id)
+        assert processed is not None and trimmed is not None
+        assert (
+            (processed.processed_live_start, processed.processed_live_end),
+            (trimmed.processed_live_start, trimmed.processed_live_end),
+        ) == ((600.5, 4200.25), (None, None))

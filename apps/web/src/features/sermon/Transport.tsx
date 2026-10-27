@@ -1,4 +1,4 @@
-import { useState, type RefObject } from "react";
+import { useEffect, useState, type RefObject } from "react";
 
 import { formatDuration } from "../../ui/format";
 import { PauseIcon, PlayIcon } from "../../ui/icons";
@@ -11,11 +11,19 @@ interface TransportProps {
   liveDuration: number | null;
   /** Null while the borders cannot change. */
   onMark: ((edge: Edge) => void) | null;
+  /** The sermon is processing: nothing plays. */
+  locked: boolean;
 }
 
 /** Play/pause and the cursor's time in the live. */
-export function Transport({ preview, cursor, liveDuration, onMark }: TransportProps) {
+export function Transport({ preview, cursor, liveDuration, onMark, locked }: TransportProps) {
   const [playing, setPlaying] = useState(false);
+  // The page pauses the preview as the processing starts; play must not read Pausar after it.
+  useEffect(() => {
+    if (locked) {
+      setPlaying(false);
+    }
+  }, [locked]);
 
   function toggle() {
     if (playing) {
@@ -53,6 +61,7 @@ export function Transport({ preview, cursor, liveDuration, onMark }: TransportPr
           className="play"
           type="button"
           aria-label={playing ? "Pausar" : "Reproduzir"}
+          disabled={locked}
           onClick={toggle}
         >
           {playing ? <PauseIcon /> : <PlayIcon />}

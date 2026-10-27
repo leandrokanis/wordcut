@@ -107,6 +107,34 @@ def set_status(
     )
 
 
+def set_segments(
+    connection: sqlite3.Connection,
+    cut_id: int,
+    segments: Sequence[Segment],
+    updated_at: datetime,
+) -> None:
+    """Store what the cut plays, in the order given, in the caller's transaction."""
+    connection.execute(
+        "UPDATE cuts SET segments = ?, updated_at = ? WHERE id = ?",
+        (_segments_json(segments), updated_at.isoformat(), cut_id),
+    )
+
+
+def set_range(
+    connection: sqlite3.Connection,
+    cut_id: int,
+    range_words: tuple[int, int],
+    segments: Sequence[Segment],
+    updated_at: datetime,
+) -> None:
+    """Store the range of words of the cut and what it plays, in the caller's transaction."""
+    connection.execute(
+        "UPDATE cuts SET range_start_word = ?, range_end_word = ?, segments = ?, updated_at = ?"
+        " WHERE id = ?",
+        (*range_words, _segments_json(segments), updated_at.isoformat(), cut_id),
+    )
+
+
 def set_caption(
     connection: sqlite3.Connection,
     cut_id: int,
@@ -148,15 +176,22 @@ def counts_of(connection: sqlite3.Connection, sermon_id: int) -> dict[str, int]:
     return {status: count for status, count in found}
 
 
+def delete(connection: sqlite3.Connection, cut_id: int) -> None:
+    """Remove the cut; its exports and spelling fixes go with it (ON DELETE CASCADE)."""
+    connection.execute("DELETE FROM cuts WHERE id = ?", (cut_id,))
+
+
 def delete_of(connection: sqlite3.Connection, sermon_id: int) -> None:
     """Remove every cut of the sermon."""
     connection.execute("DELETE FROM cuts WHERE sermon_id = ?", (sermon_id,))
 
 
 def delete_unedited_suggestions(connection: sqlite3.Connection, sermon_id: int) -> None:
-    """Remove the sermon's ``suggested`` cuts nobody has edited."""
+    """Remove the sermon's ``suggested`` cuts the LLM made that nobody has edited; a cut the
+    administrator created is never one of them, even restored to ``suggested``."""
     connection.execute(
-        "DELETE FROM cuts WHERE sermon_id = ? AND status = 'suggested' AND edited = 0",
+        "DELETE FROM cuts WHERE sermon_id = ? AND status = 'suggested' AND edited = 0"
+        " AND source = 'llm'",
         (sermon_id,),
     )
 

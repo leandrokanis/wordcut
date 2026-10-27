@@ -1,15 +1,19 @@
-"""``wordcut cut <action>``: see and preview the suggested cuts of a sermon, choose, discard
-or restore them, fix the spelling of their caption words, set their caption style and export
-them (docs/cli.md §8.1–§8.7)."""
+"""``wordcut cut <action>``: see and preview the suggested cuts of a sermon, create one,
+choose, discard or restore them, fix the spelling of their caption words, set their caption
+style, set what they play, resize or move their range, export and delete them (docs/cli.md
+§8.1–§8.11)."""
 
 from __future__ import annotations
 
 import argparse
+import json
 import sqlite3
+import sys
 from collections.abc import Callable
 from contextlib import closing
 from dataclasses import fields
 from functools import partial
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from wordcut.cuts.caption import POSITIONS, RANGES, SHADOWS, CaptionSettings
@@ -19,18 +23,23 @@ from wordcut.rendering.options import CHOICES
 from wordcut.service.cuts import (
     caption_of,
     choose_cut,
+    create_cut,
+    delete_cut,
     discard_cut,
     fix_word,
     list_cuts,
+    move_range,
     preview_cut,
     reset_caption,
     restore_cut,
+    set_range,
+    set_segments,
     show_cut,
     update_caption,
 )
 from wordcut.service.rendering import estimate_render, show_render, start_render
 from wordcut.service.sermons import CUT_STATES
-from wordcut.timefmt import format_timestamp
+from wordcut.timefmt import format_timestamp, parse_timestamp
 from wordcut_cli import deps
 from wordcut_cli.contract import Context, add_command, add_group
 from wordcut_cli.tasks_support import add_wait_option, launch
@@ -41,6 +50,7 @@ if TYPE_CHECKING:
 CAPTION_FIELDS = tuple(field.name for field in fields(CaptionSettings))
 POSITION_NAMES = {"top": "topo", "center": "centro", "bottom": "base"}
 SHADOW_NAMES = {"none": "nenhuma", "soft": "suave", "strong": "forte"}
+STDIN = "-"
 STATE_NAMES = {"suggested": "sugerido", "chosen": "escolhido", "discarded": "descartado"}
 
 
@@ -48,8 +58,8 @@ def register(commands: Commands) -> None:
     actions = add_group(
         commands,
         "cut",
-        help="cortes: ver, escolher, descartar, restaurar, corrigir a grafia, ajustar o estilo"
-        " da legenda e exportar",
+        help="cortes: ver, criar, escolher, descartar, restaurar, corrigir a grafia, definir os"
+        " trechos, ajustar a faixa, ajustar o estilo da legenda e exportar",
     )
     listing = add_command(
         actions,
@@ -112,6 +122,70 @@ def register(commands: Commands) -> None:
     fix.add_argument("id", type=int, help="ID do corte")
     fix.add_argument("word_id", type=int, help="ID da palavra, como no cut show")
     fix.add_argument("text", help="a palavra com a grafia corrigida")
+    create = add_command(
+        actions,
+        "create",
+        help="cria um corte do zero com todas as frases da faixa, encostada em início e fim de"
+        " frase, já escolhido — administrador",
+        run=_create,
+        render=_render_cut,
+        example='wordcut cut create --sermon 12 --start 12:30 --end 13:30 --title "Graça" --json',
+    )
+    create.add_argument("--sermon", type=int, required=True, help="ID da pregação")
+    create.add_argument(
+        "--start",
+        type=parse_timestamp,
+        required=True,
+        help="início na pregação, SS, MM:SS ou HH:MM:SS",
+    )
+    create.add_argument(
+        "--end", type=parse_timestamp, required=True, help="fim na pregação, SS, MM:SS ou HH:MM:SS"
+    )
+    create.add_argument(
+        "--title", help='título do corte; sem ele, "Novo corte · MM:SS" do início na pregação'
+    )
+    segments = add_command(
+        actions,
+        "segments",
+        help="define o que entra no corte e em que ordem: uma lista JSON de trechos"
+        ' [{"from_word", "to_word"}], dentro da faixa e sem sobreposição — administrador',
+        run=_segments,
+        render=_render_cut,
+        example="wordcut cut segments 34 --file - --json < trechos.json",
+    )
+    segments.add_argument("id", type=int, help="ID do corte")
+    segments.add_argument(
+        "--file", required=True, help="arquivo com a lista de trechos, em JSON; - lê do stdin"
+    )
+    resize = add_command(
+        actions,
+        "range",
+        help="redimensiona a faixa do corte, encostando em início e fim de frase; as palavras"
+        " que ficam de fora saem do corte — administrador",
+        run=_range_command,
+        render=_render_cut,
+        example="wordcut cut range 34 --start 1:02:10 --end 1:03:05 --json",
+    )
+    resize.add_argument("id", type=int, help="ID do corte")
+    resize.add_argument(
+        "--start", type=parse_timestamp, help="início na pregação, SS, MM:SS ou HH:MM:SS"
+    )
+    resize.add_argument(
+        "--end", type=parse_timestamp, help="fim na pregação, SS, MM:SS ou HH:MM:SS"
+    )
+    move = add_command(
+        actions,
+        "move",
+        help="desloca a faixa inteira em segundos, sem sair da pregação; as frases escolhidas"
+        " acompanham e encostam na frase mais próxima — administrador",
+        run=_move_command,
+        render=_render_cut,
+        example="wordcut cut move 34 --by -12.5 --json",
+    )
+    move.add_argument("id", type=int, help="ID do corte")
+    move.add_argument(
+        "--by", type=float, required=True, help="deslocamento em segundos; negativo volta"
+    )
     caption = add_command(
         actions,
         "caption",
@@ -134,6 +208,18 @@ def register(commands: Commands) -> None:
     )
     export.add_argument("id", type=int, help="ID do corte")
     _add_render_options(export)
+    delete = add_command(
+        actions,
+        "delete",
+        help=(
+            "apaga o corte com suas exportações e arquivos, sem pedir confirmação; recusa com"
+            " busy enquanto ele exporta ou a pregação dele processa ou sugere — administrador"
+        ),
+        run=_delete,
+        render=_render_deleted,
+        example="wordcut cut delete 34 --json",
+    )
+    delete.add_argument("id", type=int, help="ID do corte")
 
 
 def _add_caption_options(caption: argparse.ArgumentParser) -> None:
@@ -323,6 +409,15 @@ def _list(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:
         return list_cuts(connection, args.sermon, args.status)
 
 
+def _delete(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:
+    with closing(deps.connection()) as connection:
+        return delete_cut(Home.from_environment(), connection, args.id)
+
+
+def _render_deleted(result: dict[str, Any]) -> str:
+    return f"Corte {result['id']} apagado, com suas exportações."
+
+
 def _show(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:
     with closing(deps.connection()) as connection:
         return show_cut(connection, args.id, home=Home.from_environment())
@@ -336,6 +431,54 @@ def _preview(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:
 def _fix_word(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:
     with closing(deps.connection()) as connection:
         return fix_word(connection, args.id, args.word_id, args.text)
+
+
+def _segments(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:
+    wanted = _segments_file(args.file)
+    with closing(deps.connection()) as connection:
+        try:
+            return set_segments(connection, args.id, wanted)
+        except WordcutError as error:
+            if (error.details or {}).get("argument") != "segments":
+                raise
+            raise WordcutError(error.code, error.message, {"argument": "file"}) from error
+
+
+def _create(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:
+    with closing(deps.connection()) as connection:
+        return create_cut(connection, args.sermon, args.start, args.end, args.title)
+
+
+def _range_command(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:
+    with closing(deps.connection()) as connection:
+        return set_range(connection, args.id, args.start, args.end)
+
+
+def _move_command(args: argparse.Namespace, ctx: Context) -> dict[str, Any]:
+    with closing(deps.connection()) as connection:
+        return move_range(connection, args.id, args.by)
+
+
+def _segments_file(source: str) -> list[Any]:
+    """The list of segments in ``source``, a path or ``-`` for the standard input."""
+    # ADR-0015: neither the path nor the content the user gave is repeated.
+    try:
+        text = sys.stdin.read() if source == STDIN else Path(source).read_text(encoding="utf-8")
+        wanted = json.loads(text)
+    except (OSError, UnicodeDecodeError, ValueError) as error:
+        raise _unreadable_segments() from error
+    if not isinstance(wanted, list):
+        raise _unreadable_segments()
+    return wanted
+
+
+def _unreadable_segments() -> WordcutError:
+    return WordcutError(
+        "invalid_argument",
+        "Não foi possível ler os trechos; use um arquivo JSON com uma lista de"
+        ' {"from_word", "to_word"}.',
+        {"argument": "file"},
+    )
 
 
 def _render_fixed_word(word: dict[str, Any]) -> str:
