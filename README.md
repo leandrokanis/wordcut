@@ -19,7 +19,7 @@ Ferramentas para transformar a transmissão de um culto em:
 - [API](docs/api.md): rotas HTTP, corpos, status e eventos de progresso.
 - [Arquitetura](docs/architecture/README.md) (C4 e fluxos) e [ADRs](docs/adr/README.md).
 - [Como contribuir](CONTRIBUTING.md), [segurança](SECURITY.md) e [changelog](CHANGELOG.md).
-- [Roadmap do MVP](specs/roadmap.md).
+- [Issues](https://github.com/leandrokanis/wordcut/issues): bugs e histórias em andamento.
 
 ## Como funciona
 

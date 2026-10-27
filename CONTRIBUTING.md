@@ -13,7 +13,7 @@ seguem o BCP 14 ([RFC 2119](https://www.rfc-editor.org/rfc/rfc2119),
 | [docs/adr/](docs/adr/README.md) | decisões de arquitetura, uma por arquivo |
 | [docs/architecture/](docs/architecture/README.md) | modelo C4 e diagramas de sequência |
 | [docs/cli.md](docs/cli.md) | especificação da CLI |
-| [specs/](specs/roadmap.md) | specs, planos e QA de cada item em desenvolvimento |
+| [issues](https://github.com/leandrokanis/wordcut/issues) | bugs e histórias em andamento |
 
 ## 2. Organização do repositório
 
@@ -35,8 +35,8 @@ nenhuma app; apps não dependem umas das outras. Regra de negócio vive só no `
 
 - XP: entregas pequenas, TDD (vermelho → verde → refatorar), integração contínua na branch,
   design simples, refatoração constante e propriedade coletiva do código.
-- Cada item segue `/dev-specify` → `/dev-plan` → `/dev-implement-qa` (ver
-  [specs/roadmap.md](specs/roadmap.md)).
+- Cada item parte de uma issue e segue `/dev-specify` → `/dev-plan` → `/dev-implement-qa`.
+  Os artefatos (spec, plano, QA) ficam em `specs/`, pasta local fora do Git.
 - Testes de comportamento pela interface pública. Serviço externo (YouTube, WhisperX,
   OpenRouter) é dublê nos testes.
 - A suíte não usa a rede real. O `conftest.py` da raiz define `WORDCUT_FORBID_NETWORK`, que

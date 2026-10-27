@@ -8,8 +8,9 @@ organização do monorepo, o fluxo de trabalho, os quality gates e a política d
   sobre a constituição em questões de funcionalidade.
 - Decisão de arquitetura nova → ADR em [docs/adr/](docs/adr/README.md) e atualização de
   [docs/architecture/](docs/architecture/README.md) e do README no mesmo commit.
-- Specs, planos e QA ficam em `specs/<código>-<nome>/`; o andamento do MVP em
-  [specs/roadmap.md](specs/roadmap.md).
+- Specs, planos e QA ficam em `specs/<código>-<nome>/`, pasta local fora do Git
+  (`.gitignore`); o trabalho é rastreado nas
+  [issues do GitHub](https://github.com/leandrokanis/wordcut/issues).
 - Texto de documentação em português; código, identificadores, comentários e mensagens de
   commit em inglês.
 - Mensagens de commit em [Conventional Commits](CONTRIBUTING.md#33-commits), sem `WIP`.
