@@ -12,9 +12,9 @@ Definidas pelo administrador em 2026-10-26:
   agente, registrada no `plan.md` do item, sem parar para perguntar.
 - Tudo na branch `mvp`, um commit por item. Sem push e sem PR.
 - O ID de cada item é o código da história principal; a pasta é `specs/<código>-<nome>/`.
-- Item que não chegar a PASS no limite de rodadas é commitado como `WIP` com as pendências
-  anotadas aqui, e a execução segue para o próximo, para a branch não acumular mudança
-  solta.
+- Item que não chegar a PASS no limite de rodadas não é commitado: as pendências ficam
+  anotadas aqui e a execução para. Commits seguem Conventional Commits, sem `WIP`
+  (CONTRIBUTING.md §3.3).
 - Quality gates antes de cada commit: `uv run pytest`, `uv run ruff check .`,
   `uv run ruff format --check .`, `uv run mypy src`; na interface, typecheck e lint.
 - Testes nunca chamam serviço externo de verdade: YouTube, WhisperX, OpenRouter e

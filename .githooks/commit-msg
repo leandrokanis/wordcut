@@ -1,0 +1,22 @@
+#!/bin/sh
+# Rejects commit messages outside Conventional Commits (CONTRIBUTING.md §3.3).
+
+subject=$(grep -v '^#' "$1" | head -n 1)
+
+case "$subject" in
+  Merge\ *|Revert\ \"*|fixup!\ *|squash!\ *|amend!\ *) exit 0 ;;
+esac
+
+types='feat|fix|docs|refactor|perf|test|build|ci|chore|style|revert'
+pattern="^($types)(\([a-z0-9-]+\))?!?: [a-z0-9\`].*[^.]\$"
+
+fail() {
+  printf 'commit-msg: %s\n  %s\n' "$1" "$subject" >&2
+  printf 'Expected "<type>[(scope)][!]: <description>"; see CONTRIBUTING.md §3.3.\n' >&2
+  exit 1
+}
+
+printf '%s\n' "$subject" | grep -Eq "$pattern" || fail "not a Conventional Commits subject:"
+printf '%s\n' "$subject" | grep -Eiq '(: |\[)wip\b' && fail "WIP commits are not allowed:"
+[ "${#subject}" -le 72 ] || fail "subject longer than 72 characters:"
+exit 0
