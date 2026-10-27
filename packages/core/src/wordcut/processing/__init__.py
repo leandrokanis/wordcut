@@ -7,6 +7,7 @@ hand the pipeline doubles instead.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import Protocol
 
@@ -21,18 +22,25 @@ from wordcut.youtube import YouTube
 SPEECH_FILE = "speech.wav"
 TRANSCRIPT_FILE = "transcript.json"
 
+# How far an operation is, from 0 to 1; the pipeline turns it into the progress of its stage.
+OnProgress = Callable[[float], None]
+
 
 class ProcessingGateways(Protocol):
-    def download_section(self, url: str, start: float, end: float, output: Path) -> Path:
+    def download_section(
+        self, url: str, start: float, end: float, output: Path, *, on_progress: OnProgress
+    ) -> Path:
         """Video and audio of the live between ``start`` and ``end`` (seconds of the live)."""
 
-    def download_audio_window(self, url: str, start: float, end: float, output: Path) -> Path:
+    def download_audio_window(
+        self, url: str, start: float, end: float, output: Path, *, on_progress: OnProgress
+    ) -> Path:
         """Only the audio of the live between ``start`` and ``end``, starting exactly there."""
 
     def locate(self, recording: Path, clip: Path, expected_start: float, search: float) -> float:
         """Seconds into ``recording`` where ``clip`` starts, searched around ``expected_start``."""
 
-    def transcribe(self, media: Path, workdir: Path) -> Transcript:
+    def transcribe(self, media: Path, workdir: Path, *, on_progress: OnProgress) -> Transcript:
         """Words spoken in ``media``, with times relative to it; scratch files go in ``workdir``."""
 
     def duration(self, media: Path) -> float:
@@ -49,19 +57,23 @@ class LocalGateways:
         self._youtube = youtube
         self._transcriber = transcriber
 
-    def download_section(self, url: str, start: float, end: float, output: Path) -> Path:
-        return self._youtube.download_section(url, start, end, output)
+    def download_section(
+        self, url: str, start: float, end: float, output: Path, *, on_progress: OnProgress
+    ) -> Path:
+        return self._youtube.download_section(url, start, end, output, on_progress=on_progress)
 
-    def download_audio_window(self, url: str, start: float, end: float, output: Path) -> Path:
-        return self._youtube.download_audio_window(url, start, end, output)
+    def download_audio_window(
+        self, url: str, start: float, end: float, output: Path, *, on_progress: OnProgress
+    ) -> Path:
+        return self._youtube.download_audio_window(url, start, end, output, on_progress=on_progress)
 
     def locate(self, recording: Path, clip: Path, expected_start: float, search: float) -> float:
         return locate_clip(recording, clip, expected_start, search)
 
-    def transcribe(self, media: Path, workdir: Path) -> Transcript:
+    def transcribe(self, media: Path, workdir: Path, *, on_progress: OnProgress) -> Transcript:
         audio = extract_speech_audio(media, workdir / SPEECH_FILE)
         output = workdir / TRANSCRIPT_FILE
-        self._transcriber.transcribe(audio, output)
+        self._transcriber.transcribe(audio, output, on_progress=on_progress)
         return Transcript.load(output)
 
     def duration(self, media: Path) -> float:

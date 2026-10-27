@@ -284,6 +284,11 @@ Formato de [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões
 
 ### Alterado
 
+- O progresso de `sermon process` avança dentro do download da faixa e da transcrição, não só
+  na troca de etapa, na web, na CLI (`--wait`, `task wait`) e na SSE, sem mudança de contrato;
+  nunca diminui e é gravado no máximo uma vez por segundo, além das trocas de etapa
+  ([#3](https://github.com/leandrokanis/wordcut/issues/3); ADR-0024).
+
 - `cut list` e `GET /api/sermons/{id}/cuts` trazem em cada corte `start` e `end`: o menor
   início e o maior fim dos trechos, em tempo da pregação, ao milissegundo.
 

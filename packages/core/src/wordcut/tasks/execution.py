@@ -35,7 +35,7 @@ RUNNER_MODULE = "wordcut.tasks.runner"
 LOG_FILE_MODE = 0o600
 
 # Progress is stored at most this often, or when its message changes, to spare the database.
-PROGRESS_STORE_INTERVAL_SECONDS = 0.5
+PROGRESS_STORE_INTERVAL_SECONDS = 1.0
 
 
 def start(
@@ -170,7 +170,7 @@ class Outcome:
 def _execute(
     home: Home, task: TaskRow, task_kind: TaskKind, on_progress: ProgressListener | None
 ) -> Outcome:
-    recorder = _ProgressRecorder(home, task, on_progress)
+    recorder = ProgressRecorder(home, task, on_progress)
     resource = Resource(task.resource_type, task.resource_id)
     try:
         return Outcome(
@@ -206,18 +206,28 @@ def _now() -> datetime:
     return datetime.now().astimezone().replace(microsecond=0)
 
 
-class _ProgressRecorder:
-    """Stores the progress of ``task`` and then tells ``listener``, throttled."""
+class ProgressRecorder:
+    """Stores the progress of ``task`` and then tells ``listener``, throttled: a report with
+    the message of the last stored one waits ``PROGRESS_STORE_INTERVAL_SECONDS`` on ``clock``,
+    a new message is always stored."""
 
-    def __init__(self, home: Home, task: TaskRow, listener: ProgressListener | None) -> None:
+    def __init__(
+        self,
+        home: Home,
+        task: TaskRow,
+        listener: ProgressListener | None,
+        *,
+        clock: Callable[[], float] = time.monotonic,
+    ) -> None:
         self._home = home
         self._task = task
         self._listener = listener
+        self._clock = clock
         self._last_message: str | None = None
         self._last_stored_at = -math.inf
 
     def report(self, fraction: float, message: str) -> None:
-        moment = time.monotonic()
+        moment = self._clock()
         is_due = moment - self._last_stored_at >= PROGRESS_STORE_INTERVAL_SECONDS
         if not is_due and message == self._last_message:
             return

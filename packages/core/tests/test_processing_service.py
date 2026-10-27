@@ -13,6 +13,7 @@ from wordcut import processing
 from wordcut.db import connect
 from wordcut.errors import WordcutError
 from wordcut.home import Home
+from wordcut.processing import OnProgress
 from wordcut.service.processing import start_processing
 from wordcut.service.sermons import create_sermon, list_sermons, show_sermon, trim_sermon
 from wordcut.service.tasks import list_tasks, show_task
@@ -60,17 +61,21 @@ class FakeGateways:
         self.while_transcribing: Callable[[], None] = lambda: None
         self.downloads: list[tuple[float, float]] = []
 
-    def download_section(self, url: str, start: float, end: float, output: Path) -> Path:
+    def download_section(
+        self, url: str, start: float, end: float, output: Path, *, on_progress: OnProgress
+    ) -> Path:
         self.downloads.append((start, end))
         return output
 
-    def download_audio_window(self, url: str, start: float, end: float, output: Path) -> Path:
+    def download_audio_window(
+        self, url: str, start: float, end: float, output: Path, *, on_progress: OnProgress
+    ) -> Path:
         return output
 
     def locate(self, recording: Path, clip: Path, expected_start: float, search: float) -> float:
         return SECTION_START - (LIVE_START - 50)
 
-    def transcribe(self, media: Path, workdir: Path) -> Transcript:
+    def transcribe(self, media: Path, workdir: Path, *, on_progress: OnProgress) -> Transcript:
         self.while_transcribing()
         words = tuple(word.shifted(-SECTION_START) for word in self.live_words)
         return Transcript(words=words, language="pt", model="fake")
@@ -198,12 +203,14 @@ def test_a_detached_processing_answers_at_once_with_the_sermon_already_processin
 
 
 class RefusingYouTube(FakeGateways):
-    def download_section(self, url: str, start: float, end: float, output: Path) -> Path:
+    def download_section(
+        self, url: str, start: float, end: float, output: Path, *, on_progress: OnProgress
+    ) -> Path:
         raise YouTubeError("O YouTube recusou o pedido.")
 
 
 class MissingWhisperX(FakeGateways):
-    def transcribe(self, media: Path, workdir: Path) -> Transcript:
+    def transcribe(self, media: Path, workdir: Path, *, on_progress: OnProgress) -> Transcript:
         raise FileNotFoundError("ambiente do WhisperX não encontrado")
 
 
@@ -428,11 +435,13 @@ class FailingOnce(FakeGateways):
         super().__init__()
         self.failures = 1
 
-    def download_section(self, url: str, start: float, end: float, output: Path) -> Path:
+    def download_section(
+        self, url: str, start: float, end: float, output: Path, *, on_progress: OnProgress
+    ) -> Path:
         if self.failures:
             self.failures -= 1
             raise YouTubeError("O YouTube recusou o pedido.")
-        return super().download_section(url, start, end, output)
+        return super().download_section(url, start, end, output, on_progress=on_progress)
 
 
 def test_a_failed_sermon_is_processed_again_by_the_same_operation(
@@ -452,9 +461,11 @@ def test_a_failed_sermon_is_processed_again_by_the_same_operation(
 class YtDlpLike(FakeGateways):
     """Keeps a file it finds already downloaded, as yt-dlp does."""
 
-    def download_section(self, url: str, start: float, end: float, output: Path) -> Path:
+    def download_section(
+        self, url: str, start: float, end: float, output: Path, *, on_progress: OnProgress
+    ) -> Path:
         if not output.exists():
-            super().download_section(url, start, end, output)
+            super().download_section(url, start, end, output, on_progress=on_progress)
         return output
 
 

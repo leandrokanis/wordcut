@@ -14,6 +14,7 @@ from wordcut import processing, suggestion
 from wordcut.db import connect, transcripts
 from wordcut.db.tasks import TaskRow
 from wordcut.home import Home
+from wordcut.processing import OnProgress
 from wordcut.service.presets import build_prompt, default_preset
 from wordcut.service.sermons import create_sermon, show_sermon
 from wordcut.service.settings import store_llm_key, update_settings
@@ -46,16 +47,20 @@ class FakeLive:
 class FakeGateways:
     """Ten one-word sentences of 9.5 s each, every 10 s from 1000 s of the live."""
 
-    def download_section(self, url: str, start: float, end: float, output: Path) -> Path:
+    def download_section(
+        self, url: str, start: float, end: float, output: Path, *, on_progress: OnProgress
+    ) -> Path:
         return output
 
-    def download_audio_window(self, url: str, start: float, end: float, output: Path) -> Path:
+    def download_audio_window(
+        self, url: str, start: float, end: float, output: Path, *, on_progress: OnProgress
+    ) -> Path:
         return output
 
     def locate(self, recording: Path, clip: Path, expected_start: float, search: float) -> float:
         return expected_start
 
-    def transcribe(self, media: Path, workdir: Path) -> Transcript:
+    def transcribe(self, media: Path, workdir: Path, *, on_progress: OnProgress) -> Transcript:
         words = tuple(
             Word(f"Frase{number}.", 1000.0 + 10 * number, 1009.5 + 10 * number).shifted(
                 -SECTION_START

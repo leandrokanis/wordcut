@@ -1,4 +1,6 @@
 import subprocess
+import sys
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -7,7 +9,9 @@ import pytest
 from wordcut.errors import WordcutError
 from wordcut.processing import pipeline
 from wordcut.transcript import Transcript, Word
-from wordcut.youtube import YouTubeError
+from wordcut.youtube import YouTube, YouTubeError
+
+OnProgress = Callable[[float], None]
 
 LINK = "https://youtu.be/Ab3_x-9QzLk"
 LIVE_START = 1000.0
@@ -38,22 +42,35 @@ class FakeGateways:
     sync_offset: float = REAL_SECTION_START - (LIVE_START - 50)
     section_seconds: float = SECTION_SECONDS
     section_words: tuple[Word, ...] = in_section(*LIVE_WORDS)
+    section_progress: tuple[float, ...] = ()
+    window_progress: tuple[float, ...] = ()
+    transcription_progress: tuple[float, ...] = ()
     calls: list[tuple[object, ...]] = field(default_factory=list)
 
-    def download_section(self, url: str, start: float, end: float, output: Path) -> Path:
+    def download_section(
+        self, url: str, start: float, end: float, output: Path, *, on_progress: OnProgress
+    ) -> Path:
         self.calls.append(("download_section", url, start, end))
+        for fraction in self.section_progress:
+            on_progress(fraction)
         return output
 
-    def download_audio_window(self, url: str, start: float, end: float, output: Path) -> Path:
+    def download_audio_window(
+        self, url: str, start: float, end: float, output: Path, *, on_progress: OnProgress
+    ) -> Path:
         self.calls.append(("download_audio_window", url, start, end))
+        for fraction in self.window_progress:
+            on_progress(fraction)
         return output
 
     def locate(self, recording: Path, clip: Path, expected_start: float, search: float) -> float:
         self.calls.append(("locate", recording.name, clip.name, expected_start, search))
         return self.sync_offset
 
-    def transcribe(self, media: Path, workdir: Path) -> Transcript:
+    def transcribe(self, media: Path, workdir: Path, *, on_progress: OnProgress) -> Transcript:
         self.calls.append(("transcribe", media.name))
+        for fraction in self.transcription_progress:
+            on_progress(fraction)
         return Transcript(words=self.section_words, language="pt", model="fake")
 
     def duration(self, media: Path) -> float:
@@ -210,7 +227,9 @@ def test_a_cut_outside_the_downloaded_section_is_a_processing_error_without_a_cu
 
 
 class RefusedDownload(FakeGateways):
-    def download_audio_window(self, url: str, start: float, end: float, output: Path) -> Path:
+    def download_audio_window(
+        self, url: str, start: float, end: float, output: Path, *, on_progress: OnProgress
+    ) -> Path:
         raise YouTubeError("O YouTube recusou o pedido.")
 
 
@@ -231,7 +250,7 @@ def test_a_youtube_failure_is_a_youtube_error_with_exit_6(tmp_path: Path) -> Non
 class FailingTranscription(FakeGateways):
     failure: Exception = field(default_factory=lambda: FileNotFoundError("sem ambiente"))
 
-    def transcribe(self, media: Path, workdir: Path) -> Transcript:
+    def transcribe(self, media: Path, workdir: Path, *, on_progress: OnProgress) -> Transcript:
         raise self.failure
 
 
@@ -278,3 +297,100 @@ def test_progress_names_each_stage_in_portuguese_within_the_planned_fractions(
         (0.35, "transcrevendo"),
         (0.85, "cortando"),
     ]
+
+
+def heard_progress(gateways: FakeGateways, workdir: Path) -> list[tuple[float, str]]:
+    heard: list[tuple[float, str]] = []
+    pipeline.process(
+        gateways,
+        workdir,
+        LINK,
+        LIVE_START,
+        LIVE_END,
+        lambda fraction, message: heard.append((fraction, message)),
+        live_duration=LIVE_DURATION,
+    )
+    return heard
+
+
+def test_section_download_progress_rises_within_the_downloading_stage(tmp_path: Path) -> None:
+    heard = heard_progress(FakeGateways(section_progress=(0.5, 1.0)), tmp_path)
+
+    assert heard[:3] == [
+        (0.0, "baixando"),
+        (pytest.approx(0.14), "baixando"),
+        (pytest.approx(0.28), "baixando"),
+    ]
+
+
+def test_transcription_progress_rises_within_the_transcribing_stage(tmp_path: Path) -> None:
+    heard = heard_progress(FakeGateways(transcription_progress=(0.5,)), tmp_path)
+
+    assert heard[2:4] == [(0.35, "transcrevendo"), (pytest.approx(0.6), "transcrevendo")]
+
+
+def test_progress_beyond_the_whole_operation_stops_at_the_end_of_its_part(tmp_path: Path) -> None:
+    heard = heard_progress(FakeGateways(section_progress=(1.5,)), tmp_path)
+
+    assert heard[1] == (pytest.approx(0.28), "baixando")
+
+
+def test_progress_lower_than_what_was_reached_is_ignored(tmp_path: Path) -> None:
+    heard = heard_progress(FakeGateways(section_progress=(0.5, 0.25, 0.75)), tmp_path)
+
+    assert [fraction for fraction, message in heard if message == "baixando"] == [
+        0.0,
+        pytest.approx(0.14),
+        pytest.approx(0.21),
+    ]
+
+
+def test_the_audio_window_download_fills_the_end_of_the_downloading_stage(
+    tmp_path: Path,
+) -> None:
+    heard = heard_progress(
+        FakeGateways(section_progress=(1.0,), window_progress=(0.0, 0.5, 1.0)), tmp_path
+    )
+
+    assert [fraction for fraction, message in heard if message == "baixando"] == [
+        0.0,
+        pytest.approx(0.28),
+        pytest.approx(0.29),
+        pytest.approx(0.3),
+    ]
+
+
+@dataclass
+class SectionFromYtDlp(FakeGateways):
+    """Downloads the section through the real yt-dlp adapter, run as a process printing
+    what yt-dlp and its ffmpeg print for a section downloaded by a single ffmpeg."""
+
+    yt_dlp_lines: tuple[str, ...] = ()
+    cookies: Path = Path()
+
+    def download_section(
+        self, url: str, start: float, end: float, output: Path, *, on_progress: OnProgress
+    ) -> Path:
+        script = f"for line in {list(self.yt_dlp_lines)!r}:\n    print(line)"
+        source = YouTube(
+            cookies=self.cookies, ffmpeg_dir=None, program=(sys.executable, "-c", script)
+        )
+        return source.download_section(url, start, end, output, on_progress=on_progress)
+
+
+def test_section_downloaded_by_a_single_ffmpeg_reaches_the_end_of_its_part_before_the_window(
+    tmp_path: Path,
+) -> None:
+    cookies = tmp_path / "youtube-cookies.txt"
+    cookies.write_text("# fictício\n")
+    # The section asked around the borders is 160 s long (970 s to 1130 s of the live).
+    gateways = SectionFromYtDlp(
+        yt_dlp_lines=("out_time_us=80000000", "out_time_us=160000000", "wordcut-progress 9 9 NA"),
+        cookies=cookies,
+    )
+
+    heard = heard_progress(gateways, tmp_path)
+
+    assert max(fraction for fraction, message in heard if message == "baixando") == (
+        pytest.approx(0.28)
+    )

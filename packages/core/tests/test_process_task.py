@@ -6,11 +6,12 @@ from typing import Any
 import pytest
 
 from wordcut import processing
-from wordcut.db import connect
+from wordcut.db import connect, tasks
 from wordcut.home import Home
+from wordcut.processing import OnProgress
 from wordcut.service.sermons import create_sermon, show_sermon
 from wordcut.service.settings import update_settings
-from wordcut.tasks import BUILTIN_KIND_MODULES, Progress, Resource, kind
+from wordcut.tasks import BUILTIN_KIND_MODULES, Progress, Resource, execution, kind
 from wordcut.tasks.execution import start
 from wordcut.transcript import Transcript, Word
 from wordcut.youtube import LiveInfo
@@ -32,16 +33,20 @@ class FakeLive:
 
 
 class FakeGateways:
-    def download_section(self, url: str, start: float, end: float, output: Path) -> Path:
+    def download_section(
+        self, url: str, start: float, end: float, output: Path, *, on_progress: OnProgress
+    ) -> Path:
         return output
 
-    def download_audio_window(self, url: str, start: float, end: float, output: Path) -> Path:
+    def download_audio_window(
+        self, url: str, start: float, end: float, output: Path, *, on_progress: OnProgress
+    ) -> Path:
         return output
 
     def locate(self, recording: Path, clip: Path, expected_start: float, search: float) -> float:
         return expected_start
 
-    def transcribe(self, media: Path, workdir: Path) -> Transcript:
+    def transcribe(self, media: Path, workdir: Path, *, on_progress: OnProgress) -> Transcript:
         words = (Word("Irmãos", 1000.0, 1000.4), Word("Amém.", 1098.5, 1100.0))
         shifted = tuple(word.shifted(-SECTION_START) for word in words)
         return Transcript(words=shifted, language="pt", model="fake")
@@ -90,6 +95,37 @@ def test_the_task_reports_each_stage_up_to_saving(home: Home) -> None:
         (0.85, "cortando"),
         (0.95, "gravando"),
         (0.96, "sugerindo"),
+    ]
+
+
+class HalfwayDownload(FakeGateways):
+    def download_section(
+        self, url: str, start: float, end: float, output: Path, *, on_progress: OnProgress
+    ) -> Path:
+        on_progress(0.5)
+        return output
+
+
+def test_the_task_stores_progress_within_the_downloading_stage(
+    home: Home, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(processing, "default_gateways", lambda whisper_model: HalfwayDownload())
+    monkeypatch.setattr(execution, "PROGRESS_STORE_INTERVAL_SECONDS", 0.0)
+    sermon_id = trimmed_sermon(home)
+    stored: list[tuple[float, str | None]] = []
+
+    def read_stored(progress: Progress) -> None:
+        with closing(connect(home)) as connection:
+            task = tasks.by_id(connection, progress.task_id)
+        assert task is not None
+        stored.append((task.progress, task.progress_message))
+
+    run_task(home, sermon_id, detach=False, on_progress=read_stored)
+
+    assert stored[:3] == [
+        (0.0, "baixando"),
+        (pytest.approx(0.14), "baixando"),
+        (0.3, "sincronizando"),
     ]
 
 
